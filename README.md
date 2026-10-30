@@ -1,19 +1,36 @@
 # Point-of-Sale-System
 
-A restaurant **POS + Enterprise Management Console (EMC) + People Management + Inventory** platform. It is offline-first and cloud-ready (Firebase/Firestore), and its features are on par with Oracle MICROS Simphony.
+A cloud-native restaurant **POS + Enterprise Management Console (EMC) + People Management + Inventory** platform for Sri Lanka.
+- Built on Firebase/Firestore.
+- Multi-tenant, so it can be sold to many restaurants.
+- Features on par with Oracle MICROS Simphony, plus modern extras.
 
-> **Status:** Design phase. The documents below are drafts for review, and no application code exists yet.
+> **Status:** design approved (online-first). Development started: the calculation engine (`packages/engine`) is in place.
 
-## Delivery phases
-1. **Phase 1, Offline**: one POS machine with a local Store Hub. The restaurant runs fully without internet.
-2. **Phase 2, Online**: about a month after go-live, the existing database syncs to Firebase. EMC, People Management, Insights reports and WhatsApp reporting then move to the cloud. Selling is not interrupted.
-3. **Phase 3, Website and growth**: the restaurant website (online ordering, reservations and loyalty) connects to the POS and inventory.
+## Release plan
+1. **R1 Core POS go-live**: POS, EMC, People Management, IRD-format bills, cash, card, LankaQR and other tenders, End of Day, reports, WhatsApp EOD reports.
+2. **R2 Extended**: inventory module (recipes, FIFO), alerts, menu engineering, accounting export, digital receipts, remote monitoring.
+3. **R3 Product-ready**: platform admin for onboarding clients, QR ordering and pay (optional module).
+4. **R4 Website**: online ordering (optional).
 
 ## Design documents
-| # | Document | Contents |
-|---|----------|----------|
-| 01 | [Architecture](docs/01-architecture.md) | Local-first Store Hub, data model, offline→online sync and cutover, reliability, security, payments, tech stack |
-| 02 | [Core feature catalogue](docs/02-feature-catalog.md) | Simphony/EMC-parity scope: POS, tender media, cash, kitchen, People Management, inventory, reports |
-| 03 | [Proposed extra features](docs/03-proposed-features.md) | Optional features for you to choose (X01–X42) |
-| 04 | [Roadmap](docs/04-roadmap.md) | Milestones per phase |
-| 05 | [Open questions](docs/05-open-questions.md) | Answers needed to finalise the design |
+| # | Document |
+|---|----------|
+| 01 | [Architecture (online-first, multi-tenant)](docs/01-architecture.md) |
+| 02 | [Core feature catalogue](docs/02-feature-catalog.md) |
+| 03 | [Proposed / selected extra features](docs/03-proposed-features.md) |
+| 04 | [Roadmap](docs/04-roadmap.md) |
+| 05 | [Decisions log & remaining questions](docs/05-open-questions.md) |
+| 06 | [Sri Lanka tax & bill compliance](docs/06-sri-lanka-compliance.md) |
+| 07 | [Payments & hardware](docs/07-payments-and-hardware.md) |
+| 08 | [Accounting integration](docs/08-accounting-integration.md) |
+| 09 | [Running-cost plan & client proposal](docs/09-costing-proposal.md) |
+
+## Development
+```bash
+pnpm install
+pnpm test        # runs all package tests
+```
+| Package | Purpose |
+|---------|---------|
+| `packages/engine` | Money, check calculation (discounts, service charge, SSCL, VAT, inclusive/exclusive pricing, rounding), tenders and change, IRD invoice numbers |

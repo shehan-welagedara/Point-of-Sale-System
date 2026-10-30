@@ -1,6 +1,6 @@
-# 01 — Solution Architecture
+# 01 — Solution Architecture (Online-first, multi-tenant)
 
-> Status: **Draft for review**. This document proposes the architecture. Decisions marked **(Q#)** depend on answers in [05-open-questions.md](05-open-questions.md).
+> Status: **Revised after client decisions (2026-10-30)**. The offline phase is dropped: the product is **cloud-native on Firebase/Google Cloud** from day 1. It is built as a **multi-tenant SaaS product**: the first restaurant is tenant #1 and later restaurants are onboarded without code changes.
 
 ---
 
@@ -8,326 +8,227 @@
 
 | # | Goal | What it means in practice |
 |---|------|---------------------------|
-| G1 | **Never stop selling** | Orders, kitchen printing and payments keep working with no internet, no cloud, and even with the store server down (degraded mode). |
-| G2 | **Start with 1 terminal, scale to many** | The same software runs 1 terminal at 1 restaurant or 50 terminals across 20 restaurants. Growth needs no re-architecture. |
-| G3 | **Offline → Online is a sync, not a migration project** | Phase 1 (offline) and Phase 2 (online) use **the same data model, IDs and document paths**. Going online means switching on cloud sync and uploading the existing database. |
-| G4 | **One source of truth for calculations** | Check totals, taxes, discounts, service charges and inventory depletion come from one shared calculation engine. The POS, store server and cloud always agree to the cent. |
-| G5 | **Configurable, not customised** | Each restaurant is set up through EMC (menus, taxes, tenders, roles, layouts, printers, reports). Nothing per restaurant is hard-coded. |
-| G6 | **Secure and auditable** | Granular privileges, manager overrides, a full audit trail, and a tamper-evident transaction journal. PCI scope is kept small: card numbers never touch our system. |
-| G7 | **Apple-grade usability** | Simple, calm, touch-first UI. Common tasks take three taps or fewer. Light and dark modes. |
+| G1 | **Cloud-native, zero servers to manage** | Firebase (Firestore, Auth, Functions, Hosting, Storage). No on-premise server. A restaurant needs only a Windows PC, a printer and internet. |
+| G2 | **Keeps selling through short internet drops** | Not an "offline mode", but **resilience**: the POS keeps taking orders, printing bills and taking cash or card payments during an outage, and syncs automatically when the connection returns. |
+| G3 | **Product, not project** | One codebase serves every restaurant. Everything restaurant-specific is **configuration** in EMC: brand, logo, theme, menu, taxes, tenders, layouts, roles, modules. |
+| G4 | **One calculation engine** | Totals, service charge, SSCL, VAT, discounts and rounding come from one shared package (`@pos/engine`) used by the POS, the cloud and reports, so figures agree to the cent. |
+| G5 | **Sri Lanka compliant out of the box** | VAT/SSCL/service charge rules and the IRD tax-invoice format (Gazette 2481/22) are built in, with rates and rules editable and effective-dated. See [06-sri-lanka-compliance.md](06-sri-lanka-compliance.md). |
+| G6 | **Budget-friendly** | Runs on any Windows 10/11 PC and any ESC/POS thermal printer. A single restaurant's cloud usage stays largely inside Firebase's free tier. See [09-costing-proposal.md](09-costing-proposal.md). |
+| G7 | **Modular** | **Inventory**, **QR ordering (X01)**, **WhatsApp**, **accounting export** and the future **website** are licensable modules that can be switched on or off per tenant. |
+| G8 | **Apple-grade UX** | Calm, touch-first, light and dark modes, branded per restaurant. |
 
 ---
 
-## 2. Why Phase 1 cannot be "just Firestore offline mode"
-
-Firestore's offline persistence is a **client-side cache**, not a database of record. It is the wrong base for an offline POS because:
-
-- **No sharing between terminals over the LAN.** Without internet, terminal A cannot see a check opened on terminal B, and the KDS cannot see either one.
-- **No server-side logic offline.** There are no Cloud Functions, so no business-day close, report aggregation, inventory depletion or check-number allocation.
-- **Weak durability.** The cache can be evicted or cleared, and it has no backups.
-- **Limited querying** for reports over weeks or months of data.
-
-**Decision:** use a **local-first architecture with a Store Hub**, the same pattern as Simphony's CAPS / check-and-posting service. The Store Hub keeps a durable local database whose structure **mirrors the Firestore document model one-to-one**. Phase 2 adds a sync agent that replicates this data to Firebase. The Store Hub stays in place after go-live, which keeps the restaurant running through internet outages for good.
-
----
-
-## 3. System context
+## 2. System overview
 
 ```mermaid
 flowchart LR
-  subgraph Restaurant["Restaurant (LAN)"]
-    WS1["POS Workstation(s)<br/>Electron + React"]
-    HH["Handheld / Tablet POS<br/>(optional)"]
-    KDS["Kitchen Display(s)<br/>Web app"]
-    PRN["Printers / Cash drawer /<br/>Customer display / Card terminal"]
-    HUB["Store Hub<br/>Node.js + SQLite<br/>(local source of truth)"]
-    EMCL["EMC (local mode)<br/>served by Store Hub"]
-    WS1 <--> HUB
-    HH <--> HUB
-    KDS <--> HUB
-    WS1 --- PRN
-    HUB --- EMCL
+  subgraph Restaurant
+    POS["POS Terminal (Windows 10/11)<br/>POS Shell = Electron + React<br/>Firestore offline cache"]
+    PRN["ESC/POS printer(s)<br/>USB / Ethernet"]
+    CD["Cash drawer<br/>(via printer RJ11)"]
+    KDS["KDS screen (optional)<br/>browser"]
+    CARD["Bank card terminal<br/>(standalone)"]
+    POS --> PRN --> CD
   end
 
-  subgraph Cloud["Google Cloud / Firebase (Phase 2)"]
-    FS[(Firestore)]
-    AUTH[Firebase Auth]
-    CF[Cloud Functions / Cloud Run]
-    HOST[Firebase Hosting<br/>EMC + Insights]
-    BQ[(BigQuery<br/>analytics)]
-    GCS[Cloud Storage<br/>PDF reports, images, backups]
+  subgraph Firebase["Firebase / Google Cloud (asia-south1, Mumbai)"]
+    AUTH[Firebase Auth<br/>custom claims: tenant, role]
+    FS[(Firestore<br/>multi-tenant)]
+    CF[Cloud Functions 2nd gen<br/>triggers, scheduled jobs, webhooks]
+    HOST[Hosting<br/>EMC, Insights, QR menu]
+    GCS[Cloud Storage<br/>logos, images, PDFs, exports]
     SCH[Cloud Scheduler]
   end
 
-  HUB <-- "Sync agent<br/>(outbox up / config down)" --> FS
-  FS --> BQ
-  CF <--> FS
+  POS <--> FS
+  KDS <--> FS
+  POS --> AUTH
+  MGR["Owners / Managers<br/>EMC + Insights (any browser)"] --> HOST --> FS
   SCH --> CF
-  HOST --> FS
-
-  MGR["Managers<br/>EMC + Insights (web / mobile)"] --> HOST
-  CF --> WA["WhatsApp Business<br/>Cloud API"]
-  CF <--> IPG["Payment Gateway (IPG)"]
-  WEB["Restaurant Website /<br/>Online ordering (future)"] <--> CF
-  CF <--> ACC["Accounting / Payroll /<br/>Delivery platforms"]
+  FS <--> CF
+  CF --> WA["WhatsApp Cloud API<br/>(EOD reports, alerts)"]
+  CF <--> PH["PayHere<br/>(IPG, payment links, QR pay)"]
+  GUEST["Guest phone<br/>QR table ordering (X01)"] --> HOST
+  CF --> XL["Excel / CSV GL export<br/>→ accounting (Akaunting / ERPNext)"]
+  PADMIN["Platform Admin (you)<br/>tenants, licences, modules"] --> HOST
 ```
 
 ---
 
-## 4. Components
+## 3. Applications
 
-| Component | Purpose | Tech | Runs where |
-|-----------|---------|------|------------|
-| **POS Workstation** | Front-of-house ordering, payment, table management, cash and clock in/out | Electron + React + TypeScript; local SQLite cache | Touch PC at the counter (Q5) |
-| **Handheld POS** *(optional)* | Order and pay at the table | Same React app packaged for Android or iPad (Capacitor) or as a PWA | Tablets or handhelds |
-| **Store Hub** | Local source of truth: open checks, check numbering, kitchen routing, business day, totals, inventory depletion, backups, sync agent, local API | Node.js (Fastify) + SQLite in WAL mode; runs as a background service | Phase 1: on the same PC as the single POS. Later: optionally a dedicated mini-PC |
-| **KDS** | Kitchen and bar display: bump, recall, timers | React web app over WebSocket to the Hub | Any screen with a browser (Android TV box, tablet, PC) |
-| **EMC** (Enterprise Management Console) | All configuration: menu, taxes, tenders, layouts, devices, people management, inventory back office | React + Vite web app. **One codebase, two data adapters**: Hub API (Phase 1) and Firestore (Phase 2) | Phase 1: browser → Store Hub on the LAN. Phase 2: Firebase Hosting (cloud) |
-| **Insights** | Revenue and report portal for managers, mobile-first | React PWA (part of the EMC codebase, separate entry point) | Phase 1: LAN. Phase 2: cloud |
-| **Cloud backend** | Sync endpoint, aggregation, scheduled reports, WhatsApp, IPG webhooks, website/ordering API, integrations | Firestore, Cloud Functions (2nd gen) / Cloud Run, Auth, Storage, Scheduler, Pub/Sub, BigQuery, Secret Manager, App Check, FCM | Google Cloud (region to be confirmed, Q12) |
+| App | Users | Tech | Notes |
+|-----|-------|------|-------|
+| **POS** | Cashiers, servers, managers | React + TypeScript, packaged as the **POS Shell** (Electron) for Windows | The shell adds what browsers can't do: silent raw ESC/POS printing, cash drawer kick, auto-update, kiosk/full-screen lock, auto-start on boot, and a local durable invoice counter. |
+| **EMC** (Enterprise Management Console) | Owner, managers, admins | React + Vite on Firebase Hosting | Configuration, **user and role management (People Management)**, menu, taxes, tenders, devices, branding, inventory back office. |
+| **Insights** | Managers, owner | Same codebase as EMC, mobile-first PWA | Dashboards and reports (Daily Revenue, Item-wise, Covers, Sales, and more). |
+| **KDS** *(optional)* | Kitchen, bar | React web app | Any screen with a browser. Kitchen **printers** remain the default. |
+| **QR Order** *(X01, optional module)* | Guests | Lightweight web app on Hosting | Scan the table QR, view the menu (with allergens), order, and optionally pay with PayHere. |
+| **Platform Admin** | You, the vendor | Part of EMC, behind a super-admin claim | Onboard tenants, assign licences and modules, view usage and health, push updates. |
 
-### Why Electron for the workstation
-- It has the most mature support for **POS hardware**: ESC/POS receipt and kitchen printers over USB, serial or network; cash drawer kick; pole and customer displays; scales; barcode scanners; card terminal SDKs.
-- It uses **one language across the whole stack** (TypeScript), so the calculation engine is shared code.
-- It supports auto-update with rollback, a kiosk/lock-down mode, and dual-screen output for a customer display.
-- *Alternative:* Tauri (smaller footprint). It is worth revisiting once the hardware list is final (Q5).
-
----
-
-## 5. Deployment topologies
-
-**Phase 1 — Day 1 (single machine, offline)**
-```
-[ Touch PC ]
-  ├─ POS Workstation app
-  ├─ Store Hub service (SQLite)  ── nightly + hourly backup → USB/NAS drive
-  └─ EMC/Insights available at http://<pc-name>.local:8080 to any LAN device (manager laptop/phone)
-  + receipt printer, kitchen printer or KDS, cash drawer, card terminal
-```
-
-**Phase 1 — growing (more terminals, still offline)**: add terminals on the LAN and they connect to the Hub. Optionally move the Hub to a small dedicated PC with a UPS.
-
-**Phase 2 — Online**: the sync agent on the Hub connects to Firebase. EMC and Insights move to the cloud. The Hub keeps running locally, so internet outages do not affect service.
-
-**Multi-property (future)**: one Hub per restaurant and one cloud Enterprise. Configuration is inherited Enterprise → Zone → Property → Revenue Center, and enterprise-wide reporting comes from BigQuery.
+### Why a desktop "POS Shell" around a web app
+Browsers cannot silently send raw bytes to a USB receipt printer or open a cash drawer. The shell is a thin Electron wrapper (≈ 5% of the code) around the same React POS:
+- **Printing service** with three transports:
+  - **Windows spooler RAW** for any USB printer installed with its driver or "Generic / Text Only" (Epson TM-T82III, Xprinter, Rongta, Sewoo…).
+  - **TCP 9100** for Ethernet printers.
+  - **Serial/COM** for older devices.
+- **ESC/POS renderer** for receipts, VAT bills and kitchen chits: Sinhala/Tamil/English text, logo bitmap, QR codes (for feedback, PayHere and receipt links), cut, and **drawer kick** (`ESC p`).
+- **Auto-update** with staged rollout and rollback, a crash reporter, and remote diagnostics (X38).
+- *Fallback:* the POS also runs in plain Chrome or Edge with HTML printing, which suits tablets and demos.
 
 ---
 
-## 6. Data architecture
+## 4. Multi-tenancy (sell to many restaurants)
 
-### 6.1 One document model, two stores
-- Every entity is a **document** with a **Firestore-compatible path**, for example `orgs/{orgId}/properties/{propId}/checks/{checkId}`.
-- The Hub stores documents in SQLite as `(path, collection, id, json, version, updatedAt, deleted)`, with **generated indexed columns** for fields that are queried often (business date, RVC, status).
-- In Phase 2 each local document maps 1:1 to a Firestore document with **the same path and ID**. The initial upload is a straight copy and needs no transformation.
+- **Data isolation:** every document lives under `tenants/{tenantId}/…`. Firestore Security Rules require `request.auth.token.tenantId == tenantId` and check the user's privileges. Rules are covered by automated tests in the Firebase Emulator.
+- **Hierarchy per tenant:** Tenant (company) → Property (outlet) → Revenue Center (dining, bar, takeaway…) → Workstation. Configuration is **inherited down the hierarchy and can be overridden** at each level (as in Simphony).
+- **Licensing and modules:** `tenants/{id}.licence = { plan, terminals, modules: { inventory, qrOrdering, whatsapp, accounting, website } }`. The UI and Cloud Functions both respect the module flags.
+- **Branding per tenant:** logo, colours, fonts, receipt header and footer, and QR menu theme, all set in EMC.
+- **One deployment, many tenants.** The architecture also allows a **dedicated Firebase project per client** if a large client requires its own billing or isolation. The same code is deployed with a different config.
 
-### 6.2 Identity and numbering
-- **IDs are ULIDs**: globally unique, time-sortable, and generated on any device without coordination, so they work offline.
-- **Human-readable check numbers** come from **per-workstation ranges** (for example WS1 uses 1–4999 and WS2 uses 5000–9999; configurable). Two offline terminals can never issue the same number.
-- **Business date** is separate from calendar date. A check at 1:30 am belongs to the previous business day until End of Day runs.
+### Customising for each client: branch strategy
+You suggested a sub-branch per client. **I recommend against long-lived per-client branches.** They drift from `main`, every bug fix has to be merged N times, and within a few months clients end up on different, unmaintainable products. Instead:
 
-### 6.3 Data ownership: one writer per data type, so no sync conflicts
+| Need | Mechanism |
+|------|-----------|
+| Different menu, taxes, layouts, branding, receipts, reports | **Configuration** (EMC), with no code |
+| Feature on for some clients only | **Module or feature flags** per tenant |
+| Client-specific behaviour (special rule, integration) | **Extension points**: a `packages/extensions/<client>` plugin loaded by tenant config, still on `main` |
+| Client-specific deployment settings | `deploy/<client>/` config (Firebase project ID, region, domain) |
+| Pinning a client to a tested version | **Release tags** (`v1.4.2`) plus a per-tenant release channel (stable or beta) |
 
-| Data | Authored by | Flows | Mutability |
-|------|-------------|-------|------------|
-| Configuration (menu, prices, taxes, tenders, layouts, devices, roles) | EMC (Hub in Phase 1, cloud in Phase 2) | **Down** to Hub, then to workstations | Versioned and audited, with effective dates |
-| Employees and people records | EMC / People Management | Down | Versioned and audited |
-| Checks and transactions | POS → Hub | **Up** | Open checks change on the Hub; **closed checks are immutable** (corrections are new, linked transactions) |
-| Time and attendance punches | POS → Hub | Up | Append-only; edits are audited adjustments |
-| Inventory movements | POS depletion, receiving, transfers, counts, waste | Up (and down for cloud-entered documents) | **Append-only ledger**; stock on hand is derived |
-| Online orders (future) | Website/API → cloud | Down to Hub | State machine with versioned transitions |
+Short-lived `client/<name>/<feature>` branches are fine **while developing**. They merge back to `main` behind a flag.
 
-### 6.4 Money and calculation rules
-- All amounts are stored as **integers in minor units** (cents), so floating-point errors cannot occur.
-- One shared `@pos/engine` package computes item pricing, condiments, combos, discounts, service charges, taxes (inclusive or exclusive, compound, tax on service charge), rounding and tender change. The same code runs on the POS, the Hub and the cloud.
+---
 
-### 6.5 Configuration inheritance (Simphony-style)
-- The hierarchy is **Enterprise → Zone → Property → Revenue Center → Workstation**.
-- A record defined high up is inherited below it. A lower level can **override** chosen fields; for example, a bar RVC can price an item differently.
-- Changes can be **scheduled** (effective date and time) and published as **change sets** that can be rolled back.
+## 5. Data architecture
 
-### 6.6 Audit and tamper evidence
-- Every configuration change and privileged POS action (void, discount, reopen, refund, no-sale drawer open, price override) writes an **audit record**: who, approved by, when, where, before, after, and reason.
-- The closed-transaction journal is **hash-chained**: each record includes the hash of the previous one. Any later edit or deletion of history is detectable. This also prepares the system for fiscal or e-invoicing rules (Q2).
-
-### 6.7 Firestore layout (Phase 2 sketch)
+### 5.1 Firestore layout
 ```
-orgs/{orgId}
-  zones/{zoneId}
-  properties/{propId}
+platform/…                                  # vendor-level: plans, global templates
+tenants/{tenantId}                          # company profile, licence, branding, TIN/VAT no.
+  properties/{propId}                       # outlet: address, VAT reg., invoice settings, business-day rules
     revenueCenters/{rvcId}
-    workstations/{wsId}
-    devices/{deviceId}                 # printers, KDS, terminals
-    businessDays/{yyyy-mm-dd}
-      totals/{dimension}               # pre-aggregated: rvc, tender, family group, hour, employee
-    checks/{checkId}                   # closed checks (detail lines embedded; < 1 MB each)
-    timePunches/{punchId}
-    cashTills/{tillId}/movements/{id}
-    inventoryLedger/{movementId}
-  menuItems/{itemId}                   # master + definitions + prices with scope/overrides
-  condimentGroups/{id}  comboMeals/{id}  discounts/{id}  serviceCharges/{id}
-  taxRates/{id}  taxClasses/{id}  tenderMedia/{id}  orderTypes/{id}
-  roles/{roleId}  employees/{empId}  jobCodes/{id}
-  inventoryItems/{id}  vendors/{id}  recipes/{id}  purchaseOrders/{id}
+    workstations/{wsId}                     # invoice classification code, printers, cash drawer
+    devices/{deviceId}                      # printers, KDS
+    tables/{tableId}  floorPlans/{id}
+    checks/{checkId}                        # open + closed checks; lines, discounts, payments embedded
+    invoices/{invoiceNo}                    # immutable fiscal record for each issued bill
+    tills/{tillId}/movements/{id}           # float, pickups, paid-in/out, declarations
+    businessDays/{yyyy-mm-dd}               # status, EOD run, totals summary
+      totals/{dimension}                    # pre-aggregated by RVC, hour, tender, item, employee…
+    inventory/…                             # (module) locations, stockLevels, lots, ledger
+  menuItems/{id}  menuClasses/{id}  condimentGroups/{id}  combos/{id}
+  familyGroups/{id}  majorGroups/{id}  pages/{id} (touchscreen layouts)
+  taxRules/{id}  serviceCharges/{id}  discounts/{id}  tenderMedia/{id}  orderTypes/{id}  reasonCodes/{id}
+  roles/{roleId}                            # privilege matrix
+  users/{uid}                               # POS + EMC users: role per property, PIN hash, card id, status
+  inventoryItems/{id}  vendors/{id}  recipes/{id}  purchaseOrders/{id}  grns/{id}   # (module)
+  reportSchedules/{id}  waRecipients/{id}
   auditLog/{id}
-  config/changeSets/{id}
-```
-Hot counters (live sales totals) use **sharded counters or Function-side aggregation**, which avoids Firestore's limit of about 1 sustained write per second per document.
-
----
-
-## 7. Sync engine (Phase 2)
-
-**Upstream (Hub → cloud)**
-1. Every local write that must reach the cloud also inserts a row into an **`outbox`** table **in the same SQLite transaction**, so the write and its sync job can never diverge.
-2. The sync agent sends outbox rows in batches of up to 500 writes per Firestore batch, ordered per aggregate. It retries with exponential backoff.
-3. Writes are **idempotent** (deterministic IDs plus a version check), so retries never duplicate data.
-4. Health and lag (oldest unsynced item) appear in EMC and trigger alerts.
-
-**Downstream (cloud → Hub)**
-1. The Hub keeps Firestore listeners on configuration collections scoped to its property, with a checkpoint on `updatedAt`.
-2. Changes are applied locally, then pushed to workstations over WebSocket. Workstations hot-reload configuration between transactions, never during one.
-
-**Online orders (future website)**
-- The website writes orders to `incomingOrders`. The Hub listens, accepts them, and injects them into the POS and kitchen.
-- The Hub sends a **heartbeat**. If the restaurant is offline, the website automatically pauses online ordering.
-
----
-
-## 8. Phase 1 → Phase 2 cutover ("Cloud Link")
-
-A guided wizard in EMC, plus a runbook:
-
-1. **Prepare**: create the Firebase project (region per Q12), Auth tenant and service account; deploy rules, functions and indexes.
-2. **Register the property**: the Hub gets a device credential, stored in the OS keychain and backed by App Check / custom token.
-3. **Freeze configuration**: block EMC edits for a few minutes. Sales continue normally.
-4. **Initial upload**: the Hub streams all documents (configuration, employees, all historical checks, inventory ledger, audit log) to Firestore using the same paths and IDs. The upload can resume after interruptions.
-5. **Verify**: per-collection document counts and checksums, plus a business-day totals comparison between local and cloud reports.
-6. **Switch authority**: cloud EMC becomes the configuration master. Local EMC becomes read-only, with a "break-glass" local edit mode for emergencies.
-7. **Enable continuous sync**, WhatsApp reports, Insights in the cloud, and IPG online flows.
-8. **Rollback plan**: until sign-off, local EMC can retake authority. Nothing on the Hub is deleted.
-
-Downtime for selling: **none**.
-
----
-
-## 9. Reliability: failure matrix
-
-| Failure | Impact | Behaviour |
-|---------|--------|-----------|
-| Internet down | None for selling | Sync queues locally. IPG/online payments and WhatsApp are unavailable until it returns (cash and card terminal still work if the terminal has its own connection, Q6). |
-| Cloud outage | None for selling | Same as above. |
-| Store Hub down | Degraded | Workstations switch to **standalone mode**: they keep selling from their local config cache and journal, then reconcile automatically with the Hub. Cross-terminal check sharing pauses. |
-| Workstation crash or power loss | One terminal | Open checks live on the Hub, so another terminal picks them up. SQLite WAL means no torn writes. A UPS is recommended. |
-| Disk failure on Hub | Serious | Hourly snapshots to USB/NAS, and continuous cloud replication in Phase 2. Restore runbook targets under 30 minutes. |
-| Kitchen printer offline | Kitchen | Automatic **backup device routing**, an alert on the POS, and a reprint queue. |
-| Bad software update | All terminals | Staged rollout and one-click rollback to the previous version. |
-
-Targets (proposed): ≤ 2 s from tender to receipt; ≤ 1 s from order send to KDS on the LAN; zero data loss on single-component failure.
-
----
-
-## 10. Security
-
-- **POS sign-in**: employee ID with PIN, and/or an NFC/magnetic employee card (biometric optional). PINs are hashed with Argon2. Auto sign-out after inactivity.
-- **EMC and Insights**: Firebase Auth (email/password or Google Workspace SSO) with **MFA for administrators**.
-- **Authorisation**: role-based **privilege matrix** (hundreds of granular options, as in Simphony) with optional per-location scoping. Enforced on the Hub and in Firestore Security Rules through custom claims.
-- **Manager override**: a manager swipe or PIN at the POS, with an approval reason and threshold rules (for example, discounts above 20% need a manager).
-- **PCI DSS**: semi-integrated card terminals and hosted IPG pages, so the system **never stores, processes or transmits card numbers**; only tokens and masked references.
-- **Secrets** live in Google Secret Manager, the cloud is protected by App Check, data is encrypted at rest and in transit (TLS on the LAN as well), and the audit log is immutable.
-- **Privacy**: customer data is consent-tracked, with data export and delete capability.
-
----
-
-## 11. Payments architecture (tender media)
-
-```
-POS → Tender Media (configured in EMC) → Payment Driver (plugin) → Provider
 ```
 
-| Driver | Examples | Offline? |
-|--------|----------|----------|
-| `cash` | Local or foreign currency, denominations, rounding | ✅ |
-| `card-integrated` | Bank card terminal through a semi-integrated SDK (amount is sent to the terminal automatically, with approval code and masked PAN returned) | Depends on the terminal (Q6) |
-| `card-manual` | Standalone terminal; the cashier keys in the approval code | ✅ |
-| `ipg` | Payment link, QR on the receipt or customer display, pay-at-table, online orders (hosted page + webhook) | ❌ needs internet |
-| `wallet-qr` | Local QR / mobile wallet schemes (Q6) | ❌ |
-| `voucher` / `gift-card` | Internal stored value with serial numbers and balance | ✅ (local ledger) |
-| `house-account` | Credit customers / city ledger with credit limits and statements | ✅ |
-| `room-charge` | Hotel PMS posting (if needed, Q3) | Depends on the PMS |
-| `comp` / `staff-meal` / `officer-check` | Non-revenue tenders with authorisation | ✅ |
-| `loyalty-points` | Points redemption | ✅ / cloud |
-| `bank-transfer` / `cheque` | Reference required | ✅ |
+### 5.2 Key rules
+- **IDs** are ULIDs generated on the device, so they work even during an internet drop.
+- **Money** is stored as integers in **cents (LKR × 100)**. No floating-point arithmetic is used for money.
+- **Closed checks and invoices are immutable.** Refunds, voids after close and adjustments are new linked documents.
+- **Business date** is separate from calendar date, so a check closed at 1 am belongs to the previous day until End of Day runs.
+- **Audit log** records every configuration change and every privileged POS action: who, approver, when, terminal, before, after, and reason.
+- **Hot-document protection:** live sales totals are aggregated by Cloud Functions into `businessDays/*/totals`. The POS never writes a shared counter, which keeps it within Firestore's limit of about 1 write per second per document.
 
-**Settlement and reconciliation**
-- Split and partial tenders, deposits and advances, and refunds to the original tender.
-- End-of-day **card batch settlement** with integrated terminals.
-- An **IPG reconciliation** report matches gateway settlement files or APIs against POS tenders.
-- **Cash declaration** (blind count), with over/short by till or employee.
+### 5.3 Fiscal invoice numbering (works during an internet drop)
+The IRD format is `YYMMM_QQQQ_XXXXX` (see [06](06-sri-lanka-compliance.md)). We set the classification code **QQQQ per workstation or outlet** (for example `26OCT_W01_1234`). Each terminal then owns its own gap-free sequence:
+- It keeps a durable local counter (in the POS Shell) **and** mirrors it in Firestore (`workstations/{ws}.invoiceSeq`).
+- No round-trip to the server is needed to print a valid bill, so an internet drop never blocks billing or creates duplicates.
+- If a terminal is replaced, the new one resumes from the cloud value. If it cannot, a manager must confirm the starting number, and that action is audited.
 
 ---
 
-## 12. Integrations
+## 6. Resilience during internet drops (no offline phase)
 
-| Integration | Approach | Phase |
-|-------------|----------|-------|
-| **WhatsApp reports and alerts** | WhatsApp Business Platform (Meta Cloud API): approved message templates, a PDF report sent as a document message, scheduled through Cloud Scheduler. Optional two-way bot for managers. | 2 (Phase 1 is possible if the PC has internet, Q4) |
-| **Restaurant website / online ordering** | Public **Ordering API** (Cloud Run): published menu with channel-specific prices and availability, real-time 86 and stock, cart, IPG checkout, order injection to the Hub. The website can be any framework (Next.js recommended). | 3 |
-| **Accounting** | Daily GL journal export (sales by revenue account, taxes, tenders, COGS from inventory) through an API or CSV (Q9) | 2 |
-| **Payroll** | Hours by job code and pay rate, overtime and tips export | 2 |
-| **Delivery platforms** | Order injection API, menu sync, 86 sync | 3 |
-| **Tax authority / e-invoicing** | Country-specific fiscal module (Q2) | As required |
-| **BigQuery / Looker Studio** | Firestore → BigQuery stream, for custom analytics | 2 |
+| Situation | Behaviour |
+|-----------|-----------|
+| Internet drops (minutes to hours) | Firestore **persistent cache** keeps menu and configuration available. New checks, orders, kitchen chits, bills (with valid invoice numbers) and cash or standalone-card payments all continue. Writes queue locally and **sync automatically** when the connection returns. A banner shows "Offline – 12 changes waiting". |
+| What pauses during a drop | PayHere and online payments, QR ordering, WhatsApp, live Insights. Cloud-side jobs (inventory FIFO valuation, aggregations) catch up once the connection is back. |
+| Multiple terminals during a drop | Each terminal keeps working on its own checks. Sharing open checks between terminals resumes when the connection returns (Firestore needs the cloud to relay changes). |
+| PC failure | All data is already in the cloud. Install the POS Shell on any PC, sign in, and carry on. |
+| Printer failure | Route to a backup printer, alert the user, and keep a reprint queue. |
+
+**Recommendation for the client:** a **4G router with automatic failover** (a cheap one-off cost) in addition to fibre. With it, internet drops become practically invisible.
 
 ---
 
-## 13. Tech stack summary
+## 7. Cloud Functions (backend logic)
+
+| Function | Trigger | Purpose |
+|----------|---------|---------|
+| `onCheckClosed` | Firestore write | Re-verifies totals with `@pos/engine` (anti-tampering), writes the invoice record, updates aggregates, queues inventory depletion |
+| `inventoryDepletion` | Every 2–5 min plus on demand | Explodes recipes (including sub-recipes and modifiers) and consumes **FIFO lots** inside transactions, writing ledger entries with exact cost |
+| `endOfDay` | Scheduler (per property, configurable time) or manual | Closes the business day, checks for open checks and undeclared tills, generates the PDF reports, sends them on **WhatsApp** to managers, and writes the accounting export |
+| `alerts` | Firestore triggers | X18 exception alerts: voids or discounts over threshold, cash variance, low stock, EOD not run, terminal offline |
+| `payhereNotify` | HTTPS webhook | Verifies PayHere's MD5 signature and marks the check payment as settled |
+| `accountingExport` | EOD and on demand | Daily GL journal written to Excel/CSV, plus optional push to Akaunting or ERPNext |
+| `userAdmin` | Callable | Creates users, sets custom claims (tenant, roles, properties), PIN reset, disable |
+| `qrOrder` | Callable | Validates QR orders, prices them server-side, and injects them into the POS kitchen flow |
+
+---
+
+## 8. Security
+
+- **EMC/Insights sign-in:** Firebase Auth with email and password or Google, plus **MFA for owners and admins**.
+- **POS sign-in:** the terminal itself is registered to the property with a device credential. Employees then sign in on it with **ID + PIN** or a **swipe/NFC card**. PINs are hashed server-side.
+- **Privileges:** a role-based privilege matrix (voids, discounts, refunds, reopen, no-sale, price override, reports, each EMC area…), scoped per property. Manager override at the POS is recorded with a reason.
+- **Firestore Security Rules** enforce tenant isolation and privileges. Sensitive operations (users, invoice issue, refunds) run in Cloud Functions.
+- **App Check** blocks API abuse. Secrets (PayHere merchant secret, WhatsApp token) live in **Secret Manager**.
+- **No card data is ever stored.** Card terminals are standalone and PayHere uses its hosted checkout, which keeps PCI scope minimal.
+
+---
+
+## 9. Tech stack
 
 | Layer | Choice |
 |-------|--------|
-| Language | TypeScript everywhere (strict) |
-| Monorepo | pnpm workspaces + Turborepo |
-| POS UI | React 19, Zustand (state), TanStack Query, Tailwind CSS + Radix UI primitives, Framer Motion |
-| POS shell | Electron (auto-update, kiosk mode, hardware access) |
-| Local DB | SQLite (better-sqlite3, WAL) on Hub and workstations |
-| Hub | Node.js 22 LTS, Fastify, WebSocket, Zod validation |
-| Cloud | Firebase: Firestore, Auth, Hosting, Cloud Functions 2nd gen / Cloud Run, Storage, Scheduler, Pub/Sub, Secret Manager, App Check, FCM; BigQuery |
-| Reports | Server-rendered PDF (React-PDF / headless Chromium) + Excel (ExcelJS) |
-| Testing | Vitest (engine, 100% coverage target), Playwright (E2E), Firebase Emulator Suite (rules and functions) |
-| CI/CD | GitHub Actions → signed installers, Firebase deploy, staged rollout |
-| Observability | Structured logs → Cloud Logging, Sentry-style crash reporting, Hub health heartbeat |
+| Language | TypeScript (strict) everywhere |
+| Monorepo | pnpm workspaces |
+| UI | React 19, Vite, Tailwind CSS, Radix UI primitives, Framer Motion, Zustand, TanStack Query |
+| POS Shell | Electron (Windows x64; installer plus auto-update) |
+| Backend | Firebase: Firestore (Native, `asia-south1`), Auth, Cloud Functions 2nd gen (Node 22), Hosting, Storage, Scheduler, Secret Manager, App Check |
+| PDFs and Excel | pdf-lib / React-PDF; ExcelJS |
+| Messaging | WhatsApp Business Platform, called directly through the Cloud API (no middle-man fees) |
+| Payments | PayHere (Checkout API, Payment Links, Notify webhook), LankaQR (bank-issued), standalone bank card terminal |
+| Tests | Vitest (engine), Firebase Emulator (rules and functions), Playwright (end-to-end) |
+| CI/CD | GitHub Actions to Firebase deploy and signed Windows installer |
 
 ---
 
-## 14. Proposed repository structure
+## 10. Repository structure
 
 ```
 apps/
-  pos/            Electron + React workstation (and handheld build)
-  hub/            Store Hub service (local API, sync agent, device router, EOD)
-  emc/            EMC + Insights web app (Hub or Firestore adapter)
-  kds/            Kitchen display web app
-  functions/      Firebase Cloud Functions / Cloud Run services (Phase 2)
+  pos/            React POS (runs in the shell or a browser)
+  pos-shell/      Electron wrapper: printing, cash drawer, updates, local invoice counter
+  emc/            EMC + Insights + Platform Admin
+  kds/            Kitchen display (optional)
+  qr-order/       Guest QR ordering (X01 module)
+  functions/      Cloud Functions
 packages/
-  engine/         Pricing, tax, discount, service charge, tender & inventory-depletion engine (pure TS)
-  domain/         Entity types, Zod schemas, privilege catalogue, enums
-  data/           Repository interfaces + SQLite and Firestore adapters
-  sync/           Outbox/inbox sync engine
-  devices/        ESC/POS printing, cash drawer, customer display, scale, payment-terminal drivers
-  ui/             Design system (tokens, components, icons)
-  reports/        Report definitions (shared by local and cloud)
-  i18n/           Translations
-docs/             Architecture, feature catalogue, roadmap, decisions (ADRs)
+  engine/         Pricing, Sri Lanka tax engine, discounts, service charge, rounding, invoice numbers   ← built first
+  domain/         Entity types, Zod schemas, privilege catalogue
+  printing/       ESC/POS receipt and chit renderer (Sinhala/Tamil/English)
+  ui/             Design system
+  reports/        Report definitions (shared by Insights and the PDF/WhatsApp generator)
+firebase/         firestore.rules, indexes, storage.rules
+deploy/<client>/  Per-client deployment config (no code)
+docs/
 ```
 
 ---
 
-## 15. UX and design system (Apple-like)
-
-- **Typography**: system font stack (SF Pro on Apple devices, Inter elsewhere), clear hierarchy, generous whitespace.
-- **Touch first**: targets of at least 44×44 pt, no hover-only actions, gestures as shortcuts but never as the only path.
-- **Calm surfaces**: translucent "frosted" headers, soft shadows, rounded corners (12–16 px), restrained colour; colour is used for **status** (table states, KDS timers), not decoration.
-- **Speed**: optimistic UI, sub-100 ms tap response, no full-screen reloads.
-- **Progressive disclosure**: everyday screens stay simple, and power options sit one tap deeper.
-- **Configurable layouts**: an EMC **touchscreen designer** (drag-and-drop pages, keys, colours and images) per RVC, order type or role.
-- **Accessibility**: WCAG 2.2 AA contrast, dynamic text size, light and dark modes, multi-language with RTL-ready layouts.
-- **Consistent patterns** across POS, KDS, EMC and Insights from one `@pos/ui` package.
+## 11. UX principles (Apple-like)
+- Use the system font (Segoe UI Variable on Windows, SF on Apple), generous spacing, rounded 12–16 px surfaces, soft depth, and restrained colour. Colour is reserved for status and the tenant brand accent.
+- Touch targets are at least 44 px. Common tasks (order → send → pay → print) take three taps or fewer, with no modal stacks.
+- Use progressive disclosure: the main screens stay simple and power options sit one step deeper.
+- Support light and dark modes and per-tenant theming (logo, accent colour) from EMC.
+- Provide a drag-and-drop touchscreen designer for POS pages per RVC and role.
+- UI languages are English first, with Sinhala and Tamil ready. Receipts are multi-language.

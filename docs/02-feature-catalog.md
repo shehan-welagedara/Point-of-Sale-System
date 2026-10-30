@@ -3,7 +3,8 @@
 > This is the **baseline scope**. It matches the functional capabilities of Oracle MICROS Simphony, EMC, Simphony People Management and MICROS Inventory, rebuilt with our own design, naming and code.
 > Optional extras for you to choose from are in [03-proposed-features.md](03-proposed-features.md).
 >
-> Phase key: **P1** = Offline go-live · **P2** = Online · **P3** = Website and growth
+> Release key (revised 2026-10-30, online-first): **P1** = Core product (first restaurant go-live) · **P2** = Extended release · **P3** = Website & growth. See [04-roadmap.md](04-roadmap.md).
+> Scope note: **People Management = user accounts, roles, privileges and access control** (as in Simphony). HR features such as payroll, scheduling and leave are **out of scope**.
 
 ---
 
@@ -15,14 +16,14 @@
 | Inheritance and override of any record down the hierarchy | P1 |
 | Property parameters (business date rules, currency, rounding, receipt headers and trailers, logo) | P1 |
 | RVC parameters (table service or fast transaction, default order type, auto service charge, check-close rules) | P1 |
-| Workstation configuration (devices, default RVC, check-number range, offline behaviour, customer display) | P1 |
+| Workstation configuration (devices, default RVC, invoice classification code, customer display) | P1 |
 | **Touchscreen designer**: drag-and-drop pages, keys, colours, images, per RVC, order type or role | P1 |
 | Effective dates and scheduled changes (for example a price change starting Monday 06:00) | P1 |
 | Change sets with publish, preview, rollback and version history | P1 |
 | Bulk edit, copy record, import and export (Excel/CSV) | P1 |
 | Full audit log (who, what, when, before, after) with search | P1 |
 | Multi-language record names (receipt, kitchen and online names) | P1 |
-| Cloud EMC with multi-property management | P2 |
+| Multi-property / multi-tenant management, Platform Admin (licences, modules) | P2 |
 
 ## B. Menu management
 
@@ -65,9 +66,9 @@
 | Manager override and authorisation prompts | P1 |
 | Fast transaction (quick service) mode and table service mode per RVC | P1 |
 | Customer display (order lines, totals, promo images, payment QR) | P1 |
-| Receipt options: print, email, WhatsApp, or no receipt | P1 print · P2 digital |
+| **Printed bill per IRD format (always)** + optional digital receipt via WhatsApp/email (X06) | P1 print · P2 digital |
 | Training mode (sandbox, excluded from totals) | P1 |
-| Workstation offline (standalone) mode with automatic reconciliation | P1 |
+| Resilience to short internet drops (Firestore offline cache, queued sync, local invoice sequence) | P1 |
 | Check info lines, memo items, kitchen notes (free-text special requests) | P1 |
 
 ## D. Tender media and payment settlement
@@ -76,10 +77,10 @@
 |---------|-------|
 | Configurable **tender media** with options: open drawer, require amount, allow change/over-tender, max amount, require reference, privilege needed, tips allowed, post to till, report group | P1 |
 | Cash (local and **foreign currency** with exchange rates, change in local currency, denomination buttons, cash rounding) | P1 |
-| **Integrated card terminal** (semi-integrated: amount pushed, approval returned) | P1 (provider per Q6) |
+| Card via standalone bank terminal (approval code captured); semi-integration if the bank offers an ECR protocol | P1 |
 | Manual/standalone card (approval code entry) | P1 |
-| **IPG**: payment link, QR on bill or customer display, pay-at-table, online orders; webhook confirmation | P2 (P1 if internet) |
-| Mobile wallets / local QR payment schemes | P2 (Q6) |
+| **PayHere IPG**: payment links, QR pay-at-table (X01), online orders; webhook confirmation | P2 |
+| **LankaQR** (bank merchant QR) with reference capture | P1 |
 | **Split tender**, partial payment, **deposits and advances**, refunds to original tender | P1 |
 | **Gift vouchers / gift cards** (serials, balances, expiry, redemption, partial redemption) | P1 |
 | **House accounts / city ledger** (credit customers, limits, statements, payments received) | P1 |
@@ -120,45 +121,45 @@
 | X report (mid-day) and Z report (closing) | P1 |
 | Scheduled autosequences (for example 03:00 daily) | P1 |
 
-## H. People Management (Simphony People Management equivalent)
+## H. People Management (user accounts and access control, as in Simphony)
 
 | Feature | Phase |
 |---------|-------|
-| **Employee records**: personal, contact, emergency contact, photo, ID numbers, documents (upload) | P1 |
-| **Employment details**: hire date, status (active, on leave, terminated), department, location(s), job codes, pay rates (hourly or salary), overtime rules, probation, notes | P1 |
-| **Roles / employee classes** with a granular **privilege matrix** (hundreds of options: void, discount, refund, reopen, no-sale, transfer, reports, EMC areas…) | P1 |
-| Per-location and per-RVC access (operator records) | P1 |
-| **EMC users vs POS employees**: one person record can have both, with separate permissions | P1 |
-| PIN / card assignment and reset; auto-disable on termination | P1 |
-| **Time and attendance**: punches, breaks, edits with reason and audit, approval | P1 |
-| Labour reports: hours, overtime, labour cost %, by job code/department | P1 |
-| Tip declaration and tip reports | P1 |
-| Payroll export | P2 |
-| **Centralised cloud management** of all employees across all restaurants | P2 |
+| **User records**: name, employee no., photo, contact, status (active, suspended, terminated), properties they may work at | P1 |
+| **One identity, two access types**: POS sign-in (ID + PIN / NFC card) and EMC/Insights sign-in (email + password + MFA) | P1 |
+| **Roles / employee classes** with a granular **privilege matrix** (void, discount, refund, reopen, no-sale, price override, transfer, reports, each EMC area…) | P1 |
+| Per-property / per-RVC role assignment (operator records) | P1 |
+| Manager override rules (which privileges a manager may authorise for others; thresholds) | P1 |
+| PIN / card assignment and reset; instant disable on termination (all sessions revoked) | P1 |
+| Clock in/out at the POS (attendance only; optional) and simple hours report | P2 |
+| Login history and privileged-action audit per user | P1 |
+| Centralised management of users across all outlets / tenants | P2 |
 
-## I. Inventory and stock management
+## I. Inventory and stock management (optional licensable module)
+
+> Switched on or off per tenant. When it is off, the POS and EMC hide every inventory screen and no depletion runs. Inventory follows the core go-live as release **P2**.
 
 | Feature | Phase |
 |---------|-------|
-| **Stock item master**: categories, SKU/barcode, storage conditions, shelf life | P1 |
-| **Units of measure with conversions** (purchase unit → stock unit → recipe unit, e.g. case of 12 × 1 L → ml) | P1 |
-| **Multiple storage locations** (main store, kitchen, bar, cold room) with **transfers / requisitions** between them | P1 |
-| **Vendors** and vendor items (pack sizes, prices, lead times, minimum order) | P1 |
-| **Purchasing workflow**: requisition → purchase order → approval → send to vendor | P1 |
-| **Receiving / GRN**: partial receipts, price variance flags, credit notes, returns to vendor | P1 |
-| **Recipes / bills of materials** with sub-recipes (sauces, prep items), yield % and waste % | P1 |
-| **Real-time depletion** from POS sales, including condiments and combos | P1 |
-| **Production / batch prep** (convert raw items into prep items) | P1 |
-| **Waste / spoilage** recording with reasons | P1 |
-| **Stock counts**: full and cycle counts, count sheets by location/shelf order, blind counts, mobile counting | P1 |
-| **Variance**: actual vs theoretical usage, with cost impact | P1 |
-| **Costing**: weighted average (default), FIFO or last price (configurable) | P1 |
-| **Par levels, reorder points**, automatic order suggestions | P1 |
-| **Recipe costing and food cost %** per menu item; margin analysis | P1 |
+| **Stock item master**: categories, SKU/barcode, storage conditions, shelf life | P2 |
+| **Units of measure with conversions** (purchase unit → stock unit → recipe unit, e.g. case of 12 × 1 L → ml) | P2 |
+| **Multiple storage locations** (main store, kitchen, bar, cold room) with **transfers / requisitions** between them | P2 |
+| **Vendors** and vendor items (pack sizes, prices, lead times, minimum order) | P2 |
+| **Purchasing workflow**: requisition → purchase order → approval → send to vendor | P2 |
+| **Receiving / GRN**: partial receipts, price variance flags, credit notes, returns to vendor | P2 |
+| **Recipes / bills of materials** with sub-recipes (sauces, prep items), yield % and waste % | P2 |
+| **Real-time depletion** from POS sales, including condiments and combos | P2 |
+| **Production / batch prep** (convert raw items into prep items) | P2 |
+| **Waste / spoilage** recording with reasons | P2 |
+| **Stock counts**: full and cycle counts, count sheets by location/shelf order, blind counts, mobile counting | P2 |
+| **Variance**: actual vs theoretical usage, with cost impact | P2 |
+| **Costing: FIFO** (lot-based; client decision), with weighted average available as an option | P2 |
+| **Par levels, reorder points**, automatic order suggestions | P2 |
+| **Recipe costing and food cost %** per menu item; margin analysis | P2 |
 | Batch/lot and expiry tracking | P1 (optional) |
-| Low-stock alerts (POS, EMC, WhatsApp) | P1 / P2 |
-| Stock valuation, movement history, period close | P1 |
-| Link to **86**: stock running out can auto-86 a menu item | P1 |
+| Low-stock alerts (POS, EMC, WhatsApp) | P2 |
+| Stock valuation, movement history, period close | P2 |
+| Link to **86**: stock running out can auto-86 a menu item | P2 |
 
 ## J. Reporting and analytics (Insights web portal)
 
@@ -171,7 +172,7 @@
 | **Operations** | Covers, average check, table turn time, speed of service, open checks | P1 |
 | **Cash** | Till, cash-up, over/short, paid-in/out, pickups | P1 |
 | **Employee & labour** | Sales per server, tips, hours, labour %, sales per labour hour | P1 |
-| **Inventory** | Stock on hand, valuation, variance, usage, waste, purchases, vendor performance, food cost | P1 |
+| **Inventory** (module) | Stock on hand, valuation, variance, usage, waste, purchases, vendor performance, food cost | P2 |
 | **Enterprise** | Multi-property roll-ups, rankings | P2 |
 | Formats: on-screen, PDF, Excel, CSV; **scheduled delivery** (email, **WhatsApp**) | | P1 / P2 |
 | **Live dashboard** (today's sales, covers, avg check, top items, open checks, labour %), mobile-friendly | | P1 (LAN) / P2 (anywhere) |
@@ -180,8 +181,8 @@
 
 | Feature | Phase |
 |---------|-------|
-| Scheduled reports (e.g. End-of-Day summary + PDF at 23:30, weekly report on Monday 08:00) to configurable recipient lists | P2 |
-| Real-time alerts (see [03-proposed-features.md](03-proposed-features.md) X18) | P2 |
+| **End-of-Day reports to managers** (Daily Revenue, Item-wise, Covers, Sales) as PDF on WhatsApp, to configurable recipient lists | P1 (once the WhatsApp number is verified) |
+| Real-time exception alerts (X18 ✅ selected) | P2 |
 | Manager self-service bot ("today sales", "top items", "stock of X") | P2 (optional X17) |
 
 ## L. System administration

@@ -1,8 +1,24 @@
 # 03 — Proposed Additional Features (for your selection)
 
-These go **beyond** Simphony/EMC parity. Please reply with the IDs you want and a priority, for example:
+These go **beyond** Simphony/EMC parity.
 
-> `X01 yes P2, X04 later, X17 yes, X36 no`
+## ✅ Client selection (2026-10-30)
+| ID | Decision | Notes |
+|----|----------|-------|
+| X01 | ✅ **Optional module** | QR table ordering & pay-at-table, sold as an add-on |
+| X06 | ✅ Selected | Digital receipt **in addition to** the printed IRD-format bill, which is always printed |
+| X11 | ❌ Not needed | |
+| X14 | ✅ Selected | Allergen alerts (P1) |
+| X18 | ✅ Selected | Real-time exception alerts via WhatsApp/EMC |
+| X21 | ✅ Selected | Menu engineering matrix |
+| X27 | ✅ Selected | Excel accounting workbook + open-source connector, see [08](08-accounting-integration.md) |
+| X34 | ✅ Selected | Mobile stock count (inventory module) |
+| X36 | ✅ Implied | Multi-tenant SaaS: the product will be sold to other restaurants |
+| X38 | ✅ Selected | Remote device monitoring & OTA updates |
+| X03 | ⏸ Last phase | Website online ordering (pickup/delivery) on Firebase, after the core product is deployed |
+| Others | Not now | Can be revisited for later releases |
+
+---
 
 **My recommendation** column: ★★★ = strongly recommended · ★★ = valuable · ★ = nice to have.
 

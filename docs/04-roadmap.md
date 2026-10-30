@@ -1,71 +1,73 @@
-# 04 — Delivery Roadmap
+# 04 — Delivery Roadmap (revised 2026-10-30: online-first)
 
-Durations are left out on purpose. They depend on the answers in [05-open-questions.md](05-open-questions.md) and on the features you choose in [03-proposed-features.md](03-proposed-features.md). Once those are settled, each milestone will get an estimate.
+## ⚠️ The restaurant opens next week, but the system won't be ready by then
+A production POS that prints legally compliant bills, handles money and has been tested on real hardware **cannot responsibly go live in one week**. Rushing it risks wrong bills, lost sales data and staff losing trust in the system on day one.
+
+**Recommended interim plan for the first weeks:**
+- Use a numbered bill book or a simple free POS app (for example on a tablet) for the opening weeks, plus cash, LankaQR and the bank's card terminal.
+- If the business is **not VAT-registered at opening** (likely for a new business below the threshold; confirm with the accountant), simple bills are sufficient during this period.
+- Meanwhile we build and test Release 1, and the client completes the set-up checklist in [09 §7](09-costing-proposal.md): Google account, Meta/WhatsApp verification, PayHere, bank and hardware. **Several of those approvals take days, so they should start now.**
+- Sales from the interim period can be imported as opening history if wanted.
+
+Estimates assume steady development and timely access to the client's hardware and accounts.
 
 ---
 
-## Phase 0: Discovery and design
-- Confirm the requirements (open questions) and the feature selection.
-- Finalise the hardware list and order test devices: printer, cash drawer, card terminal.
-- Get sandbox access from the card terminal provider and the IPG provider.
-- Design clickable UX prototypes for the POS order screen, payment, floor plan, KDS, the main EMC screens and the Insights dashboard.
-- Record architecture decisions (ADRs) for the open choices, such as Electron vs Tauri and the costing method.
-- **Exit:** signed-off scope, prototypes and hardware.
+## Release 1: Core POS go-live (target ≈ 4–6 weeks)
 
-## Phase 1: Offline go-live (Store Hub + single POS)
+**R1.1 Foundation**
+- Monorepo, CI, design system.
+- **`@pos/engine`**: pricing, Sri Lanka taxes, discounts, service charge, rounding, invoice numbers. ✅ started.
+- Firebase project, Auth, multi-tenant Firestore model, Security Rules with tests.
 
-**M1. Foundation**
-- Set up the monorepo, CI, design system (`@pos/ui`), domain schemas and the calculation engine with full unit tests.
-- Build the Store Hub: SQLite document store, local API, WebSocket push, audit log and backups.
+**R1.2 EMC essentials**
+- Tenant, property, RVC and workstation setup.
+- **Branding**: logo, colours, bill header and footer.
+- Legal entity, TIN and invoice settings.
+- Menu items, modifiers/condiments, combos, prices, serving periods.
+- Tax rules, service charge, discounts, tender media, reason codes.
+- **People Management**: users, roles, privilege matrix, PIN/card.
+- Printer setup and touchscreen pages (template-based first; the drag-and-drop designer follows in R2).
 
-**M2. EMC (local) for configuration and People Management**
-- Hierarchy, property, RVC and workstation setup.
-- Menu, condiments, combos, prices, taxes, discounts, service charges and tender media.
-- Roles with the privilege matrix, employees, job codes.
-- Touchscreen designer and device and printer setup.
+**R1.3 POS**
+- Sign-in, order types, tables and floor plan, checks, seats and courses.
+- Send to kitchen (printer routing).
+- Split, merge, transfer, void and refund with reasons; discounts; manager override; allergen alerts (X14).
+- **Tenders**: cash (with foreign currency), card (standalone terminal), LankaQR, vouchers, house account, comp.
+- **IRD-format bill printing** (VAT and non-VAT modes), cash drawer kick.
+- Resilience to internet drops.
 
-**M3. POS core**
-- Sign-in, clock in/out, order types, checks, seats, courses, hold & fire.
-- Split, merge, transfer, void and refund with reason codes.
-- Table management and floor plan.
-- Cash and card tenders, foreign currency, vouchers, house accounts.
-- Receipt and kitchen printing, cash drawer, customer display.
+**R1.4 POS Shell**
+- Electron wrapper with ESC/POS printing over USB, Ethernet or serial (tested on the Epson TM-T82III and one budget printer), cash drawer, kiosk mode, auto-update.
 
-**M4. Kitchen, cash management and End of Day**
-- KDS, routing and backup devices.
-- Tills, pickups, paid-in/out, blind declaration.
-- EOD autosequence with X/Z reports.
+**R1.5 End of Day and reports**
+- Business day, cash declaration, EOD autosequence.
+- **Daily Revenue, Item-wise, Covers and Sales reports**, plus Tenders, Discounts and Voids.
+- Insights dashboard.
+- **EOD WhatsApp PDF to managers** (as soon as Meta approves the number and templates).
 
-**M5. Inventory**
-- Items, units of measure, locations, vendors.
-- Requisition → PO → GRN; recipes and real-time depletion.
-- Counts, waste, transfers, variance and costing.
+**R1.6 Go-live**
+- Load the client's menu, verify bills with the accountant, train staff, run a supervised first service, then a hyper-care week.
 
-**M6. Reports and Insights (LAN)**
-- Core sales, financial, control, labour and inventory reports with PDF and Excel export.
-- Live dashboard.
+## Release 2: Extended (≈ 4–6 weeks after R1)
+- **Inventory module** (optional per tenant):
+  - Items, units of measure, locations, vendors.
+  - Recipes and sub-recipes with **real-time depletion**, **FIFO** lots and costing.
+  - Requisitions → POs → GRN; transfers, waste, production.
+  - Stock counts and the **mobile stock count app (X34)**.
+  - Variance, valuation, par levels and reorder suggestions, low-stock alerts.
+- **X18 real-time exception alerts** (WhatsApp and EMC).
+- **X21 menu engineering**.
+- **X27 Excel accounting workbook** (with an ERPNext connector as a follow-up).
+- **X06 digital receipts** (WhatsApp/email) in addition to the printed bill.
+- **X38 remote device monitoring**, staged OTA rollout.
+- Touchscreen drag-and-drop designer; KDS (optional); attendance clock in/out (optional).
 
-**M7. Hardening and go-live**
-- Failure drills: pull the network cable, kill the Hub, cut power.
-- Performance tests, a dry run with real menu data, staff training material.
-- Install on site, run a supervised first service, keep a hyper-care period.
+## Release 3: Product-ready for selling
+- **Platform Admin**: tenant onboarding wizard, licences and module flags, usage dashboard.
+- Menu and recipe Excel import templates, demo tenant, documentation and training videos.
+- **X01 QR table ordering & PayHere pay-at-table** (optional module).
+- Hardening: load tests, security review, backups and export, status page.
 
-**Go-live checklist (excerpt):** menu loaded and verified, tax and service charge checked against manual calculations, printers routed, card terminal certified, backups tested by a real restore, UPS installed, manager accounts created, EOD time set.
-
-## Stabilisation month (restaurant runs on Phase 1)
-- Collect feedback and ship fixes and small improvements through OTA updates.
-- Prepare the Firebase project in parallel: rules, functions, indexes and BigQuery.
-
-## Phase 2: Online (Cloud Link)
-- Run the **Cloud Link cutover** described in [01-architecture.md §8](01-architecture.md#8-phase-1--phase-2-cutover-cloud-link): upload the whole existing database, verify it and switch configuration authority to the cloud. Selling never stops.
-- Cloud EMC and centralised People Management; Insights available anywhere.
-- WhatsApp scheduled reports and alerts.
-- IPG online flows: payment links, QR, pay-at-table.
-- BigQuery analytics, accounting and payroll exports.
-- The P2 extras you select (for example X01, X06, X18, X23).
-
-## Phase 3: Website and growth
-- Public Ordering API and the website integration (online ordering, real-time menu and 86, IPG checkout).
-- Reservations, loyalty and CRM, delivery platforms.
-- AI forecasting and anomaly detection.
-- Multi-property expansion, plus multi-tenant SaaS if wanted (Q1).
+## Release 4: Website (optional, last)
+- Firebase-hosted restaurant website with **online ordering (pickup or delivery)**, real-time menu and stock, PayHere checkout, and orders flowing straight into the POS and kitchen.
