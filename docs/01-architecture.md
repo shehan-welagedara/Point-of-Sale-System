@@ -161,6 +161,13 @@ The IRD format is `YYMMM_QQQQ_XXXXX` (see [06](06-sri-lanka-compliance.md)). We 
 
 ## 7. Cloud Functions (backend logic)
 
+> **Implementation status (2026-11-03):** the current build runs **without Cloud Functions**. That keeps demos and small clients inside the free tier.
+> - Business logic runs in `@pos/core` on the device and is protected by Firestore security rules (`firebase/firestore.rules`, tested on the emulator).
+> - Day totals are aggregated when each check closes, and stock depletion runs in batches (End of Day).
+> - Printing goes through the **Print Agent** (`apps/print-agent`) instead of the POS Shell.
+>
+> The functions below are added when integrations go live (PayHere notify, WhatsApp sending, scheduled EOD, server-side PIN checks).
+
 | Function | Trigger | Purpose |
 |----------|---------|---------|
 | `onCheckClosed` | Firestore write | Re-verifies totals with `@pos/engine` (anti-tampering), writes the invoice record, updates aggregates, queues inventory depletion |

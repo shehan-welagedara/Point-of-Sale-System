@@ -1,0 +1,35 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "dailyStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "businessDate", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "members",
+      "fieldPath": "uid",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    { "collectionGroup": "printJobs", "fieldPath": "expireAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "printJobs", "fieldPath": "doc", "indexes": [] },
+    { "collectionGroup": "checks", "fieldPath": "lines", "indexes": [] },
+    { "collectionGroup": "checks", "fieldPath": "totals", "indexes": [] },
+    { "collectionGroup": "checks", "fieldPath": "payments", "indexes": [] },
+    { "collectionGroup": "invoices", "fieldPath": "totals", "indexes": [] },
+    { "collectionGroup": "dailyStats", "fieldPath": "items", "indexes": [] },
+    { "collectionGroup": "dailyStats", "fieldPath": "categories", "indexes": [] },
+    { "collectionGroup": "dailyStats", "fieldPath": "hours", "indexes": [] },
+    { "collectionGroup": "dailyStats", "fieldPath": "tenders", "indexes": [] },
+    { "collectionGroup": "stockLevels", "fieldPath": "lots", "indexes": [] },
+    { "collectionGroup": "stockMovements", "fieldPath": "lines", "indexes": [] },
+    { "collectionGroup": "settings", "fieldPath": "logoDataUrl", "indexes": [] }
+  ]
+}

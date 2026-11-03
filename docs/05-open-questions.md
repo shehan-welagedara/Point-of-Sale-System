@@ -19,7 +19,19 @@
 | D14 | Repository | This repo. **One `main` product with configuration, feature flags and extension packages per client** (instead of long-lived client branches; reasoning in [01 §4](01-architecture.md)). |
 | D15 | Selected extras | X01 (optional), X06, X14, X18, X21, X27, X34, X38. Not X11. |
 
-## Remaining questions
+## Decisions (2026-11-03)
+| # | Topic | Decision |
+|---|-------|----------|
+| D16 | Environments | The code base and your demo environment live in **your** Firebase project (Blaze, kept within the free tier, see [10](10-firebase-free-tier.md)). Each client is deployed to **their own** Firebase project. |
+| D17 | Demo tax profile | Sample restaurant is **VAT-registered, not SSCL-liable**. Real details are entered per client at deployment. |
+| D18 | Payments & integrations | PayHere and LankaQR (and WhatsApp, accounting connectors) built as **templates with sample data in mock mode**; live integration later. |
+| D19 | Branding | No confirmed assets yet: sample brand; logo, colours and bill text configurable per client in EMC → Branding. |
+| D20 | Data feeding | Menu, prices, modifiers, stock items and recipes are maintained in **Excel data feeders** and imported. |
+| D21 | One database, chosen modules | POS, recipes and costing, inventory and purchasing (ERP), accounting, CRM and revenue reports share one database; each client gets only the modules they buy (*Setup → Modules*, enforced by security rules). |
+| D22 | Hardware | Two models in the same system: **dedicated** (Windows PC / POS terminal) and **mobility** (tablets). Both print physical bills and KOTs through the **Print Agent**. |
+| D23 | Market | Built for the Sri Lankan client market first (LKR, IRD invoice format, VAT/SSCL/SC, LankaQR, PayHere, Sinhala/Tamil item names). |
+
+## Remaining questions (as of 2026-10-30; items 1, 2, 4 and 6 are now covered by sample data or D16–D19)
 1. **VAT and SSCL status at opening:** is the restaurant VAT-registered and/or SSCL-liable from day 1? I need the registered name, address and TIN for the bill header.
 2. **Service charge:** confirm the % and whether it applies to takeaway and delivery. Are menu prices **inclusive or exclusive** of taxes?
 3. **Opening plan:** given next week's opening, will you use an interim arrangement for the first weeks (see [04](04-roadmap.md))?

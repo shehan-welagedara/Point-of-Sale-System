@@ -1,5 +1,24 @@
 # 04 — Delivery Roadmap (revised 2026-10-30: online-first)
 
+## Status (2026-11-03)
+Built and demo-ready:
+- **R1 core POS:**
+  - POS for dedicated terminals and tablets, with IRD tax invoices, tenders, KOT routing, X/Z reports and End of Day.
+  - EMC configuration, People Management and branding.
+  - Reports and WhatsApp EOD (simulated).
+- **R2 extended:**
+  - Inventory with FIFO, recipe depletion, purchasing, counts, waste, transfers and production; recipes and costing.
+  - Accounting journals, P&L and Excel export; menu engineering; CRM and loyalty.
+- **R3 platform:**
+  - Multi-tenant businesses with modules per client, security rules (tested on the emulator), invitations, Excel data feeders and the Print Agent.
+
+Still to do:
+- Live PayHere and WhatsApp (needs Cloud Functions and approved accounts).
+- Refunds of closed checks (credit notes), cash declaration per till, KDS screen, drag-and-drop screen designer, QR ordering (X01).
+- Accounting connectors (ERPNext/Akaunting), the POS Shell desktop wrapper.
+- Website (R4).
+
+
 ## ⚠️ The restaurant opens next week, but the system won't be ready by then
 A production POS that prints legally compliant bills, handles money and has been tested on real hardware **cannot responsibly go live in one week**. Rushing it risks wrong bills, lost sales data and staff losing trust in the system on day one.
 

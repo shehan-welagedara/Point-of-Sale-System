@@ -73,18 +73,26 @@ export class FirestoreStore implements DocStore {
     await deleteDoc(this.ref(col, id));
   }
 
+  /**
+   * Atomic for up to CHUNK writes (closing a check is 4–6). Security rules may make at most 20
+   * document lookups per batched write, so bigger jobs (imports, demo data) are committed as
+   * several small batches, a few in parallel.
+   */
   async batch(ops: WriteOp[]): Promise<void> {
-    // Firestore allows 500 writes per batch.
-    for (let i = 0; i < ops.length; i += 450) {
+    const CHUNK = 9;
+    const chunks: WriteOp[][] = [];
+    for (let i = 0; i < ops.length; i += CHUNK) chunks.push(ops.slice(i, i + CHUNK));
+    const commit = async (part: WriteOp[]) => {
       const b = writeBatch(this.db);
-      for (const op of ops.slice(i, i + 450)) {
+      for (const op of part) {
         if (op.op === "set") b.set(this.ref(op.col, op.data.id), op.data as DocumentData);
         else if (op.op === "merge") b.set(this.ref(op.col, op.id), op.data, { merge: true });
         else if (op.op === "increment") b.set(this.ref(op.col, op.id), { ...(op.base ?? {}), id: op.id, ...toIncrements(op.inc) }, { merge: true });
         else b.delete(this.ref(op.col, op.id));
       }
       await b.commit();
-    }
+    };
+    for (let i = 0; i < chunks.length; i += 6) await Promise.all(chunks.slice(i, i + 6).map(commit));
   }
 
   watch<T>(col: string, q: Query | undefined, cb: (docs: T[]) => void): () => void {

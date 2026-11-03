@@ -198,7 +198,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [mode, openLocal]);
 
   // ── Firebase mode ──
+  // While a tenant is being created and seeded, auth events must not switch to it half-written.
+  const creating = useRef(false);
   const loadMemberships = useCallback(async (u: AppUser) => {
+    if (creating.current) return;
     const { db } = firebase();
     const snap = await getDocs(query(collectionGroup(db, "members"), where("uid", "==", u.uid)));
     const ms = snap.docs.map((d) => ({ tenantId: String(d.data().tenantId), role: d.data().role as MemberRole }));
@@ -292,16 +295,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!user) throw new Error("sign in first");
-      const { db } = firebase();
-      const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "tenant"}-${Math.random().toString(36).slice(2, 7)}`;
-      const t: Tenant = { id, name, ownerUid: user.uid, modules: sample?.modules ?? { pos: true, tables: true, recipes: true, revenue: true }, plan: withSample ? "demo" : "starter", status: "active", createdAt: now };
-      const b = writeBatch(db);
-      b.set(doc(db, "tenants", id), t);
-      b.set(doc(db, "tenants", id, "members", user.uid), { id: user.uid, uid: user.uid, email: user.email, name: user.name, role: "owner", tenantId: id, createdAt: now });
-      await b.commit();
-      const fs = new FirestoreStore(db, id);
-      await fs.batch(configOps);
-      localStorage.setItem("pos-suite.activeTenant", id);
+      creating.current = true;
+      try {
+        const { db } = firebase();
+        const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "tenant"}-${Math.random().toString(36).slice(2, 7)}`;
+        const t: Tenant = { id, name, ownerUid: user.uid, modules: sample?.modules ?? { pos: true, tables: true, recipes: true, revenue: true }, plan: withSample ? "demo" : "starter", status: "active", createdAt: now };
+        const b = writeBatch(db);
+        b.set(doc(db, "tenants", id), t);
+        b.set(doc(db, "tenants", id, "members", user.uid), { id: user.uid, uid: user.uid, email: user.email, name: user.name, role: "owner", tenantId: id, createdAt: now });
+        await b.commit();
+        const fs = new FirestoreStore(db, id);
+        await fs.batch(configOps);
+        localStorage.setItem("pos-suite.activeTenant", id);
+      } finally {
+        creating.current = false;
+      }
       await loadMemberships(user);
     },
     [mode, user, openLocal, loadMemberships],

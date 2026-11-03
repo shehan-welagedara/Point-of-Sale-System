@@ -1,0 +1,154 @@
+rules_version = '2';
+
+// Multi-tenant POS Suite rules.
+// - Every business is a tenant: tenants/{tenantId}/... ; only its members can read it.
+// - A member's role (owner, admin, manager, accountant, storekeeper, viewer, terminal) decides writes.
+// - Licensed modules (tenants/{id}.modules) gate writes to ERP / finance / CRM collections.
+// - Closed checks and issued invoices are immutable (tax records).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function tenantPath(t) { return /databases/$(database)/documents/tenants/$(t); }
+    function memberPath(t) { return /databases/$(database)/documents/tenants/$(t)/members/$(request.auth.uid); }
+    // One document lookup per check: rules may make at most 10 (20 per batch) lookups.
+    function isMember(t) { return signedIn() && exists(memberPath(t)); }
+    function hasRole(t, roles) { return signedIn() && get(memberPath(t)).data.role in roles; }
+    function isAdmin(t) { return hasRole(t, ['owner', 'admin']); }
+    function isManager(t) { return hasRole(t, ['owner', 'admin', 'manager']); }
+    function canPos(t) { return hasRole(t, ['owner', 'admin', 'manager', 'terminal']); }
+    function canStock(t) { return hasRole(t, ['owner', 'admin', 'manager', 'storekeeper']); }
+    function canBooks(t) { return hasRole(t, ['owner', 'admin', 'accountant']); }
+    function moduleOn(t, m) { return get(tenantPath(t)).data.modules.get(m, false) == true; }
+    function isPlatformAdmin() { return signedIn() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)); }
+    function idMatches(id) { return !('id' in request.resource.data) || request.resource.data.id == id; }
+    function onlyChanges(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    // Platform administrators (the software vendor) are listed here by hand in the console.
+    match /platformAdmins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Invitations are keyed by lower-case email; the invited person can read and accept theirs.
+    match /invites/{email} {
+      allow read: if signedIn() && request.auth.token.email != null && request.auth.token.email.lower() == email;
+      allow create, update: if isAdmin(request.resource.data.tenantId) && request.resource.data.role != 'owner';
+      allow delete: if (signedIn() && request.auth.token.email != null && request.auth.token.email.lower() == email) || isAdmin(resource.data.tenantId);
+    }
+
+    // Lets a signed-in user find the tenants they belong to (collection-group query on members.uid).
+    match /{path=**}/members/{uid} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /tenants/{t} {
+      allow read: if isMember(t) || isPlatformAdmin();
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.id == t;
+      allow update: if (isAdmin(t) && request.resource.data.ownerUid == resource.data.ownerUid) || isPlatformAdmin();
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow read: if isMember(t);
+        // Owner joining their new tenant (same batch as the tenant), an accepted invite, or an admin.
+        allow create: if signedIn() && uid == request.auth.uid && request.resource.data.uid == uid && request.resource.data.tenantId == t && (
+                          (request.resource.data.role == 'owner' && getAfter(tenantPath(t)).data.ownerUid == request.auth.uid)
+                       || (request.auth.token.email != null
+                           && exists(/databases/$(database)/documents/invites/$(request.auth.token.email.lower()))
+                           && get(/databases/$(database)/documents/invites/$(request.auth.token.email.lower())).data.tenantId == t
+                           && get(/databases/$(database)/documents/invites/$(request.auth.token.email.lower())).data.role == request.resource.data.role)
+                       )
+                       || (isAdmin(t) && request.resource.data.role != 'owner');
+        allow update: if isAdmin(t) && resource.data.role != 'owner' && request.resource.data.role != 'owner' && onlyChanges(['role', 'name', 'staffId']);
+        allow delete: if isAdmin(t) && resource.data.role != 'owner';
+      }
+
+      // ── Configuration (back office) ──
+      match /settings/{id} { allow read: if isMember(t); allow write: if (isManager(t) || (id == 'accounting' && canBooks(t))) && idMatches(id); }
+      match /properties/{id} { allow read: if isMember(t); allow write: if isAdmin(t) && idMatches(id); }
+      match /revenueCenters/{id} { allow read: if isMember(t); allow write: if isAdmin(t) && idMatches(id); }
+      match /workstations/{id} { allow read: if isMember(t); allow write: if isAdmin(t) && idMatches(id); }
+      match /printers/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /tables/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /orderTypes/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /menuCategories/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /modifierGroups/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /discounts/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /reasonCodes/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /tenderMedia/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /roles/{id} { allow read: if isMember(t); allow write: if isAdmin(t) && idMatches(id); }
+      match /staff/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /budgets/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /menuItems/{id} {
+        allow read: if isMember(t);
+        // Terminals may only mark items out of stock (86) or back on sale.
+        allow create, delete: if isManager(t);
+        allow update: if isManager(t) || (canPos(t) && onlyChanges(['available'])) || (canStock(t) && onlyChanges(['cost']));
+      }
+
+      // ── Selling ──
+      match /checks/{id} {
+        allow read: if isMember(t);
+        allow create: if canPos(t) && idMatches(id);
+        // Open checks change freely; a closed check only gets its stock-deduction flag updated.
+        allow update: if (canPos(t) && resource.data.status == 'open')
+                      || ((canPos(t) || canStock(t)) && onlyChanges(['depletion']));
+        allow delete: if false;
+      }
+      match /invoices/{id} {
+        allow read: if isMember(t);
+        allow create: if canPos(t) && request.resource.data.id == id;
+        allow update, delete: if false;
+      }
+      match /sequences/{id} { allow read: if isMember(t); allow write: if canPos(t); }
+      match /dailyStats/{id} { allow read: if isMember(t); allow write: if canPos(t); }
+      match /printJobs/{id} {
+        allow read: if isMember(t);
+        allow create: if isMember(t) && request.resource.data.status == 'queued';
+        allow update: if isMember(t) && onlyChanges(['status', 'error', 'printedAt', 'agentId']);
+        allow delete: if isManager(t);
+      }
+      match /messageLog/{id} { allow read: if isManager(t) || canBooks(t); allow create: if isMember(t); allow update, delete: if false; }
+      match /audit/{id} { allow read: if isManager(t); allow create: if isMember(t); allow update, delete: if false; }
+
+      // ── Customers (CRM module) ──
+      match /customers/{id} {
+        allow read: if isMember(t);
+        allow write: if moduleOn(t, 'crm') && (isManager(t) || canPos(t));
+      }
+
+      // ── Inventory & purchasing (ERP modules) ──
+      match /inventoryItems/{id} { allow read: if isMember(t); allow write: if (moduleOn(t, 'inventory') || moduleOn(t, 'recipes')) && canStock(t) && idMatches(id); }
+      match /recipes/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'recipes') && canStock(t) && idMatches(id); }
+      match /locations/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'inventory') && isManager(t); }
+      match /vendors/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'purchasing') && canStock(t); }
+      match /purchaseOrders/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'purchasing') && canStock(t); }
+      match /goodsReceipts/{id} {
+        allow read: if isMember(t);
+        allow create: if moduleOn(t, 'purchasing') && canStock(t);
+        allow update: if moduleOn(t, 'purchasing') && canStock(t) && resource.data.status != 'posted';
+        allow delete: if moduleOn(t, 'purchasing') && canStock(t) && resource.data.status != 'posted';
+      }
+      match /stockLevels/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'inventory') && (canStock(t) || canPos(t)); }
+      match /stockMovements/{id} {
+        allow read: if isMember(t);
+        allow create: if moduleOn(t, 'inventory') && (canStock(t) || canPos(t));
+        allow update, delete: if false;
+      }
+      match /stockCounts/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'inventory') && canStock(t); }
+
+      // ── Accounting module ──
+      match /accounts/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'accounting') && canBooks(t); }
+      match /journals/{id} {
+        allow read: if canBooks(t) || isManager(t);
+        allow create, update: if moduleOn(t, 'accounting') && (canBooks(t) || canPos(t));
+        allow delete: if moduleOn(t, 'accounting') && canBooks(t);
+      }
+
+      // Anything not listed above is closed.
+      match /{other=**} {
+        allow read, write: if false;
+      }
+    }
+  }
+}
