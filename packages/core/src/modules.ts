@@ -36,7 +36,7 @@ export const MODULES: readonly ModuleInfo[] = [
   { key: "recipes", name: "Recipes & Costing", group: "ERP", description: "Recipes, sub-recipes (prep items), portion cost, food cost % and gross profit per item.", requires: [], status: "available" },
   { key: "inventory", name: "Inventory", group: "ERP", description: "Stock by location with FIFO lots, recipe-based depletion from sales, waste, counts, transfers, valuation.", requires: ["recipes"], status: "available" },
   { key: "purchasing", name: "Purchasing", group: "ERP", description: "Vendors, purchase orders, goods receipts (GRN) with input VAT.", requires: ["inventory"], status: "available" },
-  { key: "accounting", name: "Accounting", group: "Finance", description: "Chart of accounts, automatic daily journals, P&L and VAT/SSCL summary, Excel export.", requires: [], status: "available" },
+  { key: "accounting", name: "Accounting", group: "Finance", description: "Full general ledger (ERPNext design, S/4HANA-style universal journal): POS day posting, payables with 3-way match, receivables, bank reconciliation, fixed assets, budgets, period close, SLFRS statements, maker-checker approvals and the audit trail.", requires: [], status: "available" },
   { key: "crm", name: "Customers (CRM)", group: "Customers", description: "Customer profiles, visit and spend history, tags, business buyers for VAT invoices.", requires: [], status: "available" },
   { key: "loyalty", name: "Loyalty", group: "Customers", description: "Points on spend and redemption.", requires: ["crm"], status: "available" },
   { key: "revenue", name: "Revenue Management", group: "Insights", description: "Dashboards, menu engineering, targets and trading analysis.", requires: [], status: "available" },

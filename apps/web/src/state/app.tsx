@@ -16,8 +16,11 @@ import {
   MemoryStore,
   allModulesOn,
   isOn,
+  newId,
 } from "@pos/core";
-import { buildSampleStore, sampleSettings } from "@pos/sample-data";
+import { type Actor, type LedgerRequest, UNAUDITED, makeAuditEvent, runLedgerRequest, storeRunner } from "@pos/ledger";
+import { DEMO_PEOPLE, buildSampleStore, sampleSettings } from "@pos/sample-data";
+import { httpsCallable } from "firebase/functions";
 import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from "firebase/auth";
 import { collectionGroup, doc, getDoc, getDocs, onSnapshot, query, setDoc, where, writeBatch } from "firebase/firestore";
 import { firebase, firebaseConfigured } from "../lib/firebase";
@@ -80,6 +83,14 @@ interface AppState {
   saveSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => Promise<void>;
   resetLocalDemo: () => void;
   acceptInvite: () => Promise<boolean>;
+  /** Local demo: which demo person you are acting as (to show segregation of duties). */
+  persona: keyof typeof DEMO_PEOPLE;
+  setPersona: (p: keyof typeof DEMO_PEOPLE) => void;
+  actor: Actor | null;
+  /** Server-side ledger operation: Cloud Functions in Firebase mode, the same code locally. */
+  ledger: <T = unknown>(req: LedgerRequest) => Promise<T>;
+  /** Display name for a user id (members, demo people). */
+  personName: (uid: string | undefined) => string;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -158,6 +169,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── Local demo mode: one tenant persisted in this browser ──
   const localStore = useRef<MemoryStore | null>(null);
   const localTenant = useRef<Tenant | null>(null);
+  const [persona, setPersonaState] = useState<keyof typeof DEMO_PEOPLE>(() => {
+    try {
+      const p = localStorage.getItem("pos-suite.persona");
+      return p && p in DEMO_PEOPLE ? (p as keyof typeof DEMO_PEOPLE) : "owner";
+    } catch {
+      return "owner";
+    }
+  });
+  const personaRef = useRef(persona);
+  personaRef.current = persona;
   const openLocal = useCallback((save: LocalSave | null) => {
     if (!save) {
       setTenant(null);
@@ -179,6 +200,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }, 300);
     };
+    // Local audit trail: the same field-level events the Cloud Functions trigger records.
+    m.onWrite = (w) => {
+      if (UNAUDITED.has(w.col)) return;
+      const who = DEMO_PEOPLE[personaRef.current];
+      void makeAuditEvent({ id: newId(), at: new Date().toISOString(), actorType: "user", actorId: who.uid, actorSource: "stamp", collection: w.col, docId: w.id, before: w.before, after: w.after }).then((e) => {
+        if (e) void m.set("auditEvents", e);
+      });
+    };
     localStore.current = m;
     setTenant(save.tenant);
     setTenants([save.tenant]);
@@ -188,14 +217,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (mode !== "local") return;
-    setUser({ uid: "local-owner", email: "demo@local", name: "Demo owner" });
+    const who = DEMO_PEOPLE[persona];
+    setUser({ uid: who.uid, email: `${persona}@demo.local`, name: who.name });
     try {
       const raw = localStorage.getItem(LOCAL_KEY);
       openLocal(raw ? (JSON.parse(raw) as LocalSave) : null);
     } catch {
       openLocal(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, openLocal]);
+
+  useEffect(() => {
+    if (mode !== "local") return;
+    const who = DEMO_PEOPLE[persona];
+    setUser({ uid: who.uid, email: `${persona}@demo.local`, name: who.name });
+  }, [mode, persona]);
 
   // ── Firebase mode ──
   // While a tenant is being created and seeded, auth events must not switch to it half-written.
@@ -275,7 +312,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => applyBrand(settings.branding), [settings.branding]);
 
-  const role: MemberRole | null = mode === "local" ? (tenant ? "owner" : null) : (memberships.find((m) => m.tenantId === tenant?.id)?.role ?? null);
+  const role: MemberRole | null = mode === "local" ? (tenant ? DEMO_PEOPLE[persona].role : null) : (memberships.find((m) => m.tenantId === tenant?.id)?.role ?? null);
+  const actor: Actor | null = user && role ? { uid: user.uid, name: user.name, role } : null;
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!store || mode !== "firebase") return;
+    return store.watch<{ id: string; name?: string; email?: string }>(C.members, undefined, (ms) => setMemberNames(Object.fromEntries(ms.map((m) => [m.id, m.name || m.email || m.id]))));
+  }, [store, mode]);
+
+  const ledger = useCallback(
+    async <T,>(req: LedgerRequest): Promise<T> => {
+      if (!tenant || !actor) throw new Error("no business selected");
+      if (mode === "local") {
+        const m = localStore.current;
+        if (!m) throw new Error("no local data");
+        return (await runLedgerRequest({ runner: storeRunner(m), store: m, now: () => new Date(), sealDelayMs: 0 }, actor, req)) as T;
+      }
+      try {
+        const res = await httpsCallable(firebase().functions, "ledgerApi")({ tenantId: tenant.id, ...req });
+        return res.data as T;
+      } catch (e) {
+        throw new Error((e as { message?: string }).message?.replace(/^.*?:\s*/, "") || "the server could not complete this");
+      }
+    },
+    [tenant, actor, mode],
+  );
 
   const createTenant = useCallback(
     async (name: string, withSample: boolean) => {
@@ -377,6 +438,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     resetLocalDemo: () => {
       localStorage.removeItem(LOCAL_KEY);
       openLocal(null);
+    },
+    persona,
+    setPersona: (p) => {
+      try {
+        localStorage.setItem("pos-suite.persona", p);
+      } catch {
+        /* per-browser convenience only */
+      }
+      setPersonaState(p);
+    },
+    actor,
+    ledger,
+    personName: (uid) => {
+      if (!uid) return "—";
+      const demo = Object.values(DEMO_PEOPLE).find((p) => p.uid === uid);
+      return demo?.name ?? memberNames[uid] ?? (user?.uid === uid ? user.name : uid.length > 14 ? `${uid.slice(0, 8)}…` : uid);
     },
     acceptInvite: async () => {
       if (mode !== "firebase" || !user?.email) return false;

@@ -7,7 +7,6 @@ import {
   type Customer,
   type DailyStats,
   type Discount,
-  type GoodsReceipt,
   type Invoice,
   type MenuCategory,
   type MenuItem,
@@ -20,14 +19,12 @@ import {
   type RevenueCenter,
   type Role,
   type Staff,
-  type StockMovement,
   type Table,
   type TenderMedia,
   type Workstation,
   COLLECTIONS as C,
   activeLines,
   allocateCheckNo,
-  buildDailyJournal,
   businessDateNow,
   closeCheck,
   computeCheckTotals,
@@ -37,7 +34,6 @@ import {
   newCheck,
   newId,
   processDepletion,
-  receiptValue,
   sendRound,
   statsId,
   verifyPin,
@@ -569,7 +565,7 @@ function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, m
   print: (kind: "kot" | "bill" | "receipt" | "report", doc: ReceiptDoc, printer: Printer | undefined) => Promise<void>;
   onPreview: (doc: ReceiptDoc, title: string) => void;
 }) {
-  const { settings, on, toast } = useApp();
+  const { settings, on, toast, ledger } = useApp();
   const store = useStore();
   const [eod, setEod] = useState<string[] | null>(null);
   const bd = businessDateNow(settings.pos);
@@ -596,11 +592,14 @@ function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, m
     }
     const stats = await store.get<DailyStats>(C.dailyStats, statsId(ws.propertyId, bd));
     if (on("accounting")) {
-      const [movements, receipts] = await Promise.all([store.list<StockMovement>(C.stockMovements, { where: [["businessDate", "==", bd]] }), store.list<GoodsReceipt>(C.goodsReceipts, { where: [["date", "==", bd]] })]);
-      const posted = receipts.filter((g) => g.status === "posted");
-      const j = buildDailyJournal({ date: bd, propertyId: ws.propertyId, stats, movements, receipts: posted, receiptValues: new Map(posted.map((g) => [g.id, receiptValue(g)])), tenders, settings: settings.accounting });
-      if (j.lines.length) await store.set(C.journals, j);
-      steps.push(`Daily journal posted (${j.lines.length} lines).`);
+      // Posted by the ledger service (a Cloud Function in production): numbered, hash-chained and
+      // audited. Re-running End of Day later posts only the difference (late sales).
+      try {
+        const v = await ledger<{ number?: string } | null>({ action: "postPosDay", propertyId: ws.propertyId, businessDate: bd });
+        steps.push(v ? `Day posted to the ledger as ${v.number ?? "a POS day journal"}.` : "Ledger already up to date for this day.");
+      } catch (e) {
+        steps.push(`⚠ Ledger posting failed (${(e as Error).message}). Post the day later from Finance → Overview.`);
+      }
     }
     if (stats) {
       const doc = buildDaySummary({ stats, kind: "Z", width: widthForPaper(receiptPrinter?.paperWidthMm ?? 80), businessName: settings.business.tradingName, propertyName: ws.propertyId, tenders, printedAt: new Date().toISOString() });

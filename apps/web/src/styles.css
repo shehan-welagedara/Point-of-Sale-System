@@ -204,7 +204,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 /* ── Stats ── */
 .stat { padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
 .stat .label { font-size: 13px; color: var(--text-2); font-weight: 550; }
-.stat .value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.stat .value { font-size: clamp(19px, 1.7vw, 26px); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat .delta { font-size: 12px; font-weight: 600; }
 .bar-track { height: 8px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 99px; background: var(--brand); }

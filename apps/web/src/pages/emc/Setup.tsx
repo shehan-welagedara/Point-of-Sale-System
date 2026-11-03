@@ -243,7 +243,7 @@ export function IntegrationsPage() {
         </div>
         <div className="card card-body stack">
           <h3>Accounting export</h3>
-          <p className="small muted">Daily journals export to Excel today. ERPNext and Akaunting connectors post the same journals through their APIs once configured.</p>
+          <p className="small muted">The books are kept in the built-in ledger (Finance). This setting is only for groups that also consolidate in an external system: export the journal entries and SAF-T file from Finance and the Audit Center, or connect ERPNext/Akaunting later.</p>
           <Field label="Target">
             <select className="select" value={s.accountingExport.target} onChange={(e) => setS({ ...s, accountingExport: { ...s.accountingExport, target: e.target.value as IntegrationSettings["accountingExport"]["target"] } })}>
               <option value="excel">Excel workbook</option>

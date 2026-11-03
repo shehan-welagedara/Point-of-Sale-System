@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import type { ModuleKey } from "@pos/core";
+import { DEMO_PEOPLE } from "@pos/sample-data";
 import { useApp } from "../../state/app";
 
 interface NavItem {
@@ -61,14 +62,27 @@ export const NAV: { group: string; module?: ModuleKey; items: NavItem[] }[] = [
     items: [{ to: "/emc/crm/customers", label: "Customers", ico: "☺" }],
   },
   {
-    group: "Accounting",
+    group: "Finance",
     module: "accounting",
     items: [
-      { to: "/emc/accounting/journals", label: "Journals", ico: "⎘" },
-      { to: "/emc/accounting/statements", label: "P&L and trial balance", ico: "Σ" },
-      { to: "/emc/accounting/accounts", label: "Chart of accounts", ico: "#" },
-      { to: "/emc/accounting/mapping", label: "Account mapping", ico: "↔" },
+      { to: "/emc/finance", label: "Overview", ico: "◎" },
+      { to: "/emc/finance/approvals", label: "Approvals", ico: "✓" },
+      { to: "/emc/finance/journals", label: "Journals", ico: "⎘" },
+      { to: "/emc/finance/payables", label: "Payables", ico: "↗" },
+      { to: "/emc/finance/receivables", label: "Receivables", ico: "↙" },
+      { to: "/emc/finance/bank", label: "Bank reconciliation", ico: "⌂" },
+      { to: "/emc/finance/assets", label: "Fixed assets", ico: "▣" },
+      { to: "/emc/finance/budgets", label: "Budgets", ico: "◔" },
+      { to: "/emc/finance/statements", label: "Financial statements", ico: "Σ" },
+      { to: "/emc/finance/documents", label: "All documents", ico: "≡" },
+      { to: "/emc/finance/periods", label: "Period close", ico: "⏏" },
+      { to: "/emc/finance/accounts", label: "Chart of accounts", ico: "#" },
+      { to: "/emc/finance/settings", label: "Finance settings", ico: "↔" },
     ],
+  },
+  {
+    group: "Assurance",
+    items: [{ to: "/emc/audit", label: "Audit Center", ico: "⛨" }],
   },
   {
     group: "People",
@@ -93,7 +107,7 @@ export const NAV: { group: string; module?: ModuleKey; items: NavItem[] }[] = [
 ];
 
 export function Shell() {
-  const { settings, tenant, tenants, switchTenant, on, mode, user, signOut, role } = useApp();
+  const { settings, tenant, tenants, switchTenant, on, mode, user, signOut, role, persona, setPersona } = useApp();
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   const b = settings.branding;
@@ -124,7 +138,7 @@ export function Shell() {
               {g.items
                 .filter((i) => !i.module || on(i.module))
                 .map((i) => (
-                  <NavLink key={i.to} to={i.to} className={({ isActive }) => (isActive ? "active" : "")}>
+                  <NavLink key={i.to} to={i.to} end={i.to === "/emc/finance"} className={({ isActive }) => (isActive ? "active" : "")}>
                     <span className="ico">{i.ico}</span>
                     {i.label}
                   </NavLink>
@@ -132,7 +146,19 @@ export function Shell() {
             </div>
           ))}
         </nav>
-        <div style={{ padding: 12, borderTop: "1px solid var(--line)" }} className="row between">
+        {mode === "local" ? (
+          <div style={{ padding: "10px 12px 0", borderTop: "1px solid var(--line)" }}>
+            <label className="tiny muted" htmlFor="persona">Acting as (demo)</label>
+            <select id="persona" className="select" style={{ minHeight: 30, padding: "2px 6px", fontSize: 13 }} value={persona} onChange={(e) => setPersona(e.target.value as keyof typeof DEMO_PEOPLE)} title="Switch person to see maker-checker and auditor access">
+              {(Object.keys(DEMO_PEOPLE) as (keyof typeof DEMO_PEOPLE)[]).map((k) => (
+                <option key={k} value={k}>
+                  {DEMO_PEOPLE[k].name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+        <div style={{ padding: 12, borderTop: mode === "local" ? undefined : "1px solid var(--line)" }} className="row between">
           <span className="tiny muted" title={user?.email}>
             {user?.name}
           </span>

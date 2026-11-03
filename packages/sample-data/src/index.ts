@@ -5,7 +5,6 @@ import {
   type Check,
   type CheckLine,
   type Customer,
-  type DailyStats,
   type GoodsReceipt,
   type IntegrationSettings,
   type InventoryItem,
@@ -15,7 +14,6 @@ import {
   type PosContext,
   type PosSettings,
   type Recipe,
-  type StockMovement,
   type TaxSettings,
   type TenderMedia,
   type Tenant,
@@ -25,7 +23,6 @@ import {
   MemoryStore,
   addDays,
   allModulesOn,
-  buildDailyJournal,
   closeCheck,
   computeCheckTotals,
   costMenuItem,
@@ -34,12 +31,14 @@ import {
   makePayment,
   postGoodsReceipt,
   processDepletion,
-  receiptValue,
   sendRound,
 } from "@pos/core";
-import { ACCOUNTS, CATEGORIES, CUSTOMERS, INVENTORY, MENU, MODIFIER_GROUPS, PREP, RECIPES, STAFF, VENDORS } from "./catalog.js";
+import { defaultChartOfAccounts, defaultLedgerSettings } from "@pos/ledger";
+import { CATEGORIES, CUSTOMERS, INVENTORY, MENU, MODIFIER_GROUPS, PREP, RECIPES, STAFF, VENDORS } from "./catalog.js";
+import { seedFinance } from "./finance.js";
 
 export * from "./catalog.js";
+export * from "./finance.js";
 
 export const SAMPLE_PROPERTY_ID = "CMB";
 export const SAMPLE_LOCATION_ID = "MAIN";
@@ -126,8 +125,10 @@ export function sampleSettings(): {
         stockAdjustment: "5110",
         accountsPayable: "2000",
         complimentary: "5200",
+        stockReceivedNotBilled: "2010",
       },
-    },
+      ledger: defaultLedgerSettings(SAMPLE_PROPERTY_ID),
+    } as AccountingSettings,
     integrations: {
       id: "integrations",
       payhere: { mode: "mock", merchantId: "1200000 (sample)", currency: "LKR" },
@@ -282,7 +283,7 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
   CUSTOMERS.forEach(([name, phone, tags, birthday], i) =>
     put(C.customers, { id: `CUS${String(i + 1).padStart(4, "0")}`, name, phone, tags, ...(birthday ? { birthday } : {}), marketingConsent: true, visits: 0, totalSpend: 0, points: 0, createdAt: now } satisfies Customer),
   );
-  ACCOUNTS.forEach(([c, name, type]) => put(C.accounts, { id: c, code: c, name, type }));
+  defaultChartOfAccounts().forEach((a) => put(C.accounts, a));
   put(C.budgets, { id: `${opts.today.slice(0, 7)}__${SAMPLE_PROPERTY_ID}`, month: opts.today.slice(0, 7), propertyId: SAMPLE_PROPERTY_ID, salesTarget: lkr(2_500_000), foodCostTargetBp: 3200 });
   await store.batch(ops);
 
@@ -410,25 +411,8 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
 
   await processDepletion(store, { locationId: SAMPLE_LOCATION_ID, by: "sample-data", limit: 2000 });
 
-  // Daily journals for the completed days.
-  const movements = await store.list<StockMovement>(C.stockMovements);
-  const receipts = await store.list<GoodsReceipt>(C.goodsReceipts);
-  for (let d = -1; d < historyDays; d++) {
-    const date = addDays(startDate, d);
-    const stats = await store.get<DailyStats>(C.dailyStats, `${SAMPLE_PROPERTY_ID}__${date}`);
-    const dayReceipts = receipts.filter((r) => r.date === date && r.status === "posted");
-    const journal = buildDailyJournal({
-      date,
-      propertyId: SAMPLE_PROPERTY_ID,
-      stats,
-      movements: movements.filter((m) => m.businessDate === date),
-      receipts: dayReceipts,
-      receiptValues: new Map(dayReceipts.map((r) => [r.id, receiptValue(r)])),
-      tenders,
-      settings: s.accounting,
-    });
-    if (journal.lines.length) await store.set(C.journals, journal);
-  }
+  // Books: opening balances, assets, POS days, supplier and customer invoices, payments, budgets.
+  await seedFinance(store, { today: opts.today, historyStart: startDate, openDate, propertyId: SAMPLE_PROPERTY_ID });
 
   return {
     store,

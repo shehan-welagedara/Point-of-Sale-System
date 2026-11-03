@@ -1,5 +1,6 @@
 import { type FirebaseApp, initializeApp } from "firebase/app";
 import { type Auth, connectAuthEmulator, getAuth } from "firebase/auth";
+import { type Functions, connectFunctionsEmulator, getFunctions } from "firebase/functions";
 import {
   type Firestore,
   connectFirestoreEmulator,
@@ -25,9 +26,9 @@ export function firebaseConfigured(): boolean {
   return Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 }
 
-let cached: { app: FirebaseApp; auth: Auth; db: Firestore } | null = null;
+let cached: { app: FirebaseApp; auth: Auth; db: Firestore; functions: Functions } | null = null;
 
-export function firebase(): { app: FirebaseApp; auth: Auth; db: Firestore } {
+export function firebase(): { app: FirebaseApp; auth: Auth; db: Firestore; functions: Functions } {
   if (cached) return cached;
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
@@ -36,10 +37,13 @@ export function firebase(): { app: FirebaseApp; auth: Auth; db: Firestore } {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     ignoreUndefinedProperties: true,
   });
+  // Must match the region the functions are deployed to (apps/functions/.env LOCATION).
+  const functions = getFunctions(app, (env.VITE_FUNCTIONS_REGION as string | undefined) || "asia-south1");
   if (env.VITE_USE_EMULATORS === "true") {
     connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
     connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
   }
-  cached = { app, auth, db };
+  cached = { app, auth, db, functions };
   return cached;
 }

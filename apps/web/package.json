@@ -14,6 +14,7 @@
     "@pos/core": "workspace:*",
     "@pos/engine": "workspace:*",
     "@pos/excel": "workspace:*",
+    "@pos/ledger": "workspace:*",
     "@pos/printing": "workspace:*",
     "@pos/sample-data": "workspace:*",
     "firebase": "11.10.0",

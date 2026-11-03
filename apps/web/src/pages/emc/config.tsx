@@ -548,30 +548,6 @@ export function CustomersPage() {
   );
 }
 
-export function AccountsPage() {
-  const { on } = useApp();
-  if (!on("accounting")) return <ModuleOff name="Accounting" />;
-  return (
-    <CrudPage
-      title="Chart of accounts"
-      col={C.accounts}
-      idFrom="code"
-      noun="account"
-      newDoc={() => ({ code: "", name: "", type: "expense" })}
-      fields={[
-        { key: "code", label: "Account code", type: "text", required: true, readOnlyOnEdit: true },
-        { key: "name", label: "Name", type: "text", required: true },
-        { key: "type", label: "Type", type: "select", options: ["asset", "liability", "equity", "income", "expense"].map((v) => ({ value: v, label: v })) },
-      ]}
-      columns={[
-        { header: "Code", render: (d) => <span className="mono">{d.code}</span> },
-        { header: "Name", render: (d) => d.name },
-        { header: "Type", render: (d) => <span className="badge">{d.type}</span> },
-      ]}
-    />
-  );
-}
-
 // ───────────────────────────── People ─────────────────────────────
 
 function PinEditor({ doc, setDoc }: { doc: Record<string, any>; setDoc: (d: any) => void }) {

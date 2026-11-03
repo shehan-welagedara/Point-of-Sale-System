@@ -88,6 +88,9 @@ importers:
       '@pos/excel':
         specifier: workspace:*
         version: link:../../packages/excel
+      '@pos/ledger':
+        specifier: workspace:*
+        version: link:../../packages/ledger
       '@pos/printing':
         specifier: workspace:*
         version: link:../../packages/printing
@@ -216,6 +219,9 @@ importers:
       '@pos/engine':
         specifier: workspace:*
         version: link:../engine
+      '@pos/ledger':
+        specifier: workspace:*
+        version: link:../ledger
     devDependencies:
       typescript:
         specifier: 5.9.3

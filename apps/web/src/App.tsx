@@ -6,7 +6,6 @@ import { Onboarding } from "./pages/auth/Onboarding";
 import { Shell } from "./pages/emc/Shell";
 import { Dashboard, MenuEngineering, Reports } from "./pages/emc/Reports";
 import {
-  AccountsPage,
   CategoriesPage,
   CustomersPage,
   DevicesPage,
@@ -24,7 +23,15 @@ import {
 } from "./pages/emc/config";
 import { RecipesPage } from "./pages/emc/Recipes";
 import { AdjustPage, GoodsReceiptsPage, MovementsPage, PurchaseOrdersPage, StockCountsPage, StockOnHand } from "./pages/emc/Inventory";
-import { JournalsPage, MappingPage, StatementsPage } from "./pages/emc/Accounting";
+import { FinanceOverview } from "./pages/finance/Overview";
+import { ApprovalsPage, DocumentsPage, JournalsPage } from "./pages/finance/Journals";
+import { PayablesPage, ReceivablesPage } from "./pages/finance/Parties";
+import { BankPage } from "./pages/finance/Bank";
+import { AssetsPage } from "./pages/finance/Assets";
+import { StatementsPage } from "./pages/finance/Statements";
+import { PeriodsPage } from "./pages/finance/Periods";
+import { BudgetsPage, ChartOfAccountsPage, FinanceSettingsPage } from "./pages/finance/Masters";
+import { AuditCenter } from "./pages/audit/AuditCenter";
 import { BrandingPage, BusinessTaxPage, IntegrationsPage, ModulesPage } from "./pages/emc/Setup";
 import { DataPage, LoginsPage, PrintQueuePage, RolesPage } from "./pages/emc/Admin";
 import { PosApp } from "./pages/pos/Pos";
@@ -60,10 +67,21 @@ export function App() {
         <Route path="inventory/adjust" element={<AdjustPage />} />
         <Route path="inventory/movements" element={<MovementsPage />} />
         <Route path="crm/customers" element={<CustomersPage />} />
-        <Route path="accounting/journals" element={<JournalsPage />} />
-        <Route path="accounting/statements" element={<StatementsPage />} />
-        <Route path="accounting/accounts" element={<AccountsPage />} />
-        <Route path="accounting/mapping" element={<MappingPage />} />
+        <Route path="finance" element={<FinanceOverview />} />
+        <Route path="finance/approvals" element={<ApprovalsPage />} />
+        <Route path="finance/journals" element={<JournalsPage />} />
+        <Route path="finance/payables" element={<PayablesPage />} />
+        <Route path="finance/receivables" element={<ReceivablesPage />} />
+        <Route path="finance/bank" element={<BankPage />} />
+        <Route path="finance/assets" element={<AssetsPage />} />
+        <Route path="finance/budgets" element={<BudgetsPage />} />
+        <Route path="finance/statements" element={<StatementsPage />} />
+        <Route path="finance/documents" element={<DocumentsPage />} />
+        <Route path="finance/periods" element={<PeriodsPage />} />
+        <Route path="finance/accounts" element={<ChartOfAccountsPage />} />
+        <Route path="finance/settings" element={<FinanceSettingsPage />} />
+        <Route path="accounting/*" element={<Navigate to="/emc/finance" replace />} />
+        <Route path="audit" element={<AuditCenter />} />
         <Route path="people/staff" element={<StaffPage />} />
         <Route path="people/roles" element={<RolesPage />} />
         <Route path="people/logins" element={<LoginsPage />} />

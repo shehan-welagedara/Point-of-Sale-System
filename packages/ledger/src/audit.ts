@@ -208,18 +208,36 @@ export async function verifyLedger(vouchers: readonly Voucher[], entries: readon
   return issues;
 }
 
-/** Re-hashes issued invoices and checks each workstation's chain and numbering. */
+/**
+ * Re-hashes issued invoices and walks each workstation's chain from its first invoice by following
+ * the `prevHash` links (the order invoices were issued, which client clocks can't disturb). An
+ * altered invoice fails its own hash and breaks the link to the next one; a deleted or inserted
+ * one leaves invoices that can't be reached from the start of the chain, or a fork.
+ */
 export async function verifyInvoices(invoices: readonly Invoice[]): Promise<IntegrityIssue[]> {
   const issues: IntegrityIssue[] = [];
   const byWs = new Map<string, Invoice[]>();
   for (const i of invoices) byWs.set(i.workstationId, [...(byWs.get(i.workstationId) ?? []), i]);
   for (const [ws, list] of byWs) {
-    const sorted = [...list].sort((a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id));
-    let prev = "";
-    for (const inv of sorted) {
-      if ((await invoiceHash(inv)) !== inv.hash) issues.push({ area: "invoices", severity: "critical", message: `Invoice ${inv.id} was altered after it was issued` });
-      if (inv.prevHash !== prev) issues.push({ area: "invoices", severity: "critical", message: `Invoice chain of ${ws} broken at ${inv.id}` });
-      prev = inv.hash;
+    for (const inv of list) if ((await invoiceHash(inv)) !== inv.hash) issues.push({ area: "invoices", severity: "critical", message: `Invoice ${inv.id} was altered after it was issued` });
+    const byPrev = new Map<string, Invoice[]>();
+    for (const inv of list) byPrev.set(inv.prevHash, [...(byPrev.get(inv.prevHash) ?? []), inv]);
+    const reached = new Set<string>();
+    let cur = "";
+    for (;;) {
+      const next = (byPrev.get(cur) ?? []).filter((n) => !reached.has(n.id));
+      if (!next.length) break;
+      if (next.length > 1) issues.push({ area: "invoices", severity: "critical", message: `Invoice chain of ${ws} forks after ${cur ? (list.find((i) => i.hash === cur)?.id ?? "?") : "the start"}: ${next.map((n) => n.id).join(", ")}` });
+      const n = next.sort((a, b) => a.issuedAt.localeCompare(b.issuedAt))[0]!;
+      reached.add(n.id);
+      cur = n.hash;
+    }
+    const orphans = list.filter((i) => !reached.has(i.id)).sort((a, b) => a.issuedAt.localeCompare(b.issuedAt));
+    if (orphans.length) {
+      // Report where the break is: an invoice whose predecessor is missing.
+      const hashes = new Set(list.map((i) => i.hash));
+      const at = orphans.find((i) => !hashes.has(i.prevHash)) ?? orphans[0]!;
+      issues.push({ area: "invoices", severity: "critical", message: `Invoice chain of ${ws} broken at ${at.id} (${orphans.length} invoice(s) not linked to the chain)` });
     }
   }
   return issues;

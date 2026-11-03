@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   type Check,
+  type Invoice,
   type DailyStats,
   type InventoryItem,
-  type JournalEntry,
   type MenuItem,
   type Recipe,
   type StockLevel,
@@ -11,6 +11,7 @@ import {
   costRecipe,
   costingContext,
 } from "@pos/core";
+import { type AccountBalance, type LedgerEntry, type Voucher, LEDGER as L, balanceSheet, defaultChartOfAccounts, trialBalance, verifyInvoices, verifyLedger } from "@pos/ledger";
 import { INVENTORY_CODES, MENU, RECIPES, buildSampleStore } from "../src/index.js";
 
 describe("sample dataset", () => {
@@ -38,11 +39,18 @@ describe("sample dataset", () => {
     expect(stats).toHaveLength(8);
     expect(stats.reduce((a, s) => a + s.checks, 0)).toBe(checks.length);
 
-    const journals = await store.list<JournalEntry>(C.journals);
-    expect(journals.length).toBeGreaterThanOrEqual(8);
-    for (const j of journals) {
-      expect(j.lines.reduce((a, l) => a + l.debit, 0)).toBe(j.lines.reduce((a, l) => a + l.credit, 0));
-    }
+    // Books built through the ledger verify cleanly and balance.
+    const vouchers = await store.list<Voucher>(L.vouchers);
+    expect(vouchers.filter((v) => v.type === "posDay" && v.status === "posted").length).toBeGreaterThanOrEqual(8);
+    expect(vouchers.filter((v) => v.status === "submitted").map((v) => v.id).sort()).toEqual(["PI-V002", "UTIL-NOV"]);
+    expect(await verifyLedger(vouchers, await store.list<LedgerEntry>(L.ledger), await store.list<AccountBalance>(L.balances))).toEqual([]);
+    expect(await verifyInvoices(await store.list<Invoice>(C.invoices))).toEqual([]);
+    const tb = trialBalance(defaultChartOfAccounts(), await store.list<AccountBalance>(L.balances), { fromPeriod: "2026-04", toPeriod: "2027-03", fyStartPeriod: "2026-04" });
+    expect(tb.totals.debit).toBe(tb.totals.credit);
+    const bs = balanceSheet(defaultChartOfAccounts(), await store.list<AccountBalance>(L.balances), { asOfPeriod: "2026-11", fyStartPeriod: "2026-04" });
+    expect(bs.balanced).toBe(true);
+    // Uninvoiced receipts remain in goods received not billed.
+    expect((await store.list<AccountBalance>(L.balances)).filter((b) => b.account === "2010").reduce((a, b) => a + b.credit - b.debit, 0)).toBeGreaterThan(0);
 
     const rice = await store.get<StockLevel>(C.stockLevels, `MAIN__${INVENTORY_CODES.get("riceSamba")}`);
     expect(rice!.qty).toBeGreaterThan(0);

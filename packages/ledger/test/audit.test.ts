@@ -89,6 +89,11 @@ describe("ledger integrity", () => {
     const i4 = await mk("26NOV_W01_4", i2.hash, "2026-11-03T12:00:00Z");
     expect(await verifyInvoices([i1, i2, i4])).toEqual([]);
     expect((await verifyInvoices([i1, { ...i2, seller: { ...i2.seller, legalName: "Other" } }, i4])).length).toBe(1);
+    // The chain is followed by its links, so a POS clock running backwards is not a break…
+    const late = await mk("26NOV_W01_5", i4.hash, "2026-11-03T09:00:00Z");
+    expect(await verifyInvoices([late, i4, i2, i1])).toEqual([]);
+    // …but a deleted invoice is: the rest of the chain can't be reached.
+    expect((await verifyInvoices([i1, i4, late])).map((i) => i.message)).toEqual(["Invoice chain of W01 broken at 26NOV_W01_4 (2 invoice(s) not linked to the chain)"]);
     expect(sequenceGaps([i1.id, i2.id, i4.id, "JV-202627-00001", "JV-202627-00003", "PAY-202627-00001"])).toEqual([
       { series: "26NOV_W01", missing: ["26NOV_W01_3"] },
       { series: "JV-202627-", missing: ["JV-202627-00002"] },
