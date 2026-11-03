@@ -11,7 +11,7 @@
 | D6 | Payments | **PayHere** for IPG. Cheapest mix recommended: cash + LankaQR + bank card terminal in-store, PayHere for online. |
 | D7 | Inventory | Optional module; **every sale deducts stock through recipes**; **FIFO** costing; complete feature set. |
 | D8 | People Management | User accounts, roles, privileges and access control only. **No HR/payroll.** |
-| D9 | Accounting | Built-in Excel accounting workbook, then an open-source connector (ERPNext recommended). See [08](08-accounting-integration.md). |
+| D9 | Accounting | ~~Excel workbook, then an ERPNext connector.~~ Superseded by D24. |
 | D10 | Reports | Daily Revenue, Item-wise, Covers and Sales reports, sent to **managers only at End of Day** via WhatsApp. |
 | D11 | Website | Firebase-based, online ordering (pickup/delivery). **Last, optional phase.** |
 | D12 | Cloud ownership | The manager's Google account owns the Firebase project and billing. Costing in [09](09-costing-proposal.md). |
@@ -30,6 +30,13 @@
 | D21 | One database, chosen modules | POS, recipes and costing, inventory and purchasing (ERP), accounting, CRM and revenue reports share one database; each client gets only the modules they buy (*Setup → Modules*, enforced by security rules). |
 | D22 | Hardware | Two models in the same system: **dedicated** (Windows PC / POS terminal) and **mobility** (tablets). Both print physical bills and KOTs through the **Print Agent**. |
 | D23 | Market | Built for the Sri Lankan client market first (LKR, IRD invoice format, VAT/SSCL/SC, LankaQR, PayHere, Sinhala/Tamil item names). |
+
+## Decisions (2026-11-04)
+| # | Topic | Decision |
+|---|-------|----------|
+| D24 | Accounting | A **complete accounting system following ERPNext's design, built natively on Firestore** (not ERPNext itself, which needs its own MariaDB server). The whole database stays in Firebase. Feature scope is benchmarked on SAP S/4HANA Finance. See [13](13-accounting-and-audit.md). |
+| D25 | Server-side logic | **Cloud Functions** for posting, numbering, approvals, period close and the audit trail, so no client can bypass them. Settings keep them in the free tier ([10](10-firebase-free-tier.md)). Clients without Accounting can run without functions. |
+| D26 | Audit | Field-level audit trail of every business record, captured by a server trigger, sealed hourly in a hash chain. Plus integrity verification, segregation of duties, an auditor role, and SAF-T and auditor exports. |
 
 ## Remaining questions (as of 2026-10-30; items 1, 2, 4 and 6 are now covered by sample data or D16–D19)
 1. **VAT and SSCL status at opening:** is the restaurant VAT-registered and/or SSCL-liable from day 1? I need the registered name, address and TIN for the bill header.

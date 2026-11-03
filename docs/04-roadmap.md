@@ -1,6 +1,6 @@
 # 04 — Delivery Roadmap (revised 2026-10-30: online-first)
 
-## Status (2026-11-03)
+## Status (2026-11-04)
 Built and demo-ready:
 - **R1 core POS:**
   - POS for dedicated terminals and tablets, with IRD tax invoices, tenders, KOT routing, X/Z reports and End of Day.
@@ -8,14 +8,19 @@ Built and demo-ready:
   - Reports and WhatsApp EOD (simulated).
 - **R2 extended:**
   - Inventory with FIFO, recipe depletion, purchasing, counts, waste, transfers and production; recipes and costing.
-  - Accounting journals, P&L and Excel export; menu engineering; CRM and loyalty.
+  - Menu engineering; CRM and loyalty.
+- **Finance & assurance:**
+  - Full general ledger in Firestore (ERPNext design, S/4HANA-style universal journal): POS day posting, payables with 3-way match, receivables, payments with open items and FX, bank reconciliation, fixed assets, budgets, period close, SLFRS statements.
+  - Maker–checker approvals and segregation of duties, all enforced by Cloud Functions.
+  - System-wide audit trail with sealed hash chains, integrity verification, SAF-T and auditor exports. See [13](13-accounting-and-audit.md).
 - **R3 platform:**
   - Multi-tenant businesses with modules per client, security rules (tested on the emulator), invitations, Excel data feeders and the Print Agent.
 
 Still to do:
 - Live PayHere and WhatsApp (needs Cloud Functions and approved accounts).
 - Refunds of closed checks (credit notes), cash declaration per till, KDS screen, drag-and-drop screen designer, QR ordering (X01).
-- Accounting connectors (ERPNext/Akaunting), the POS Shell desktop wrapper.
+- The POS Shell desktop wrapper.
+- Finance extensions: document attachments, dunning, multi-company consolidation, IFRS 16 leases, deferred tax.
 - Website (R4).
 
 
@@ -77,7 +82,7 @@ Estimates assume steady development and timely access to the client's hardware a
   - Variance, valuation, par levels and reorder suggestions, low-stock alerts.
 - **X18 real-time exception alerts** (WhatsApp and EMC).
 - **X21 menu engineering**.
-- **X27 Excel accounting workbook** (with an ERPNext connector as a follow-up).
+- **X27 accounting**: delivered as a built-in general ledger with audit trail ([13](13-accounting-and-audit.md)).
 - **X06 digital receipts** (WhatsApp/email) in addition to the printed bill.
 - **X38 remote device monitoring**, staged OTA rollout.
 - Touchscreen drag-and-drop designer; KDS (optional); attendance clock in/out (optional).

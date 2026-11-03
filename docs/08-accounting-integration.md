@@ -1,47 +1,38 @@
-# 08 — Accounting Integration (X27)
+# 08 — Accounting (X27)
 
 ## Short answer
-1. **Built in, available from day 1: an Excel accounting workbook** generated automatically every day. It is enough for a small restaurant and its accountant.
-2. When the client wants full books (ledgers, AP/AR, bank reconciliation, financial statements), connect an **open-source accounting system**. **ERPNext** is recommended, with **Akaunting** as the lighter option.
+The **Accounting module is a built-in general ledger** in the same Firebase database as the POS. It follows ERPNext's design, with S/4HANA-style capabilities. The POS, inventory and purchasing post into it automatically, so there is nothing to export and re-key. The design, controls and audit features are described in **[13-accounting-and-audit.md](13-accounting-and-audit.md)**.
 
-The POS is **not** the general ledger. It produces a clean, balanced **daily GL journal**, and any accounting tool can consume it.
+This replaces the earlier plan of an Excel workbook followed by an ERPNext connector (decision D9, superseded by D24).
 
-## 1. Built-in Excel accounting workbook
-Generated at End of Day and on demand (EMC → Accounting → Export), and stored in Cloud Storage. It can optionally be emailed or sent on WhatsApp to the accountant.
+## What posts automatically
+| Source | Document | Ledger effect |
+|---|---|---|
+| POS End of Day | POS day (`POS-…`) | Sales by major group, discounts, service charge, SSCL, VAT output, tenders (cash, card, LankaQR and PayHere clearing, vouchers, house accounts), FIFO cost of sales, waste, stock count differences. Late sales post as an adjustment. |
+| Goods receipt | (inside the POS day) | Dr Inventory, Cr Stock received but not billed |
+| Supplier invoice | `PINV-…` | Clears stock received but not billed. Input VAT, WHT and price variance; Cr Trade creditors (by supplier) |
+| Payments and receipts | `PAY-…` | Bank vs party, bank charges, realised FX gain/loss, open-item allocation |
+| Depreciation run | `DEP-…` | Depreciation expense vs accumulated depreciation, per asset |
+| Year-end close | `PCV-…` | Income and expenses to retained earnings |
 
-| Sheet | Contents |
-|-------|----------|
-| `Journal` | Balanced double-entry daily journal (debits = credits) using the client's **chart-of-accounts mapping** |
-| `Sales Summary` | By revenue category (Food, Beverage, Liquor, Other), RVC and order type |
-| `Taxes` | VAT output, SSCL and service charge per day, ready for the VAT/SSCL returns |
-| `Tenders` | Cash, card clearing, LankaQR clearing, PayHere clearing, vouchers, house accounts, with expected vs declared amounts |
-| `Purchases` *(inventory module)* | GRNs by vendor, with input VAT where applicable |
-| `COGS & Stock` *(inventory module)* | FIFO cost of sales by category, waste, closing stock value |
-| `Month` | Month-to-date pivot: a P&L-style view (sales − COGS − discounts) |
-
-Example journal for one day:
+Example POS day (VAT-registered, SSCL not liable):
 ```
 Dr Cash on hand              120,000.00
-Dr Card clearing – Bank A     95,000.00
-Dr LankaQR clearing           42,841.21
+Dr Card settlements           95,000.00
+Dr LankaQR settlements        36,552.40
 Dr Discounts allowed           6,200.00
     Cr Sales – Food                 160,000.00
     Cr Sales – Beverage              40,000.00
-    Cr Service charge income         19,380.00   (10% × 193,800 net)
-    Cr SSCL payable                   5,329.50   (2.5% × 213,180)
-    Cr VAT output payable            39,331.71   (18% × 218,509.50)
+    Cr Service charge                19,380.00   (10% × 193,800 net)
+    Cr VAT output payable            38,372.40   (18% × 213,180)
                              ----------    ----------
-                             264,041.21    264,041.21
+                             257,752.40    257,752.40
 ```
-Account codes are mapped in EMC (Accounting → Account mapping), so the export matches the client's chart of accounts.
+Accounts for each part are set in **Finance → Finance settings**. The account for each tender is set on the tender.
 
-## 2. Open-source options (for full accounting)
+## Exports for accountants, auditors and group reporting
+- Excel from every finance screen: statements, GL, aging, asset register, budgets, bank reconciliation.
+- Audit Center → **Auditor exports**: an Excel audit package (journal entries, documents, trial balance, audit trail, users) and **SAF-T 2.0 XML**.
 
-| Option | Type | Pros | Cons | Fit |
-|--------|------|------|------|-----|
-| **ERPNext** (Frappe, GPL v3) | Web ERP, self-host or managed hosting | Full double-entry accounting, AP/AR, bank reconciliation, fixed assets, multi-company. **Robust REST API** (we push the daily Journal Entry automatically). Large community | Heavier; needs a small server or managed hosting (monthly fee) | ★★★ **Recommended** for growing restaurants and multi-outlet clients. Also a good standard to offer every client of your product |
-| **Akaunting** (open source, Laravel) | Web, self-host or cloud | Simple, clean UI, invoices, bills, banking, REST API | Some features are paid apps; less depth than ERPNext | ★★ Small single-outlet clients |
-| **Frappe Books** | Free desktop app | Very simple, no hosting cost | Single-user; CSV import only (no live push) | ★ Very small clients |
-| **GnuCash** | Free desktop app | Mature double-entry | Desktop-only, accountant-oriented, CSV import | ★ |
-
-**Plan:** ship the Excel workbook first. Then add an **ERPNext connector** (push the daily Journal Entry, purchase invoices from GRNs and supplier master data) as a paid add-on module. The export layer uses a common interface, so an Akaunting or Xero/QuickBooks connector can be added later.
+## External systems (optional)
+A client group that already runs ERPNext, Akaunting, Xero or QuickBooks for consolidation can import the journal-entry export or SAF-T file. Direct API connectors remain possible add-ons (Setup → Integrations → Accounting export), but they are no longer needed to keep the books.

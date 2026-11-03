@@ -60,7 +60,12 @@ Each business you create is a separate **tenant** with its own data, logins and 
   - Printers, with a Print Agent installed ([11](11-hardware-and-printing.md)).
 - [ ] *People*: POS staff with PINs, roles and privileges, back-office logins (owner, managers, accountant, storekeeper).
 - [ ] *Setup → Integrations*: PayHere merchant ID, LankaQR merchant ID from the bank, and WhatsApp numbers. Keep them in **mock** until the accounts are approved.
-- [ ] Do a test day: sell, void, discount, split payment, End of Day; check the Z report, stock and journal.
+- [ ] *Finance* (if the Accounting module is on):
+  - *Finance settings*: account mapping, approval limits (owner), cost centres.
+  - Opening balances as a journal on the go-live date.
+  - Register fixed assets.
+  - Invite the accountant (role **Accountant**) and the external auditor (role **Auditor**, read-only).
+- [ ] Do a test day: sell, void, discount, split payment, End of Day. Check the Z report, the stock, and the POS day in *Finance → All documents*. Then run *Audit Center → Integrity check*.
 
 ## 5. Deploying to a client's own Firebase project
 The code base stays in this repository and in your Firebase project. Each client gets their own Firebase project, owned and billed by them, built from the **same `main` branch**:
@@ -68,8 +73,10 @@ The code base stays in this repository and in your Firebase project. Each client
 npx firebase use --add                  # add the client project, alias e.g. "client-spice"
 cp apps/web/.env.example apps/web/.env.client-spice   # the client's web config
 cp apps/web/.env.client-spice apps/web/.env.local
+cp apps/functions/.env.example apps/functions/.env    # LOCATION = the client's Firestore region
 npx firebase use client-spice
-pnpm firebase:deploy
+npx firebase functions:artifacts:setpolicy --location asia-south1 --days 1
+pnpm firebase:deploy                    # hosting, rules, indexes and the accounting/audit functions
 ```
 - Create the owner's account on the deployed site and create the business: empty, or import their Excel data feeder.
 - Configuration that differs per client lives in **their data**: settings, modules, branding and menus. Do not keep a separate code branch per client. Client-specific code (rare) goes behind a module flag or into an extension package on `main`, so every client keeps receiving fixes ([01 §4](01-architecture.md)).
@@ -80,7 +87,9 @@ pnpm firebase:deploy
 | `apps/web` | Back office (EMC), POS (terminals and tablets), dashboards and reports |
 | `apps/print-agent` | Print Agent for USB/network printers and the cash drawer |
 | `packages/engine` | Money, Sri Lanka service charge/SSCL/VAT, tenders, IRD invoice numbers |
-| `packages/core` | Domain model, modules, privileges, costing, FIFO inventory, checks, reports, accounting, integration templates |
+| `packages/core` | Domain model, modules, privileges, costing, FIFO inventory, checks, reports, POS day journal, integration templates |
+| `packages/ledger` | General ledger: posting, approvals, assets, bank matching, statements, audit trail, integrity checks, SAF-T |
+| `apps/functions` | Cloud Functions: ledger API, audit trail triggers, hourly sealing |
 | `packages/printing` | Bill, KOT and report layouts; ESC/POS and text renderers |
 | `packages/sample-data` | The Sri Lankan demo restaurant |
 | `packages/excel` | Excel data feeder (template, validated import, export) and report exports |
@@ -91,6 +100,7 @@ pnpm firebase:deploy
 ```bash
 pnpm test         # unit tests for every package
 pnpm test:rules   # security rules on the Firestore emulator (needs Java)
+pnpm test:functions  # Cloud Functions end to end on the emulators (needs Java)
 pnpm typecheck
 pnpm build
 ```

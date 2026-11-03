@@ -22,7 +22,7 @@
 | Firestore reads | 50,000 / day | ~20–40k / day | USD 0 – 1 |
 | Firestore writes | 20,000 / day | ~4–6k / day | USD 0 |
 | Firestore storage | 1 GiB | < 1 GiB in year 1 | USD 0 |
-| Cloud Functions | 2 M invocations / month | ~50–100k | USD 0 |
+| Cloud Functions (accounting ledger and audit trail) | 2 M invocations / month | ~50–150k | USD 0 |
 | Hosting (EMC, Insights, QR menu) | 10 GB stored, 360 MB/day transfer | Small | USD 0 |
 | Cloud Storage (logos, PDFs, Excel exports) | — | 1–2 GB | USD 0.05 – 0.10 |
 | Cloud Scheduler | 3 jobs per billing account | 2–3 jobs | USD 0 |
@@ -76,7 +76,7 @@ This structure fits both this first client and future clients:
 | One-time setup | Onboarding: menu and recipe loading, tax and bill configuration, printer setup, staff training, go-live support |
 | Monthly subscription | Per outlet, includes 1 POS terminal, EMC, People Management, Insights and EOD WhatsApp reports |
 | Additional terminal | Per terminal per month |
-| Add-on modules | **Inventory** (recipes, FIFO, purchasing, mobile stock count) · **QR Ordering & Pay** · **Accounting connector (ERPNext)** · Website/online ordering (future) |
+| Add-on modules | **Inventory** (recipes, FIFO, purchasing, mobile stock count) · **QR Ordering & Pay** · **Accounting** (full general ledger, audit trail and auditor exports) · Website/online ordering (future) |
 | Support | Standard (business hours) or Premium (7 days, with remote monitoring alerts, X38) |
 
 *For this client:* the Firebase project lives in **their** Google account, so they pay Google directly, and your fee covers software, setup and support. For future clients you can either do the same or host them as tenants on **your** platform project and include cloud costs in the subscription. The software supports both.

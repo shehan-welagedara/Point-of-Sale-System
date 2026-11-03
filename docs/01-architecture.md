@@ -161,7 +161,12 @@ The IRD format is `YYMMM_QQQQ_XXXXX` (see [06](06-sri-lanka-compliance.md)). We 
 
 ## 7. Cloud Functions (backend logic)
 
-> **Implementation status (2026-11-03):** the current build runs **without Cloud Functions**. That keeps demos and small clients inside the free tier.
+> **Implementation status (2026-11-04):** four functions are deployed with the **Accounting module** (`apps/functions`, see [13](13-accounting-and-audit.md)):
+> - `ledgerApi`: the callable for posting, approvals, reversal, POS day, depreciation, periods, year-end and the integrity check.
+> - `auditTrail` and `auditTenant`: record every change.
+> - `auditSealer`: hourly hash-chain seals.
+>
+> Everything else still runs **without Cloud Functions**, which keeps demos and small clients inside the free tier.
 > - Business logic runs in `@pos/core` on the device and is protected by Firestore security rules (`firebase/firestore.rules`, tested on the emulator).
 > - Day totals are aggregated when each check closes, and stock depletion runs in batches (End of Day).
 > - Printing goes through the **Print Agent** (`apps/print-agent`) instead of the POS Shell.
@@ -175,7 +180,9 @@ The IRD format is `YYMMM_QQQQ_XXXXX` (see [06](06-sri-lanka-compliance.md)). We 
 | `endOfDay` | Scheduler (per property, configurable time) or manual | Closes the business day, checks for open checks and undeclared tills, generates the PDF reports, sends them on **WhatsApp** to managers, and writes the accounting export |
 | `alerts` | Firestore triggers | X18 exception alerts: voids or discounts over threshold, cash variance, low stock, EOD not run, terminal offline |
 | `payhereNotify` | HTTPS webhook | Verifies PayHere's MD5 signature and marks the check payment as settled |
-| `accountingExport` | EOD and on demand | Daily GL journal written to Excel/CSV, plus optional push to Akaunting or ERPNext |
+| `ledgerApi` ✅ | Callable | Posts accounting documents (POS day, invoices, payments, journals, depreciation) with gap-free numbers and a hash chain; approvals with segregation of duties; period and year-end close; integrity check |
+| `auditTrail` / `auditTenant` ✅ | Firestore write | Field-level audit event for every business record change |
+| `auditSealer` ✅ | Scheduler (hourly) | Seals new audit events into a hash chain |
 | `userAdmin` | Callable | Creates users, sets custom claims (tenant, roles, properties), PIN reset, disable |
 | `qrOrder` | Callable | Validates QR orders, prices them server-side, and injects them into the POS kitchen flow |
 
