@@ -12,3 +12,5 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 .firebaserc.local
+apps/functions/dist/
+apps/functions/.env

@@ -24,19 +24,31 @@ function toIncrements(inc: Increments): DocumentData {
   return out;
 }
 
-/** Firestore adapter: collection `x` lives at `tenants/{tenantId}/x`. */
+/**
+ * Firestore adapter: collection `x` lives at `tenants/{tenantId}/x`; the audit trail is read from
+ * `auditLog/{tenantId}/…` (written only by Cloud Functions). Every write is stamped with the
+ * signed-in user and time, which the audit trigger uses alongside Firebase's own auth context.
+ */
 export class FirestoreStore implements DocStore {
   constructor(
     private readonly db: Firestore,
     readonly tenantId: string,
+    private readonly uid: () => string | undefined = () => undefined,
   ) {}
 
   private col(name: string) {
+    if (name === "auditEvents") return collection(this.db, "auditLog", this.tenantId, "events");
+    if (name === "auditSeals") return collection(this.db, "auditLog", this.tenantId, "seals");
     return collection(this.db, "tenants", this.tenantId, name);
   }
 
   private ref(name: string, id: string) {
-    return doc(this.db, "tenants", this.tenantId, name, id);
+    return doc(this.col(name), id);
+  }
+
+  private stamp<T extends object>(data: T): T {
+    const uid = this.uid();
+    return uid ? { ...data, updatedBy: uid, updatedAt: new Date().toISOString() } : data;
   }
 
   private build(name: string, q?: Query): FsQuery {
@@ -58,11 +70,11 @@ export class FirestoreStore implements DocStore {
   }
 
   async set<T extends DocData>(col: string, data: T): Promise<void> {
-    await setDoc(this.ref(col, data.id), data as DocumentData);
+    await setDoc(this.ref(col, data.id), this.stamp(data) as DocumentData);
   }
 
   async merge(col: string, id: string, data: Record<string, unknown>): Promise<void> {
-    await setDoc(this.ref(col, id), data, { merge: true });
+    await setDoc(this.ref(col, id), this.stamp(data), { merge: true });
   }
 
   async increment(col: string, id: string, inc: Increments, base?: Record<string, unknown>): Promise<void> {
@@ -85,8 +97,8 @@ export class FirestoreStore implements DocStore {
     const commit = async (part: WriteOp[]) => {
       const b = writeBatch(this.db);
       for (const op of part) {
-        if (op.op === "set") b.set(this.ref(op.col, op.data.id), op.data as DocumentData);
-        else if (op.op === "merge") b.set(this.ref(op.col, op.id), op.data, { merge: true });
+        if (op.op === "set") b.set(this.ref(op.col, op.data.id), this.stamp(op.data) as DocumentData);
+        else if (op.op === "merge") b.set(this.ref(op.col, op.id), this.stamp(op.data), { merge: true });
         else if (op.op === "increment") b.set(this.ref(op.col, op.id), { ...(op.base ?? {}), id: op.id, ...toIncrements(op.inc) }, { merge: true });
         else b.delete(this.ref(op.col, op.id));
       }

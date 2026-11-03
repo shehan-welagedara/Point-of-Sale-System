@@ -7,3 +7,4 @@ export * from "./reports.js";
 export * from "./bank.js";
 export * from "./audit.js";
 export * from "./saft.js";
+export * from "./service.js";

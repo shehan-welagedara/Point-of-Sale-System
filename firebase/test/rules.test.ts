@@ -23,12 +23,16 @@ async function seedTenant(modules: Record<string, boolean> = { pos: true, recipe
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, "tenants", T), { id: T, name: "Spice", ownerUid: "owner", modules, plan: "demo", status: "active" });
-    for (const [uid, role] of [["owner", "owner"], ["mgr", "manager"], ["till", "terminal"], ["acct", "accountant"], ["view", "viewer"]] as const) {
+    for (const [uid, role] of [["owner", "owner"], ["mgr", "manager"], ["till", "terminal"], ["acct", "accountant"], ["acct2", "accountant"], ["aud", "auditor"], ["view", "viewer"]] as const) {
       await setDoc(doc(db, "tenants", T, "members", uid), { id: uid, uid, email: `${uid}@example.lk`, role, tenantId: T });
     }
     await setDoc(doc(db, "tenants", T, "menuItems", "K001"), { id: "K001", name: "Kottu", price: 120000, available: true });
     await setDoc(doc(db, "tenants", T, "checks", "closed1"), { id: "closed1", status: "closed", depletion: "pending" });
     await setDoc(doc(db, "tenants", T, "invoices", "26NOV_W01_1"), { id: "26NOV_W01_1", hash: "x" });
+    await setDoc(doc(db, "tenants", T, "settings", "accounting"), { id: "accounting", ledger: { journalApprovalThreshold: 0, paymentApprovalThreshold: 5000000, matchTolerance: { qtyBp: 0, priceBp: 200 } }, accounts: {} });
+    await setDoc(doc(db, "tenants", T, "vouchers", "posted1"), { id: "posted1", status: "posted", number: "JV-202627-00001", createdBy: "acct" });
+    await setDoc(doc(db, "tenants", T, "assets", "A1"), { id: "A1", status: "active", accumulatedDep: 0, name: "Oven" });
+    await setDoc(doc(db, "auditLog", T, "events", "e1"), { id: "e1", action: "create" });
   });
 }
 
@@ -73,7 +77,8 @@ describe("roles", () => {
     await assertSucceeds(setDoc(doc(as("mgr"), "tenants", T, "discounts", "D1"), { id: "D1", name: "10%" }));
     await assertFails(setDoc(doc(as("till"), "tenants", T, "discounts", "D2"), { id: "D2", name: "Free" }));
     await assertFails(setDoc(doc(as("view"), "tenants", T, "settings", "tax"), { id: "tax" }));
-    await assertSucceeds(setDoc(doc(as("acct"), "tenants", T, "settings", "accounting"), { id: "accounting" }));
+    await assertSucceeds(updateDoc(doc(as("acct"), "tenants", T, "settings", "accounting"), { "accounts.vatInput": "1300" }));
+    await assertFails(setDoc(doc(as("acct"), "tenants", T, "settings", "accounting"), { id: "accounting" })); // would wipe the approval thresholds
     await assertFails(setDoc(doc(as("acct"), "tenants", T, "settings", "tax"), { id: "tax" }));
   });
 
@@ -121,3 +126,52 @@ describe("module licensing", () => {
     await assertFails(setDoc(doc(as("till"), "tenants", T, "accounts", "1001"), { id: "1001" }));
   });
 });
+
+describe("accounting and audit", () => {
+  beforeEach(() => seedTenant());
+
+  it("lets preparers keep drafts but only the server posts", async () => {
+    const acct = as("acct");
+    const draft = { id: "d1", type: "journal", status: "draft", createdBy: "acct", lines: [] };
+    await assertSucceeds(setDoc(doc(acct, "tenants", T, "vouchers", "d1"), draft));
+    await assertSucceeds(updateDoc(doc(acct, "tenants", T, "vouchers", "d1"), { remarks: "Rent", updatedBy: "acct", updatedAt: "now" }));
+    await assertFails(updateDoc(doc(as("acct2"), "tenants", T, "vouchers", "d1"), { remarks: "Changed by someone else" }));
+    await assertFails(updateDoc(doc(acct, "tenants", T, "vouchers", "d1"), { status: "posted" }));
+    await assertFails(setDoc(doc(acct, "tenants", T, "vouchers", "d2"), { ...draft, id: "d2", status: "posted", number: "JV-1" }));
+    await assertFails(updateDoc(doc(as("owner"), "tenants", T, "vouchers", "posted1"), { remarks: "edit after posting" }));
+    await assertFails(setDoc(doc(as("owner"), "tenants", T, "ledger", "x"), { id: "x" }));
+    await assertFails(setDoc(doc(as("owner"), "tenants", T, "accountBalances", "x"), { id: "x" }));
+    await assertFails(setDoc(doc(as("owner"), "tenants", T, "fiscalYears", "2026-27"), { id: "2026-27" }));
+    await assertFails(setDoc(doc(as("mgr"), "tenants", T, "vouchers", "m1"), { ...draft, id: "m1", createdBy: "mgr" }));
+  });
+
+  it("keeps approval thresholds under owner control", async () => {
+    await assertFails(updateDoc(doc(as("acct"), "tenants", T, "settings", "accounting"), { "ledger.journalApprovalThreshold": 99999999 }));
+    await assertSucceeds(updateDoc(doc(as("acct"), "tenants", T, "settings", "accounting"), { "accounts.vatOutput": "2100" }));
+    await assertSucceeds(updateDoc(doc(as("owner"), "tenants", T, "settings", "accounting"), { "ledger.journalApprovalThreshold": 100000 }));
+  });
+
+  it("protects depreciation figures on assets", async () => {
+    await assertSucceeds(updateDoc(doc(as("acct"), "tenants", T, "assets", "A1"), { name: "Combi oven" }));
+    await assertFails(updateDoc(doc(as("acct"), "tenants", T, "assets", "A1"), { accumulatedDep: 5 }));
+    await assertFails(updateDoc(doc(as("owner"), "tenants", T, "assets", "A1"), { status: "disposed" }));
+  });
+
+  it("opens the audit log to auditors and owners only, and to nobody for writing", async () => {
+    await assertSucceeds(getDoc(doc(as("aud"), "auditLog", T, "events", "e1")));
+    await assertSucceeds(getDoc(doc(as("owner"), "auditLog", T, "events", "e1")));
+    await assertFails(getDoc(doc(as("mgr"), "auditLog", T, "events", "e1")));
+    await assertFails(getDoc(doc(as("acct"), "auditLog", T, "events", "e1")));
+    await assertFails(setDoc(doc(as("owner"), "auditLog", T, "events", "e2"), { id: "e2" }));
+    await assertFails(updateDoc(doc(as("owner"), "auditLog", T, "events", "e1"), { action: "update" }));
+    // Auditors read everything but change nothing.
+    await assertSucceeds(getDoc(doc(as("aud"), "tenants", T, "menuItems", "K001")));
+    await assertSucceeds(getDoc(doc(as("aud"), "tenants", T, "vouchers", "posted1")));
+    await assertFails(updateDoc(doc(as("aud"), "tenants", T, "menuItems", "K001"), { price: 1 }));
+  });
+
+  it("accepts the audit stamp on narrowly permitted updates", async () => {
+    await assertSucceeds(updateDoc(doc(as("till"), "tenants", T, "menuItems", "K001"), { available: false, updatedBy: "till", updatedAt: "2026-11-03T10:00:00Z" }));
+  });
+});
+

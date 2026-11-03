@@ -4,8 +4,56 @@
       "collectionGroup": "dailyStats",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "propertyId", "order": "ASCENDING" },
-        { "fieldPath": "businessDate", "order": "ASCENDING" }
+        {
+          "fieldPath": "propertyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "businessDate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ledger",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "account",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "postingDate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "accountBalances",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "fiscalYear",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "period",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "vouchers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "postingDate",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
@@ -14,22 +62,111 @@
       "collectionGroup": "members",
       "fieldPath": "uid",
       "indexes": [
-        { "order": "ASCENDING", "queryScope": "COLLECTION" },
-        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
       ]
     },
-    { "collectionGroup": "printJobs", "fieldPath": "expireAt", "ttl": true, "indexes": [] },
-    { "collectionGroup": "printJobs", "fieldPath": "doc", "indexes": [] },
-    { "collectionGroup": "checks", "fieldPath": "lines", "indexes": [] },
-    { "collectionGroup": "checks", "fieldPath": "totals", "indexes": [] },
-    { "collectionGroup": "checks", "fieldPath": "payments", "indexes": [] },
-    { "collectionGroup": "invoices", "fieldPath": "totals", "indexes": [] },
-    { "collectionGroup": "dailyStats", "fieldPath": "items", "indexes": [] },
-    { "collectionGroup": "dailyStats", "fieldPath": "categories", "indexes": [] },
-    { "collectionGroup": "dailyStats", "fieldPath": "hours", "indexes": [] },
-    { "collectionGroup": "dailyStats", "fieldPath": "tenders", "indexes": [] },
-    { "collectionGroup": "stockLevels", "fieldPath": "lots", "indexes": [] },
-    { "collectionGroup": "stockMovements", "fieldPath": "lines", "indexes": [] },
-    { "collectionGroup": "settings", "fieldPath": "logoDataUrl", "indexes": [] }
+    {
+      "collectionGroup": "printJobs",
+      "fieldPath": "expireAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "printJobs",
+      "fieldPath": "doc",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "checks",
+      "fieldPath": "lines",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "checks",
+      "fieldPath": "totals",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "checks",
+      "fieldPath": "payments",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "invoices",
+      "fieldPath": "totals",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "dailyStats",
+      "fieldPath": "items",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "dailyStats",
+      "fieldPath": "categories",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "dailyStats",
+      "fieldPath": "hours",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "dailyStats",
+      "fieldPath": "tenders",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "stockLevels",
+      "fieldPath": "lots",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "stockMovements",
+      "fieldPath": "lines",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "settings",
+      "fieldPath": "logoDataUrl",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "vouchers",
+      "fieldPath": "lines",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "vouchers",
+      "fieldPath": "items",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "events",
+      "fieldPath": "before",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "events",
+      "fieldPath": "after",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "seals",
+      "fieldPath": "eventIds",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "bankStatements",
+      "fieldPath": "lines",
+      "indexes": []
+    }
   ]
 }

@@ -214,7 +214,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const preferred = localStorage.getItem("pos-suite.activeTenant");
     const active = ts.find((t) => t.id === preferred) ?? ts[0] ?? null;
     setTenant(active);
-    setStore(active ? new FirestoreStore(db, active.id) : null);
+    setStore(active ? new FirestoreStore(db, active.id, () => firebase().auth.currentUser?.uid) : null);
   }, []);
 
   useEffect(() => {
@@ -304,7 +304,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         b.set(doc(db, "tenants", id), t);
         b.set(doc(db, "tenants", id, "members", user.uid), { id: user.uid, uid: user.uid, email: user.email, name: user.name, role: "owner", tenantId: id, createdAt: now });
         await b.commit();
-        const fs = new FirestoreStore(db, id);
+        const fs = new FirestoreStore(db, id, () => firebase().auth.currentUser?.uid);
         await fs.batch(configOps);
         localStorage.setItem("pos-suite.activeTenant", id);
       } finally {
@@ -320,7 +320,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("pos-suite.activeTenant", id);
       const t = tenants.find((x) => x.id === id) ?? null;
       setTenant(t);
-      setStore(t && mode === "firebase" ? new FirestoreStore(firebase().db, t.id) : store);
+      setStore(t && mode === "firebase" ? new FirestoreStore(firebase().db, t.id, () => firebase().auth.currentUser?.uid) : store);
     },
     [tenants, mode, store],
   );

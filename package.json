@@ -11,10 +11,11 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "test:rules": "firebase emulators:exec --only firestore --project demo-pos-suite \"vitest run --root firebase\"",
-    "emulators": "firebase emulators:start --only auth,firestore --project demo-pos-suite",
+    "emulators": "pnpm --filter @pos/functions build && firebase emulators:start --only auth,firestore,functions --project demo-pos-suite",
     "templates": "pnpm --filter @pos/excel templates",
     "agent": "pnpm --filter @pos/print-agent start",
-    "firebase:deploy": "pnpm build && firebase deploy --only hosting,firestore"
+    "firebase:deploy": "pnpm build && firebase deploy --only hosting,firestore,functions",
+    "test:functions": "pnpm --filter @pos/functions build && node -e \"require('fs').writeFileSync('apps/functions/dist/.env.local','SEAL_DELAY_MS=0\\n')\" && firebase emulators:exec --only auth,firestore,functions --project demo-pos-suite \"vitest run --root apps/functions test/emulator.test.ts\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "4.0.1",

@@ -19,10 +19,20 @@ service cloud.firestore {
     function canPos(t) { return hasRole(t, ['owner', 'admin', 'manager', 'terminal']); }
     function canStock(t) { return hasRole(t, ['owner', 'admin', 'manager', 'storekeeper']); }
     function canBooks(t) { return hasRole(t, ['owner', 'admin', 'accountant']); }
+    function canSeeBooks(t) { return hasRole(t, ['owner', 'admin', 'accountant', 'auditor', 'manager']); }
+    function canAudit(t) { return hasRole(t, ['owner', 'admin', 'auditor']); }
+    function sameApproval() {
+      let a = request.resource.data.get('ledger', {});
+      let b = resource.data.get('ledger', {});
+      return a.get('journalApprovalThreshold', -1) == b.get('journalApprovalThreshold', -1)
+          && a.get('paymentApprovalThreshold', -1) == b.get('paymentApprovalThreshold', -1)
+          && a.get('matchTolerance', {}) == b.get('matchTolerance', {});
+    }
     function moduleOn(t, m) { return get(tenantPath(t)).data.modules.get(m, false) == true; }
     function isPlatformAdmin() { return signedIn() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)); }
     function idMatches(id) { return !('id' in request.resource.data) || request.resource.data.id == id; }
-    function onlyChanges(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    // updatedBy/updatedAt are the audit stamp every client write carries.
+    function onlyChanges(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys.concat(['updatedBy', 'updatedAt'])); }
 
     // Platform administrators (the software vendor) are listed here by hand in the console.
     match /platformAdmins/{uid} {
@@ -35,6 +45,12 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.token.email != null && request.auth.token.email.lower() == email;
       allow create, update: if isAdmin(request.resource.data.tenantId) && request.resource.data.role != 'owner';
       allow delete: if (signedIn() && request.auth.token.email != null && request.auth.token.email.lower() == email) || isAdmin(resource.data.tenantId);
+    }
+
+    // Audit trail: written only by Cloud Functions, outside tenants/… so it cannot re-trigger itself.
+    match /auditLog/{t}/{part}/{id} {
+      allow read: if canAudit(t);
+      allow write: if false;
     }
 
     // Lets a signed-in user find the tenants they belong to (collection-group query on members.uid).
@@ -64,7 +80,13 @@ service cloud.firestore {
       }
 
       // ── Configuration (back office) ──
-      match /settings/{id} { allow read: if isMember(t); allow write: if (isManager(t) || (id == 'accounting' && canBooks(t))) && idMatches(id); }
+      // Approval thresholds are a control: only an owner/administrator may change them.
+      match /settings/{id} {
+        allow read: if isMember(t);
+        allow write: if idMatches(id) && (
+             (id != 'accounting' && isManager(t))
+          || (id == 'accounting' && (isAdmin(t) || (canBooks(t) && resource != null && sameApproval()))));
+      }
       match /properties/{id} { allow read: if isMember(t); allow write: if isAdmin(t) && idMatches(id); }
       match /revenueCenters/{id} { allow read: if isMember(t); allow write: if isAdmin(t) && idMatches(id); }
       match /workstations/{id} { allow read: if isMember(t); allow write: if isAdmin(t) && idMatches(id); }
@@ -137,8 +159,42 @@ service cloud.firestore {
       }
       match /stockCounts/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'inventory') && canStock(t); }
 
-      // ── Accounting module ──
-      match /accounts/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'accounting') && canBooks(t); }
+      // ── Accounting module (ERPNext-style ledger; postings only by Cloud Functions) ──
+      match /accounts/{id} { allow read: if isMember(t); allow create, update: if moduleOn(t, 'accounting') && canBooks(t) && idMatches(id); allow delete: if false; }
+      match /vouchers/{id} {
+        allow read: if canSeeBooks(t);
+        // Drafts belong to their preparer; submitting, approving and posting happen on the server.
+        allow create: if moduleOn(t, 'accounting') && canBooks(t) && idMatches(id)
+                      && request.resource.data.status == 'draft' && request.resource.data.createdBy == request.auth.uid
+                      && !('number' in request.resource.data) && !('hash' in request.resource.data);
+        allow update: if canBooks(t) && resource.data.status == 'draft' && resource.data.createdBy == request.auth.uid
+                      && request.resource.data.status == 'draft' && request.resource.data.createdBy == request.auth.uid
+                      && !('number' in request.resource.data) && !('hash' in request.resource.data);
+        allow delete: if canBooks(t) && resource.data.status == 'draft' && resource.data.createdBy == request.auth.uid;
+      }
+      match /ledger/{id} { allow read: if canSeeBooks(t); allow write: if false; }
+      match /accountBalances/{id} { allow read: if canSeeBooks(t); allow write: if false; }
+      match /numberSeries/{id} { allow read: if canSeeBooks(t); allow write: if false; }
+      match /ledgerHead/{id} { allow read: if canSeeBooks(t); allow write: if false; }
+      match /fiscalYears/{id} { allow read: if isMember(t); allow write: if false; }
+      match /costCenters/{id} { allow read: if isMember(t); allow create, update: if moduleOn(t, 'accounting') && canBooks(t) && idMatches(id); allow delete: if false; }
+      match /glBudgets/{id} { allow read: if canSeeBooks(t); allow write: if moduleOn(t, 'accounting') && canBooks(t) && idMatches(id); }
+      match /exchangeRates/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'accounting') && canBooks(t) && idMatches(id); }
+      match /bankStatements/{id} { allow read: if canSeeBooks(t); allow create: if moduleOn(t, 'accounting') && canBooks(t) && request.resource.data.importedBy == request.auth.uid; allow update, delete: if false; }
+      match /bankRecons/{id} {
+        allow read: if canSeeBooks(t);
+        allow create: if moduleOn(t, 'accounting') && canBooks(t) && request.resource.data.createdBy == request.auth.uid;
+        allow delete: if canBooks(t);
+        allow update: if false;
+      }
+      match /assets/{id} {
+        allow read: if canSeeBooks(t);
+        allow create: if moduleOn(t, 'accounting') && canBooks(t) && idMatches(id) && request.resource.data.status == 'active';
+        // Depreciation and disposal figures are maintained by the server only.
+        allow update: if moduleOn(t, 'accounting') && canBooks(t)
+                      && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['accumulatedDep', 'lastDepPeriod', 'status', 'disposalDate']);
+        allow delete: if canBooks(t) && resource.data.accumulatedDep == 0 && !('lastDepPeriod' in resource.data);
+      }
       match /journals/{id} {
         allow read: if canBooks(t) || isManager(t);
         allow create, update: if moduleOn(t, 'accounting') && (canBooks(t) || canPos(t));

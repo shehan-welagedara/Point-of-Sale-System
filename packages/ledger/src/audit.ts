@@ -18,6 +18,8 @@ export interface AuditEvent {
   at: string;
   actorType: "user" | "service" | "system" | "unknown";
   actorId?: string;
+  /** Where the identity came from: Firebase's verified auth context, or the write's audit stamp. */
+  actorSource?: "auth" | "stamp";
   collection: string;
   docId: string;
   action: "create" | "update" | "delete";
@@ -48,7 +50,7 @@ export interface AuditSeal {
 export const UNAUDITED = new Set(["ledger", "accountBalances", "ledgerHead", "numberSeries", "sequences", "dailyStats", "printJobs", "auditEvents", "auditSeals"]);
 
 /** Fields that only describe bookkeeping noise and are left out of diffs. */
-const NOISE = new Set(["updatedAt"]);
+const NOISE = new Set(["updatedAt", "updatedBy"]);
 
 export function diffDocs(before: Record<string, unknown> | null, after: Record<string, unknown> | null): Pick<AuditEvent, "action" | "changedFields" | "before" | "after"> {
   if (!before && after) return { action: "create", changedFields: Object.keys(after).filter((k) => !NOISE.has(k)).sort(), after };
@@ -69,7 +71,7 @@ export function auditEventHash(e: Omit<AuditEvent, "hash">): Promise<string> {
 }
 
 /** Builds an event for a document change, or null when nothing meaningful changed. */
-export async function makeAuditEvent(args: { id: string; at: string; actorType: AuditEvent["actorType"]; actorId?: string; collection: string; docId: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null }): Promise<AuditEvent | null> {
+export async function makeAuditEvent(args: { id: string; at: string; actorType: AuditEvent["actorType"]; actorId?: string; actorSource?: AuditEvent["actorSource"]; collection: string; docId: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null }): Promise<AuditEvent | null> {
   const d = diffDocs(args.before, args.after);
   if (d.action === "update" && d.changedFields.length === 0) return null;
   // Large blobs (logos) are recorded by size, not content.
@@ -80,6 +82,7 @@ export async function makeAuditEvent(args: { id: string; at: string; actorType: 
     at: args.at,
     actorType: args.actorType,
     ...(args.actorId ? { actorId: args.actorId } : {}),
+    ...(args.actorSource ? { actorSource: args.actorSource } : {}),
     collection: args.collection,
     docId: args.docId,
     action: d.action,
