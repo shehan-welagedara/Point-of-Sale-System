@@ -402,6 +402,12 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
     }
   }
 
+  // Today's check numbers continue after the sample checks.
+  const todays = (await store.list<Check>(C.checks, { where: [["businessDate", "==", opts.today]] }));
+  for (const wsId of new Set(todays.map((c) => c.workstationId))) {
+    await store.merge(C.sequences, wsId, { checkDate: opts.today, checkSeq: Math.max(...todays.filter((c) => c.workstationId === wsId).map((c) => c.checkNo)) });
+  }
+
   await processDepletion(store, { locationId: SAMPLE_LOCATION_ID, by: "sample-data", limit: 2000 });
 
   // Daily journals for the completed days.

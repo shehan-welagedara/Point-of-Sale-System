@@ -6,3 +6,9 @@ coverage/
 .env
 .env.*
 .firebase/
+apps/web/.env.local
+*.tsbuildinfo
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebaserc.local

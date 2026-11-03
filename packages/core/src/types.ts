@@ -518,6 +518,8 @@ export interface Check extends Entity {
   customerId?: string;
   /** Buyer details for a VAT tax invoice to a registered business. */
   buyer?: { name: string; tin: string; address: string };
+  /** Guest allergies: adding an item that contains one asks for confirmation (X14). */
+  allergies?: string[];
   status: "open" | "closed" | "voided";
   lines: CheckLine[];
   checkDiscountIds: string[];
