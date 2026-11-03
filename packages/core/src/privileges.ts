@@ -50,6 +50,7 @@ export const MEMBER_ROLE_INFO: Record<MemberRole, { label: string; description: 
   manager: { label: "Manager", description: "Menu, prices, staff, reports, stock and POS operations.", canWrite: ["menu", "people", "inventory", "purchasing", "crm", "pos", "reports"] },
   accountant: { label: "Accountant", description: "Accounting, journals and reports; read-only elsewhere.", canWrite: ["accounting"] },
   storekeeper: { label: "Storekeeper", description: "Stock, receiving, counts, waste and purchase orders.", canWrite: ["inventory", "purchasing"] },
+  auditor: { label: "Auditor", description: "Read-only access to everything, including the audit trail, integrity checks and audit exports.", canWrite: [] },
   viewer: { label: "Viewer", description: "Read-only access to reports and settings.", canWrite: [] },
   terminal: { label: "POS terminal", description: "Device login for POS terminals and tablets: checks, payments and print jobs only.", canWrite: ["pos"] },
 };

@@ -151,6 +151,8 @@ export class MemoryStore implements DocStore {
   private listeners = new Set<Listener>();
   /** Called after every write, e.g. to persist to localStorage. */
   onChange?: () => void;
+  /** Called for every document change with its before/after state (local audit trail). */
+  onWrite?: (change: { col: string; id: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null }) => void;
 
   private colMap(col: string): Map<string, Record<string, unknown>> {
     let m = this.data.get(col);
@@ -200,6 +202,8 @@ export class MemoryStore implements DocStore {
     const touched = new Set<string>();
     for (const op of ops) {
       const m = this.colMap(op.col);
+      const id = op.op === "set" ? op.data.id : op.id;
+      const before = m.get(id) ?? null;
       if (op.op === "set") {
         if (!op.data.id) throw new Error(`document in ${op.col} has no id`);
         m.set(op.data.id, clone(op.data) as Record<string, unknown>);
@@ -212,6 +216,7 @@ export class MemoryStore implements DocStore {
         m.delete(op.id);
       }
       touched.add(op.col);
+      this.onWrite?.({ col: op.col, id, before, after: m.get(id) ?? null });
     }
     for (const l of this.listeners) {
       if (touched.has(l.col)) l.cb(runQuery([...this.colMap(l.col).values()], l.query));

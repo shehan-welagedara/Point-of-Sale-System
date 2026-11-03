@@ -99,6 +99,9 @@ export interface AccountingSettings extends Entity {
     stockAdjustment: string;
     accountsPayable: string;
     complimentary: string;
+    /** Goods received, not yet invoiced (ERPNext "Stock Received But Not Billed"). When set, goods
+     * receipts credit this account and the supplier invoice moves it to trade creditors with VAT. */
+    stockReceivedNotBilled?: string;
   };
 }
 
@@ -286,7 +289,7 @@ export interface Staff extends Entity {
 }
 
 /** Back-office login (Firebase Auth user) and its access level for this tenant. */
-export type MemberRole = "owner" | "admin" | "manager" | "accountant" | "storekeeper" | "viewer" | "terminal";
+export type MemberRole = "owner" | "admin" | "manager" | "accountant" | "storekeeper" | "auditor" | "viewer" | "terminal";
 
 export interface Member extends Entity {
   /** Firebase Auth uid (= id). */
@@ -599,10 +602,40 @@ export interface DailyStats extends Entity {
   voids: MoneyQty;
 }
 
+export type AccountType =
+  | "Bank"
+  | "Cash"
+  | "Receivable"
+  | "Payable"
+  | "Stock"
+  | "StockReceivedNotBilled"
+  | "Tax"
+  | "FixedAsset"
+  | "AccumulatedDepreciation"
+  | "Depreciation"
+  | "CostOfGoodsSold"
+  | "Equity"
+  | "RetainedEarnings"
+  | "Income"
+  | "Expense"
+  | "RoundOff"
+  | "ExchangeGainLoss";
+
+/** Chart of accounts node (ERPNext-style tree: groups contain ledgers; only ledgers take postings). */
 export interface Account extends Entity {
   code: string;
   name: string;
+  /** Root type (balance-sheet or P&L section). */
   type: "asset" | "liability" | "equity" | "income" | "expense";
+  parentId?: string;
+  isGroup?: boolean;
+  accountType?: AccountType;
+  /** Frozen accounts accept no new postings. */
+  frozen?: boolean;
+  /** Account currency when it is not the company currency (e.g. a USD bank account). */
+  currency?: string;
+  /** SLFRS/IFRS financial statement line, for statement mapping and audit files. */
+  statementLine?: string;
 }
 
 export interface JournalLine {

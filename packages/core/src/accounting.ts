@@ -91,8 +91,13 @@ export function buildDailyJournal(args: {
   for (const r of args.receipts) {
     const value = args.receiptValues.get(r.id) ?? 0;
     lines.push(line(a.inventory, value, `GRN ${r.number}`));
-    lines.push(line(a.vatInput, r.inputVat, `Input VAT ${r.number}`));
-    lines.push(line(a.accountsPayable, -(value + r.inputVat), `Supplier ${r.number}`));
+    if (a.stockReceivedNotBilled) {
+      // Perpetual inventory: the supplier invoice later clears this account and books input VAT.
+      lines.push(line(a.stockReceivedNotBilled, -value, `Received not billed ${r.number}`));
+    } else {
+      lines.push(line(a.vatInput, r.inputVat, `Input VAT ${r.number}`));
+      lines.push(line(a.accountsPayable, -(value + r.inputVat), `Supplier ${r.number}`));
+    }
   }
   const out = consolidate(lines);
   const t = journalTotals(out);

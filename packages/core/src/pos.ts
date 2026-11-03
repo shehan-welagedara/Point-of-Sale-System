@@ -26,7 +26,13 @@ import type {
   TenderMedia,
   WorkstationSequence,
 } from "./types.js";
-import { newId, nowIso, sha256Hex } from "./util.js";
+import { canonicalJson, newId, nowIso, sha256Hex } from "./util.js";
+
+/** Tamper-evidence hash of an invoice: SHA-256 of the previous hash plus the canonical record. */
+export function invoiceHash(invoice: Omit<Invoice, "hash"> | Invoice): Promise<string> {
+  const { hash: _ignored, ...base } = invoice as Invoice;
+  return sha256Hex(base.prevHash + canonicalJson(base));
+}
 
 /** Settings and reference data a terminal keeps in memory while selling. */
 export interface PosContext {
@@ -191,7 +197,7 @@ export async function closeCheck(store: DocStore, check: Check, ctx: PosContext,
     totals,
     prevHash,
   };
-  const hash = await sha256Hex(prevHash + JSON.stringify(base));
+  const hash = await invoiceHash(base);
   const invoice: Invoice = { ...base, hash };
 
   const closed: Check = {
