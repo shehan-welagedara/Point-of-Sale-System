@@ -1,5 +1,8 @@
 # Point-of-Sale-System (POS Suite)
 
+> **This is the `enterprise/hotel-suite` branch: Enterprise Hotel Edition (Model 2).** It is for medium to large hotels and runs POS, guest system and ERPNext on MariaDB, in each hotel and in Google Cloud, all configured from the Firebase console. **Status: design and build documentation; the build has not started.** Start with [docs/enterprise](docs/enterprise/README.md). The rest of this README describes the Cloud Restaurant Edition (Model 1) that this branch starts from and reuses.
+
+
 A restaurant platform for the Sri Lankan market. It combines **POS + back office (EMC) + recipes and costing + inventory and purchasing (ERP) + customers (CRM) + a full general ledger + revenue reports**, with a system-wide audit trail,, all sharing one Firebase/Firestore database. Each client gets **only the modules they buy**.
 
 > **Status:** working product foundation with full demo data. Runs locally with no setup, or on Firebase within the free tier. Integrations (PayHere, LankaQR, WhatsApp) run as templates in mock mode until client accounts are approved.
@@ -53,6 +56,7 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | 14 | [**Feature coverage vs Simphony and S/4HANA**](docs/14-feature-coverage.md) |
 | 15 | [**Licensing and modules**](docs/15-licensing-and-modules.md) |
 | 16 | [**Users, access control, audit and QA**](docs/16-users-access-and-audit.md) |
+| E | [**Enterprise Hotel Edition (this branch)**](docs/enterprise/README.md) |
 
 ## Commands
 ```bash
