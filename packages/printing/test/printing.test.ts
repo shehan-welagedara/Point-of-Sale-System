@@ -1,0 +1,82 @@
+import { describe, expect, it } from "vitest";
+import { calculateCheck, sriLankaChargeRules } from "@pos/engine";
+import type { BrandingSettings, BusinessSettings, Check, TenderMedia } from "@pos/core";
+import { buildBill, buildKot, pairLines, toEscPos, toText, wrap } from "../src/index.js";
+
+const business: BusinessSettings = {
+  id: "business",
+  legalName: "Sample Restaurant (Pvt) Ltd",
+  tradingName: "Spice Lagoon",
+  tin: "100000000",
+  vatRegistered: true,
+  ssclLiable: false,
+  addressLines: ["No. 25, Galle Road", "Colombo 03"],
+  phone: "011 200 0000",
+  email: "",
+};
+const branding: BrandingSettings = { id: "branding", displayName: "Spice Lagoon", primaryColor: "#000", accentColor: "#000", receiptHeaderLines: [], receiptFooterLines: ["Thank you!"], poweredBy: "Demo POS" };
+const tenders = new Map<string, TenderMedia>([["CASH", { id: "CASH", name: "Cash", type: "cash", allowChange: true, requiresReference: false, opensDrawer: true, accountCode: "1000", sortOrder: 1, active: true }]]);
+
+const check: Check = {
+  id: "c1", propertyId: "P1", rvcId: "R1", workstationId: "W01", checkNo: 12, orderTypeId: "dine-in", tableId: "T4", covers: 2, staffId: "S1",
+  status: "closed", sentRounds: 1, businessDate: "2026-11-03", openedAt: "2026-11-03T14:00:00Z", closedAt: "2026-11-03T15:11:00Z", channel: "pos",
+  checkDiscountIds: [], change: 0,
+  lines: [
+    { id: "a", menuItemId: "K001", name: "Chicken Kottu", qty: 2, unitPrice: 120_000, modifiers: [{ groupId: "g", optionId: "o", name: "Extra spicy", price: 0 }], taxClass: "standard", kotRoute: "kitchen", categoryId: "K", discountIds: [], sentRound: 1 },
+    { id: "b", menuItemId: "J001", name: "Lime Juice", qty: 1, unitPrice: 45_000, modifiers: [], taxClass: "standard", kotRoute: "bar", categoryId: "D", discountIds: [], sentRound: 1 },
+  ],
+  payments: [],
+};
+
+const totals = calculateCheck({
+  orderType: "dine-in", pricing: "exclusive",
+  rules: sriLankaChargeRules({ vatRegistered: true, ssclLiable: false }),
+  lines: check.lines.map((l) => ({ id: l.id, name: l.name, quantity: l.qty, unitPrice: l.unitPrice, taxClass: "standard" })),
+});
+const paid: Check = { ...check, payments: [{ id: "p", tenderId: "CASH", amount: 400_000, applied: totals.amountDue, tendered: 400_000, at: "", by: "S1" }], change: 400_000 - totals.amountDue };
+
+describe("layout helpers", () => {
+  it("wraps and pairs text", () => {
+    expect(wrap("one two three four", 9)).toEqual(["one two", "three", "four"]);
+    expect(pairLines("Chicken Kottu", "2,400.00", 24)).toEqual(["Chicken Kottu   2,400.00"]);
+  });
+});
+
+describe("bill", () => {
+  it("prints the IRD tax invoice particulars for a VAT-registered seller", () => {
+    const text = toText(buildBill({ kind: "invoice", check: paid, totals, business, branding, width: 48, staffName: "Nimali", orderTypeName: "Dine-in", tableName: "4", tenders, invoiceNo: "26NOV_W01_1", openDrawer: true }));
+    for (const s of ["TAX INVOICE", "TIN: 100000000", "26NOV_W01_1", "Invoice Dt : ", "03-11-2026 20:41", "Supply Dt  :", "Value excl. VAT", "VAT 18%", "Service Charge 10%", "Change"]) {
+      expect(text).toContain(s);
+    }
+    expect(text).toContain("   - Extra spicy");
+    expect(text.split("\n").every((l) => l.length <= 48)).toBe(true);
+  });
+
+  it("prints a plain invoice without VAT lines for non-registered sellers, and guest checks before payment", () => {
+    const plain = toText(buildBill({ kind: "invoice", check: paid, totals, business: { ...business, vatRegistered: false }, branding, width: 32, staffName: "N", orderTypeName: "Dine-in", tenders, invoiceNo: "26NOV_W01_2" }));
+    expect(plain).not.toContain("TAX INVOICE");
+    expect(plain).not.toContain("TIN:");
+    const guest = toText(buildBill({ kind: "guestCheck", check, totals, business, branding, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, qr: { data: "000201", caption: "Scan to pay with LankaQR" } }));
+    expect(guest).toContain("GUEST CHECK");
+    expect(guest).toContain("not a tax invoice");
+  });
+
+  it("encodes ESC/POS with init, cut and drawer kick", () => {
+    const bytes = toEscPos(buildBill({ kind: "invoice", check: paid, totals, business, branding, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, invoiceNo: "26NOV_W01_1", openDrawer: true }));
+    expect([...bytes.slice(0, 2)]).toEqual([0x1b, 0x40]);
+    const hex = Buffer.from(bytes).toString("hex");
+    expect(hex).toContain("1d564200");
+    expect(hex).toContain("1b700019fa");
+    expect(Buffer.from(bytes).toString("latin1")).toContain("TAX INVOICE");
+  });
+});
+
+describe("KOT", () => {
+  it("shows round, table and allergens", () => {
+    const text = toText(buildKot({ check, lines: [check.lines[0]!], station: "Kitchen", width: 48, staffName: "Tharindu", orderTypeName: "Dine-in", tableName: "4", at: "2026-11-03T14:05:00Z", menuItems: new Map([["K001", { allergens: ["gluten", "egg"] } as never]]) }));
+    expect(text).toContain("KOT - KITCHEN");
+    expect(text).toContain("TABLE 4");
+    expect(text).toContain("2 x Chicken Kottu");
+    expect(text).toContain("CONTAINS: GLUTEN, EGG");
+  });
+});

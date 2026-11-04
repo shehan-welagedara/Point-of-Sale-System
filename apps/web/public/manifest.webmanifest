@@ -1,0 +1,10 @@
+{
+  "name": "POS Suite",
+  "short_name": "POS",
+  "start_url": "/pos",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F5F5F7",
+  "theme_color": "#0F766E",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

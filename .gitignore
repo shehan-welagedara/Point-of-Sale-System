@@ -1,0 +1,20 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+*.log
+.env
+.env.*
+.firebase/
+apps/web/.env.local
+*.tsbuildinfo
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebaserc.local
+apps/functions/dist/
+apps/functions/.env
+
+# Vendor licence signing keys and issued licences (never commit)
+licence-keys/
+e2e-failure.png

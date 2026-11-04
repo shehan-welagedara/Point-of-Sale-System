@@ -1,0 +1,17 @@
+{
+  "name": "@pos/excel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Excel data feeders: template generation, import validation and export.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "templates": "tsx scripts/generate-templates.ts"
+  },
+  "dependencies": { "@pos/core": "workspace:*", "@pos/sample-data": "workspace:*", "exceljs": "4.4.0" },
+  "devDependencies": { "typescript": "5.9.3", "vitest": "3.2.4", "tsx": "4.19.4", "@types/node": "22.15.3" }
+}

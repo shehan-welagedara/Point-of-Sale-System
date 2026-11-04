@@ -1,0 +1,34 @@
+{
+  "name": "@pos/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Back office (EMC), POS and manager reports. Runs against Firebase or, with no Firebase config, in local demo mode.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pos/core": "workspace:*",
+    "@pos/engine": "workspace:*",
+    "@pos/excel": "workspace:*",
+    "@pos/ledger": "workspace:*",
+    "@pos/printing": "workspace:*",
+    "@pos/sample-data": "workspace:*",
+    "firebase": "11.10.0",
+    "qrcode": "1.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-router-dom": "6.28.0"
+  },
+  "devDependencies": {
+    "@types/qrcode": "1.5.5",
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
+    "@vitejs/plugin-react": "4.4.1",
+    "typescript": "5.9.3",
+    "vite": "6.3.5"
+  }
+}

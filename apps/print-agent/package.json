@@ -1,0 +1,23 @@
+{
+  "name": "@pos/print-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Print Agent: runs on a PC or mini-PC on the restaurant network and prints queued bills/KOTs on USB or network ESC/POS printers (used by tablets and terminals).",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pos/core": "workspace:*",
+    "@pos/printing": "workspace:*",
+    "firebase": "11.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "tsx": "4.19.4",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

@@ -1,0 +1,4 @@
+# DEMO licence signing key. PUBLIC on purpose: anyone can issue demo licences with it.
+# Production: run `pnpm licence keygen` and use your own key pair.
+public=MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE85ylaqW1wjgPRsjQpHPcJzbLym6yTypROXgPgJbNik_kkKimzb3INbrq5HPDxUcQxzuHhzf-gm500yRWTw3N2Q
+private=MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgH2xoUmhCsQZhUe7An-6dYgF0rSBQ-5tDI1nwHyf5_9WhRANCAATznKVqpbXCOA9GyNCkc9wnNsvKbrJPKlE5eA-Als2KT-SQqKbNvcg1uurkc8PFRxDHO4eHN_6CbnTTJFZPDc3Z
