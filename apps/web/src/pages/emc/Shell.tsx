@@ -95,6 +95,7 @@ export function Launchpad() {
           <p>{settings.business.tradingName} · choose a module</p>
         </div>
       </div>
+      <div className="launch-groups">
       {groups.map((g) => {
         const ws = visible.filter((w) => w.group === g);
         if (!ws.length) return null;
@@ -113,6 +114,7 @@ export function Launchpad() {
           </section>
         );
       })}
+      </div>
       {locked.length ? (
         <section className="stack tight">
           <span className="section-title">Not in your licence</span>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   type Check,
@@ -106,6 +106,11 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
   const [cat, setCat] = useState<string>("");
   const [q, setQ] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Item buttons are paged like a terminal on PCs and tablets (no scrolling); phones scroll.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [perPage, setPerPage] = useState(0);
+  const [itemPage, setItemPage] = useState(0);
+  const swipe = useRef<number | null>(null);
   const [dialog, setDialog] = useState<
     | { t: "mods"; item: MenuItem }
     | { t: "allergy"; item: MenuItem; hits: string[] }
@@ -401,9 +406,32 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
     .filter((m) => (q.trim() ? `${m.code} ${m.name} ${m.nameSi ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()) : m.categoryId === cat))
     .sort((a, b) => a.sortOrder - b.sortOrder);
   const catColor = new Map(categories.map((c) => [c.id, c.color]));
+  const pageCount = perPage > 0 ? Math.max(1, Math.ceil(items.length / perPage)) : 1;
+  const shownPage = Math.min(itemPage, pageCount - 1);
+  const shown = perPage > 0 && items.length > perPage ? items.slice(shownPage * perPage, (shownPage + 1) * perPage) : items;
   const selLine = check?.lines.find((l) => l.id === sel);
   const customer = customers.find((c) => c.id === check?.customerId);
   const itemCount = check ? activeLines(check).reduce((a, l) => a + l.qty, 0) : 0;
+
+  useEffect(() => setItemPage(0), [cat, q]);
+  useLayoutEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const measure = () => {
+      if (window.innerWidth <= 860) return setPerPage(0);
+      const cs = getComputedStyle(el);
+      const cols = cs.gridTemplateColumns.split(" ").filter(Boolean).length || 1;
+      const gap = parseFloat(cs.rowGap) || 10;
+      const itemH = el.querySelector<HTMLElement>(".pos-item")?.offsetHeight || 92;
+      const avail = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const rows = Math.max(1, Math.floor((avail + gap) / (itemH + gap)));
+      setPerPage(cols * rows);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [view, theme.buttonSize, theme.showImages, theme.columns, theme.fontScale, items.length > 0]);
 
   return (
     <div className={themeClass(theme)} style={themeStyle(theme, settings.branding.primaryColor)}>
@@ -476,8 +504,18 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
             <div className="pos-search">
               <input className="input" placeholder="Search item or code" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            <div className="pos-grid" style={gridColumns(theme)}>
-              {items.map((m) => {
+            <div
+              ref={gridRef}
+              className={`pos-grid${pageCount > 1 ? " paged" : ""}`}
+              style={gridColumns(theme)}
+              onPointerDown={(e) => (swipe.current = e.clientX)}
+              onPointerUp={(e) => {
+                const dx = swipe.current === null ? 0 : e.clientX - swipe.current;
+                swipe.current = null;
+                if (pageCount > 1 && Math.abs(dx) > 80) setItemPage(Math.max(0, Math.min(pageCount - 1, shownPage + (dx < 0 ? 1 : -1))));
+              }}
+            >
+              {shown.map((m) => {
                 const img = theme.showImages && m.hasImage ? imageOf.get(m.id) : undefined;
                 const meta = (
                   <>
@@ -503,6 +541,13 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
                 );
               })}
             </div>
+            {pageCount > 1 ? (
+              <div className="pos-pager" aria-label="Item pages">
+                <button className="btn" disabled={shownPage === 0} onClick={() => setItemPage(shownPage - 1)} aria-label="Previous page">‹ Prev</button>
+                <span className="small muted">Page {shownPage + 1} of {pageCount}</span>
+                <button className="btn" disabled={shownPage >= pageCount - 1} onClick={() => setItemPage(shownPage + 1)} aria-label="Next page">Next ›</button>
+              </div>
+            ) : null}
           </section>
 
           <aside className={`pos-check${sheetOpen ? " open" : ""}`}>

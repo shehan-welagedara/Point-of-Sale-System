@@ -160,7 +160,7 @@ function DeviceSetup({ workstations, rvcs, onPick }: { workstations: Workstation
         <p className="muted">Choose which workstation this screen is. Each workstation numbers its own bills (IRD invoice series) and keeps its own transaction journal, so use each one on only one device.</p>
         <div className="stack tight">
           {workstations.map((w) => (
-            <button key={w.id} className="btn lg block" style={{ justifyContent: "space-between" }} onClick={() => onPick(w.id)}>
+            <button key={w.id} className="btn lg block device-btn" style={{ justifyContent: "space-between" }} onClick={() => onPick(w.id)}>
               <span>{w.name}</span>
               <span className={`badge ${w.deviceProfile === "mobile" ? "info" : "brand"}`}>
                 {rvcs.find((r) => r.id === w.rvcId)?.name} · {w.code}

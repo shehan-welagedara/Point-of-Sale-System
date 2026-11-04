@@ -46,7 +46,7 @@ export function FinanceOverview() {
   return (
     <div className="page">
       <PageHead title="Finance" subtitle={`Fiscal year ${fiscal.current?.id ?? "—"} · figures update as documents post`} actions={<Link className="btn" to="/emc/finance/statements">Financial statements</Link>} />
-      <div className="grid cols-3">
+      <div className="stats">
         <Stat label="Cash and bank" value={money(cash)} />
         <Stat label="Receivables" value={money(receivable)} {...(overdueAr ? { sub: `${money(overdueAr)} overdue`, tone: "bad" as const } : {})} />
         <Stat label="Payables" value={money(payable)} {...(overdueAp ? { sub: `${money(overdueAp)} overdue`, tone: "warn" as const } : {})} />
@@ -56,7 +56,7 @@ export function FinanceOverview() {
         <Stat label="Profit year to date" value={money(profitYtd)} tone={profitYtd >= 0 ? "good" : "bad"} sub={fiscal.current?.id ?? ""} />
         <Stat label="VAT payable (net)" value={money(vat)} />
       </div>
-      <div className="grid cols-2">
+      <div className="cards4">
         <div className="card">
           <div className="card-head"><h3>Waiting for approval</h3><Link className="small" to="/emc/finance/approvals">Open inbox →</Link></div>
           <div className="card-body stack tight">

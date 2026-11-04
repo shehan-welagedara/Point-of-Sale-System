@@ -108,7 +108,7 @@ export function StatementsPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page fill">
       <PageHead
         title="Financial statements"
         subtitle="Live from the universal journal: every figure drills down to the documents behind it. Layouts follow SLFRS (Sri Lanka's IFRS)."
@@ -138,7 +138,7 @@ export function StatementsPage() {
       {!reports ? (
         <Loading />
       ) : tab === "tb" ? (
-        <div className="card table-wrap">
+        <div className="card table-wrap fill-card">
           <div className="card-head"><h3>Trial balance</h3><span className={`badge ${reports.tb.totals.debit === reports.tb.totals.credit ? "good" : "bad"}`}>{reports.tb.totals.debit === reports.tb.totals.credit ? "Balanced" : "Out of balance"}</span></div>
           <table className="table">
             <thead><tr><th>Account</th><th className="num">Opening</th><th className="num">Debit</th><th className="num">Credit</th><th className="num">Closing</th></tr></thead>
@@ -157,7 +157,7 @@ export function StatementsPage() {
           </table>
         </div>
       ) : tab === "pl" ? (
-        <div className="card table-wrap">
+        <div className="card table-wrap fill-card">
           <div className="card-head"><h3>Statement of profit or loss</h3><span className={`badge ${reports.pl.netProfit >= 0 ? "good" : "bad"}`}>{money(reports.pl.netProfit)}</span></div>
           <table className="table">
             <tbody>
@@ -176,7 +176,7 @@ export function StatementsPage() {
           <p className="small muted" style={{ padding: "0 16px 16px" }}>Costs are shown as negatives. Gross margin {reports.pl.revenue.total ? `${((reports.pl.grossProfit / reports.pl.revenue.total) * 100).toFixed(1)}%` : "—"}.</p>
         </div>
       ) : tab === "bs" ? (
-        <div className="card table-wrap">
+        <div className="card table-wrap fill-card">
           <div className="card-head"><h3>Statement of financial position as at {toPeriod}</h3><span className={`badge ${reports.bs.balanced ? "good" : "bad"}`}>{reports.bs.balanced ? "Balanced" : "Does not balance"}</span></div>
           <table className="table">
             <tbody>
@@ -193,7 +193,7 @@ export function StatementsPage() {
           </table>
         </div>
       ) : tab === "cf" ? (
-        <div className="card table-wrap">
+        <div className="card table-wrap fill-card">
           <div className="card-head"><h3>Statement of cash flows (indirect method)</h3><span className={`badge ${reports.cf.reconciles ? "good" : "bad"}`}>{reports.cf.reconciles ? "Reconciles to cash" : "Does not reconcile"}</span></div>
           <table className="table">
             <tbody>
@@ -215,7 +215,7 @@ export function StatementsPage() {
           </table>
         </div>
       ) : tab === "gl" ? (
-        <div className="card table-wrap">
+        <div className="card table-wrap fill-card">
           <div className="card-head"><h3>General ledger {glAccount}</h3><span className="small muted">Opening {money(glRows?.opening)}</span></div>
           {!glRows ? (
             <Loading />
@@ -241,7 +241,7 @@ export function StatementsPage() {
         </div>
       ) : reports.tax ? (
         <div className="grid cols-2">
-          <div className="card table-wrap">
+          <div className="card table-wrap fill-card">
             <div className="card-head"><h3>VAT return working</h3></div>
             <table className="table">
               <tbody>
@@ -251,7 +251,7 @@ export function StatementsPage() {
               <tfoot><tr><td>Net VAT payable</td><td className="num">{amount(reports.tax.netVatPayable)}</td></tr></tfoot>
             </table>
           </div>
-          <div className="card table-wrap">
+          <div className="card table-wrap fill-card">
             <div className="card-head"><h3>Other taxes</h3></div>
             <table className="table">
               <tbody>

@@ -189,7 +189,7 @@ export function RolesPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page fill">
       <PageHead
         title="Roles & privileges"
         subtitle="What each role may do on the POS, its limits, and its level. Level 1 is the most senior: people can approve actions only for roles at their level or below, and only within their own limits."
@@ -202,8 +202,8 @@ export function RolesPage() {
           ) : null
         }
       />
-      <div className="callout small">Click a cell to cycle: <span className="badge">—</span> not allowed → <span className="badge good">✓</span> allowed → <span className="badge warn">✓ approval</span> allowed but a senior employee must approve each time.</div>
-      <div className="card table-wrap">
+      <div className="callout small" style={{ flex: "none" }}>Click a cell to cycle: <span className="badge">—</span> not allowed → <span className="badge good">✓</span> allowed → <span className="badge warn">✓ approval</span> allowed but a senior employee must approve each time.</div>
+      <div className="card table-wrap fill-card">
         <table className="table">
           <thead>
             <tr>

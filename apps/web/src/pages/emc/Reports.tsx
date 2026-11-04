@@ -284,7 +284,7 @@ export function Reports() {
   const maxHour = Math.max(1, ...byHour.map((h) => h.amount));
 
   return (
-    <div className="page">
+    <div className="page fill">
       <PageHead
         title="Reports"
         subtitle="Daily revenue, item-wise sales, covers and sales analysis. Totals come from pre-aggregated daily figures, so they load instantly."
@@ -339,7 +339,7 @@ export function Reports() {
             <Stat label="Checks · covers" value={`${merged.checks} · ${merged.covers}`} sub={`Avg check ${money(merged.checks ? Math.round(merged.total / merged.checks) : 0)}`} />
             <Stat label="Voids" value={money(merged.voids.amount)} sub={`${merged.voids.qty} item(s)`} tone={merged.voids.qty ? "warn" : undefined} />
           </div>
-          <div className="card table-wrap">
+          <div className="card table-wrap fill-card">
             <table className="table">
               <thead>
                 <tr>
@@ -392,7 +392,7 @@ export function Reports() {
           </div>
         </>
       ) : tab === "items" ? (
-        <div className="card table-wrap">
+        <div className="card table-wrap fill-card">
           <table className="table">
             <thead>
               <tr>
@@ -423,7 +423,7 @@ export function Reports() {
           </table>
         </div>
       ) : tab === "covers" ? (
-        <div className="card table-wrap">
+        <div className="card table-wrap fill-card">
           <table className="table">
             <thead>
               <tr>
@@ -500,7 +500,7 @@ export function Reports() {
           </div>
         </div>
       ) : (
-        <div className="card table-wrap">
+        <div className="card table-wrap fill-card">
           <div className="card-head"><h3>Checks closed on {to}</h3></div>
           {!checks ? (
             <Loading />
