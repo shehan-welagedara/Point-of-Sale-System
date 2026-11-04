@@ -9,17 +9,22 @@ A restaurant platform for the Sri Lankan market. It combines **POS + back office
 pnpm install
 pnpm dev                 # open http://localhost:5173 → "Load the demo restaurant"
 ```
-- POS: **Open POS** → pick a workstation → *Kasun Perera* → PIN **1111**.
+- The back office opens on a **launchpad**: each module (POS Configuration, Menu, Inventory, Finance, Audit Center, People & Security, Administration…) opens as its own workspace.
+- POS: **Point of Sale** → pick a workstation → employee number **1001**, PIN **1111** (manager). Others: 1002/2222 cashier, 1006/6666 supervisor, 1007/7777 bartender.
 - Finance: **Finance → Overview**. Switch **Acting as** (bottom of the sidebar) between Owner, Accountant and External auditor to see maker–checker approvals and read-only audit access.
 - All demo data is fictional sample data: "Spice Lagoon", Colombo. VAT-registered, SSCL not liable.
 
 ## What's in the box
 | Area | Highlights |
 |------|-----------|
+| **Licensing & modules** | Editions (Starter, Professional, Enterprise) with add-ons and limits; vendor-signed licence keys bound to the client's Firebase project; modules chosen at installation; launchpad with a separate workspace per module. [Details](docs/15-licensing-and-modules.md) |
 | **POS** (terminals and tablets) | PIN sign-in with roles and manager override; tables and covers; dine-in, takeaway and delivery; modifiers; **allergy alerts**; send to kitchen (KOT routing kitchen/bar, backup printers); guest check with **LankaQR**; split payments (cash with change, card approval code, LankaQR, PayHere, USD cash, vouchers, house account, comp); voids with reason codes; discounts; 86 items; X/Z reports; **End of Day** (stock deduction, journal, WhatsApp report) |
 | **Sri Lanka compliance** | Service charge → SSCL → VAT order, inclusive or exclusive pricing, **IRD tax invoice format** (Gazette 2481/22) with `YYMMM_W01_n` numbers per workstation, hash-chained immutable invoices, plain invoices for non-VAT businesses |
 | **Back office (EMC)** | Menu, categories, modifiers, tenders, discounts, order types, reason codes, tables, outlets and revenue centres, devices and printers, **branding per client** (logo, colours, bill text), **modules on/off per client** |
-| **People Management** | POS staff (PIN, card, status), roles with a privilege matrix, back-office logins with access levels and email invitations |
+| **People & Security** | Hotel hierarchy (enterprise → property → revenue centre); employees with property roles, revenue-centre access, cards and employment dates; roles with **levels, limits and "needs approval"**; sign-in by number/card/name + PIN with **lockout**, auto sign-out, **clock in/out**; manager override by a senior employee only; back-office logins. [Details](docs/16-users-access-and-audit.md) |
+| **POS look** | **Three themes** (Classic, Modern, Midnight), every colour, size and layout customisable with live preview; **item photos** on buttons |
+| **Transaction journal** | Every operator action (voids, discounts, overrides, transfers, splits, no-sales, paid in/out, approvals, sign-ins) hash-chained per workstation; on-POS **reports** (daily sales, employee financial, items, open checks, exceptions) |
+| **Quality assurance** | Every save validated against schemas; cross-module **data quality** check; integrity check of invoices, ledger, audit trail and POS journal; unit, rules, server and browser end-to-end tests |
 | **Recipes & costing** | Recipes and prep sub-recipes, portion cost, food cost %, gross profit, price at target cost % |
 | **Inventory & purchasing** | Stock items with purchase/stock units, locations, **FIFO** lots, recipe-based depletion of every sale, purchase orders (suggested from par levels), goods receipts with input VAT, waste, transfers, production batches, blind stock counts, movements, valuation |
 | **Accounting (general ledger)** | ERPNext design on Firestore with an S/4HANA-style universal journal: POS days post automatically; supplier invoices with **3-way match**; customer invoices; payments with open items and FX; **bank reconciliation**; **fixed assets** (SL/WDV); budgets; **period close** and year-end; SLFRS **P&L, balance sheet, cash flow**, TB, GL, VAT/SSCL/WHT; **maker–checker approvals**; gap-free numbering and hash-chained postings, all on the server (Cloud Functions). [Details](docs/13-accounting-and-audit.md) |
@@ -45,6 +50,9 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | 11 | [**Hardware models (dedicated vs tablets) & printing**](docs/11-hardware-and-printing.md) |
 | 12 | [**Getting started, demos & client deployments**](docs/12-getting-started.md) |
 | 13 | [**Accounting (general ledger) & audit**](docs/13-accounting-and-audit.md) |
+| 14 | [**Feature coverage vs Simphony and S/4HANA**](docs/14-feature-coverage.md) |
+| 15 | [**Licensing and modules**](docs/15-licensing-and-modules.md) |
+| 16 | [**Users, access control, audit and QA**](docs/16-users-access-and-audit.md) |
 
 ## Commands
 ```bash
@@ -52,6 +60,9 @@ pnpm dev               # web app (local demo mode unless apps/web/.env.local has
 pnpm test              # unit tests (engine, core, ledger, printing, sample data, Excel, print agent, functions)
 pnpm test:rules        # Firestore security rules on the emulator (needs Java)
 pnpm test:functions    # Cloud Functions end to end on the emulators (needs Java)
+pnpm test:e2e          # browser end-to-end in local demo mode (needs Playwright + Chromium)
+pnpm licence keygen    # vendor: create your licence signing key (once)
+pnpm licence issue …   # vendor: issue a client licence key (see docs/15)
 pnpm emulators         # local Firebase Auth + Firestore + Functions
 pnpm build             # production build of the web app
 pnpm firebase:deploy   # deploy hosting, Firestore rules/indexes and functions (see docs/10 first)

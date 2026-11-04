@@ -13,13 +13,13 @@ The build runs on **Firestore + Authentication (email/password) + Hosting + a fe
 | **Cloud Firestore** (the `(default)` database) | ✅ | Free daily quota (about 50,000 reads, 20,000 writes, 20,000 deletes and 1 GiB stored). A demo day uses a small fraction (see §5). |
 | **Authentication** (email/password) | ✅ | Email/password sign-in has no per-user charge for normal Firebase Auth. **Do not enable phone/SMS sign-in or SMS MFA**: SMS is charged per message. |
 | **Hosting** | ✅ | Free quota (about 10 GB stored and 360 MB transfer per day). The app is about 0.6 MB gzipped. |
-| **Cloud Functions** (2nd gen) | ✅ only when the Accounting module is used | Four functions: `ledgerApi` (posting, approvals, period close, integrity check), `auditTrail` and `auditTenant` (record every change), `auditSealer` (hourly). Free quota: about 2 million invocations a month plus compute time. A restaurant uses tens of thousands. They run at **0 minimum instances**, 256 MiB, max 3 instances. Deploying also uses **Cloud Build** (free build minutes), **Artifact Registry** (0.5 GB free; set the clean-up policy in §2), **Eventarc** (Firestore triggers) and **Cloud Scheduler** (3 free jobs per billing account; the sealer uses 1). |
+| **Cloud Functions** (2nd gen) | ✅ licence activation, audit trail and (with Accounting) the ledger | Five functions: `ledgerApi` (posting, approvals, period close, integrity check), `auditTrail` and `auditTenant` (record every change), `auditSealer` (hourly), `licenceApi` (licence activation, rarely called). Free quota: about 2 million invocations a month plus compute time. A restaurant uses tens of thousands. They run at **0 minimum instances**, 256 MiB, max 3 instances. Deploying also uses **Cloud Build** (free build minutes), **Artifact Registry** (0.5 GB free; set the clean-up policy in §2), **Eventarc** (Firestore triggers) and **Cloud Scheduler** (3 free jobs per billing account; the sealer uses 1). |
 | Cloud Storage | ❌ not used | Logos are resized and stored inside Firestore settings (≤ 360 px), so no Storage bucket is needed. |
 | Realtime Database, Extensions, BigQuery export, Vertex AI / Gemini, Test Lab, App Hosting | ❌ | Not needed. Leave them off. |
 
 The PayHere, LankaQR and WhatsApp integrations run in **mock mode**, which makes no external calls. When a client goes live with them, the server-side parts (PayHere notify URL, WhatsApp sending) will be added as more functions within the same quotas.
 
-If a client doesn't take the Accounting module, you can skip deploying functions entirely (`firebase deploy --only hosting,firestore`). The POS, inventory, CRM and reports work without them.
+Deploy the functions for every client: licence activation and the server-side audit trail need them, and they stay inside the free quotas. (A deployment without functions still runs the POS and back office, but can't activate a licence, so it stays on the 30-day trial, and changes are not audited server-side.)
 
 ## 2. Settings to turn on (one-off, about 15 minutes)
 
@@ -75,6 +75,8 @@ This works, but it **shuts the project down** until billing is re-enabled. Use i
 | End of Day with stock deduction | ~1 per ingredient used | ~1 per ingredient |
 | Post the POS day to the ledger (function) | ~60 (settings, accounts, day totals, movements) | ~25 (document, ledger lines, balances, number) |
 | Audit trail (function) | 0 | +1 per changed business record (e.g. a sale adds ~5) |
+| POS transaction journal | 25 once per POS start | ~4–6 per check (begin, send, payment, close; voids/discounts when they happen) |
+| Item photos | 1 per photo when the POS loads (≈ 30 KB each) | 1 per photo upload |
 | Hourly seal (function) | the new events since the last seal | 1 |
 | Integrity check (function, on demand) | every voucher, ledger line, invoice and audit event once. Run it monthly, not daily |  0 |
 
@@ -112,7 +114,4 @@ cp apps/web/.env.example apps/web/.env.local          # paste the Firebase web c
 cp apps/functions/.env.example apps/functions/.env    # LOCATION = your Firestore region
 npx firebase functions:artifacts:setpolicy --location asia-south1 --days 1
 pnpm firebase:deploy
-
-# without the Accounting module (no functions at all)
-npx firebase deploy --only hosting,firestore
 ```

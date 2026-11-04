@@ -27,7 +27,7 @@
 | D18 | Payments & integrations | PayHere and LankaQR (and WhatsApp, accounting connectors) built as **templates with sample data in mock mode**; live integration later. |
 | D19 | Branding | No confirmed assets yet: sample brand; logo, colours and bill text configurable per client in EMC → Branding. |
 | D20 | Data feeding | Menu, prices, modifiers, stock items and recipes are maintained in **Excel data feeders** and imported. |
-| D21 | One database, chosen modules | POS, recipes and costing, inventory and purchasing (ERP), accounting, CRM and revenue reports share one database; each client gets only the modules they buy (*Setup → Modules*, enforced by security rules). |
+| D21 | One database, chosen modules | POS, recipes and costing, inventory and purchasing (ERP), accounting, CRM and revenue reports share one database; each client gets only the modules they buy (*Administration → Licence & modules*, within the licence entitlement, enforced by security rules). |
 | D22 | Hardware | Two models in the same system: **dedicated** (Windows PC / POS terminal) and **mobility** (tablets). Both print physical bills and KOTs through the **Print Agent**. |
 | D23 | Market | Built for the Sri Lankan client market first (LKR, IRD invoice format, VAT/SSCL/SC, LankaQR, PayHere, Sinhala/Tamil item names). |
 
@@ -36,6 +36,11 @@
 |---|-------|----------|
 | D24 | Accounting | A **complete accounting system following ERPNext's design, built natively on Firestore** (not ERPNext itself, which needs its own MariaDB server). The whole database stays in Firebase. Feature scope is benchmarked on SAP S/4HANA Finance. See [13](13-accounting-and-audit.md). |
 | D25 | Server-side logic | **Cloud Functions** for posting, numbering, approvals, period close and the audit trail, so no client can bypass them. Settings keep them in the free tier ([10](10-firebase-free-tier.md)). Clients without Accounting can run without functions. |
+| D27 | Licensing | Editions + add-ons + limits as entitlements in vendor-signed licence keys (ECDSA), bound to the client's Firebase project; modules chosen at installation within the entitlement. See [15](15-licensing-and-modules.md). |
+| D28 | Navigation | Back office split into module workspaces opened from a launchpad (Fiori / EMC style). |
+| D29 | Users and access | Simphony-style hierarchy (enterprise → property → revenue centre), roles per property with levels and limits, operator records per revenue centre, manager override by seniority. See [16](16-users-access-and-audit.md). |
+| D30 | POS look | Three templates (Classic, Modern, Midnight) plus full customisation; item photos stored resized in Firestore (no Cloud Storage cost). |
+| D31 | Quality | Schema validation on every save, cross-module data-quality check, browser end-to-end tests in CI-style scripts. |
 | D26 | Audit | Field-level audit trail of every business record, captured by a server trigger, sealed hourly in a hash chain. Plus integrity verification, segregation of duties, an auditor role, and SAF-T and auditor exports. |
 
 ## Remaining questions (as of 2026-10-30; items 1, 2, 4 and 6 are now covered by sample data or D16–D19)

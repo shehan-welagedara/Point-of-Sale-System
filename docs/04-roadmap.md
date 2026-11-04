@@ -9,6 +9,11 @@ Built and demo-ready:
 - **R2 extended:**
   - Inventory with FIFO, recipe depletion, purchasing, counts, waste, transfers and production; recipes and costing.
   - Menu engineering; CRM and loyalty.
+- **Platform (2026-11-04):**
+  - Licensing: editions, add-ons, limits, vendor-signed keys, module choice at installation; launchpad with separate module workspaces.
+  - Hotel-grade access: property roles, revenue-centre access, role levels and limits, manager override by seniority, sign-in lockout, auto sign-out, clock in/out.
+  - POS: three themes with full customisation, item photos, transaction journal, on-POS reports, price override, open price, paid in/out, transfer and split.
+  - Quality: schema validation on every save, data-quality check, browser end-to-end tests. Coverage against Simphony/S4HANA: [14](14-feature-coverage.md).
 - **Finance & assurance:**
   - Full general ledger in Firestore (ERPNext design, S/4HANA-style universal journal): POS day posting, payables with 3-way match, receivables, payments with open items and FX, bank reconciliation, fixed assets, budgets, period close, SLFRS statements.
   - Maker–checker approvals and segregation of duties, all enforced by Cloud Functions.
@@ -18,7 +23,7 @@ Built and demo-ready:
 
 Still to do:
 - Live PayHere and WhatsApp (needs Cloud Functions and approved accounts).
-- Refunds of closed checks (credit notes), cash declaration per till, KDS screen, drag-and-drop screen designer, QR ordering (X01).
+- Hotel room charge to the PMS, till assignment and blind cash declaration, refunds with credit notes, price levels/happy hour, merge checks, KDS screen, zones, QR ordering (X01). Full list in [14 §6](14-feature-coverage.md).
 - The POS Shell desktop wrapper.
 - Finance extensions: document attachments, dunning, multi-company consolidation, IFRS 16 leases, deferred tax.
 - Website (R4).

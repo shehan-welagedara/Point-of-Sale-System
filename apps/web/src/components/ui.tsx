@@ -147,7 +147,7 @@ export function ModuleOff({ name }: { name: string }) {
     <div className="page">
       <div className="card pad">
         <Empty title={`${name} is not enabled for this business`}>
-          <p>Switch it on under Setup → Modules if the client has licensed it.</p>
+          <p>Switch it on under Administration → Licence &amp; modules if the client has licensed it.</p>
         </Empty>
       </div>
     </div>

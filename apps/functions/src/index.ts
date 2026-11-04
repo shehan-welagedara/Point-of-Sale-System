@@ -1,5 +1,5 @@
 /**
- * Cloud Functions (2nd gen). Four functions only, to keep deployments and build storage small:
+ * Cloud Functions (2nd gen). Five functions only, to keep deployments and build storage small:
  *
  *  - ledgerApi    callable: every accounting operation (post, approve, reverse, close, verify…)
  *  - auditTrail   Firestore trigger: records every change to tenant data with the actor

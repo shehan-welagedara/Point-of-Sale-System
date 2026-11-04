@@ -36,7 +36,7 @@ export function Onboarding() {
         <div className="card pad stack" style={{ background: "var(--surface-2)" }}>
           <h3>Demo restaurant</h3>
           <p className="small muted">
-            Loads “Spice Lagoon”, a sample Colombo restaurant: 37 menu items with recipes and costs, 57 stock items plus 6 prep sub-recipes, vendors, staff (PINs 1111–5555, owner 9999), customers, a week of sales, stock, and journals. VAT-registered, SSCL not liable.
+            Loads “Spice Lagoon”, a sample Colombo restaurant: 37 menu items with recipes and costs, 57 stock items plus 6 prep sub-recipes, vendors, employees (sign in with number 1001 and PIN 1111, or 1002/2222, 1006/6666…), customers, a week of sales, stock and full books. VAT-registered, SSCL not liable.
           </p>
           <button className="btn primary" disabled={Boolean(busy)} onClick={() => run("demo", () => createTenant("Spice Lagoon (demo)", true))}>
             {busy === "demo" ? "Building demo data…" : "Load the demo restaurant"}

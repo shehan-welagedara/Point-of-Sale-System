@@ -54,7 +54,9 @@ Each business you create is a separate **tenant** with its own data, logins and 
   - Inclusive or exclusive pricing.
   - Confirm everything with the client's accountant ([06](06-sri-lanka-compliance.md)).
 - [ ] *Setup → Branding*: logo, colours, bill header and footer.
-- [ ] *Setup → Modules*: switch on only what the client bought.
+- [ ] *Administration → Licence & modules*: activate the client's licence key (issued with `pnpm licence issue`, see [15](15-licensing-and-modules.md)), then switch on what they bought.
+- [ ] *People & Security*: sign-in policy (method, lockout, auto sign-out, clock in), roles with levels and limits, employees with properties and revenue centres.
+- [ ] *POS Configuration → POS themes*: choose Classic, Modern or Midnight and adjust colours; add item photos under Menu Management if wanted.
 - [ ] *Setup → Devices & printers*:
   - One workstation per POS device. Its code appears in invoice numbers.
   - Printers, with a Print Agent installed ([11](11-hardware-and-printing.md)).
@@ -101,6 +103,7 @@ pnpm firebase:deploy                    # hosting, rules, indexes and the accoun
 pnpm test         # unit tests for every package
 pnpm test:rules   # security rules on the Firestore emulator (needs Java)
 pnpm test:functions  # Cloud Functions end to end on the emulators (needs Java)
+pnpm test:e2e        # browser end-to-end (needs Playwright + Chromium)
 pnpm typecheck
 pnpm build
 ```
