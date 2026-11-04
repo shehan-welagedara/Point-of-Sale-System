@@ -10,6 +10,8 @@ import {
   COLLECTIONS as C,
   costRecipe,
   costingContext,
+  dataHealth,
+  HEALTH_COLLECTIONS,
 } from "@pos/core";
 import { type AccountBalance, type LedgerEntry, type Voucher, LEDGER as L, balanceSheet, defaultChartOfAccounts, trialBalance, verifyInvoices, verifyLedger } from "@pos/ledger";
 import { INVENTORY_CODES, MENU, RECIPES, buildSampleStore } from "../src/index.js";
@@ -45,6 +47,11 @@ describe("sample dataset", () => {
     expect(vouchers.filter((v) => v.status === "submitted").map((v) => v.id).sort()).toEqual(["PI-V002", "UTIL-NOV"]);
     expect(await verifyLedger(vouchers, await store.list<LedgerEntry>(L.ledger), await store.list<AccountBalance>(L.balances))).toEqual([]);
     expect(await verifyInvoices(await store.list<Invoice>(C.invoices))).toEqual([]);
+    // Every master record is valid and every cross-module reference resolves.
+    const snapshot = Object.fromEntries(await Promise.all(HEALTH_COLLECTIONS.map(async (col) => [col, await store.list<Record<string, unknown>>(col)] as const)));
+    const health = dataHealth(snapshot, tenant.modules);
+    expect(health.filter((h) => h.severity === "error").map((h) => `${h.collection}/${h.id}: ${h.message}`)).toEqual([]);
+    expect(health.map((h) => `${h.collection}/${h.id}: ${h.message}`)).toEqual([]);
     const tb = trialBalance(defaultChartOfAccounts(), await store.list<AccountBalance>(L.balances), { fromPeriod: "2026-04", toPeriod: "2027-03", fyStartPeriod: "2026-04" });
     expect(tb.totals.debit).toBe(tb.totals.credit);
     const bs = balanceSheet(defaultChartOfAccounts(), await store.list<AccountBalance>(L.balances), { asOfPeriod: "2026-11", fyStartPeriod: "2026-04" });

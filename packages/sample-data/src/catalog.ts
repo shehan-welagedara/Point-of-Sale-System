@@ -203,11 +203,14 @@ export const CUSTOMERS: [name: string, phone: string, tags: string[], birthday?:
   ["Tharushi de Silva", "077 100 0010", ["vip"], "1990-12-02"],
 ];
 
-export const STAFF: [employeeNo: string, name: string, roleId: string, pin: string][] = [
-  ["1001", "Kasun Perera", "manager", "1111"],
-  ["1002", "Nimali Fernando", "cashier", "2222"],
-  ["1003", "Tharindu Silva", "server", "3333"],
-  ["1004", "Fathima Rizwan", "server", "4444"],
-  ["1005", "Suresh Kumar", "kitchen", "5555"],
-  ["9000", "Owner (demo)", "owner", "9999"],
+/** Demo employees: [number (sign-in ID), name, role, PIN, job title, revenue centres (empty = all), card]. */
+export const STAFF: [employeeNo: string, name: string, roleId: string, pin: string, jobTitle: string, rvcIds: string[], cardId?: string][] = [
+  ["1001", "Kasun Perera", "manager", "1111", "Restaurant manager", [], "CARD1001"],
+  ["1002", "Nimali Fernando", "cashier", "2222", "Cashier", ["DINING", "TAKEAWAY"]],
+  ["1003", "Tharindu Silva", "server", "3333", "Steward", ["DINING"]],
+  ["1004", "Fathima Rizwan", "server", "4444", "Steward", ["DINING", "BAR"]],
+  ["1005", "Suresh Kumar", "kitchen", "5555", "Chef de partie", []],
+  ["1006", "Dilan Jayasuriya", "supervisor", "6666", "Captain", [], "CARD1006"],
+  ["1007", "Ishara Gunawardena", "bartender", "7777", "Bartender", ["BAR"]],
+  ["9000", "Owner (demo)", "owner", "9999", "Owner", []],
 ];

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   type InventoryItem,
   type MenuCategory,
+  type MenuImage,
   type Printer,
   type TenderMedia,
   COLLECTIONS as C,
@@ -10,7 +11,8 @@ import {
 } from "@pos/core";
 import { buildTestPage, widthForPaper } from "@pos/printing";
 import { CrudPage, type FieldDef } from "../../components/CrudPage";
-import { useApp, useCollection, useStore } from "../../state/app";
+import { useApp, useCollection, useDoc, useStore } from "../../state/app";
+import { resizeImage } from "../../lib/images";
 import { money, pct, stockQty } from "../../lib/format";
 import { queuePrint } from "../../lib/printing";
 import { Field, ModuleOff } from "../../components/ui";
@@ -57,7 +59,47 @@ export function CategoriesPage() {
   );
 }
 
+function MenuThumb({ id }: { id: string }) {
+  const img = useDoc<MenuImage>(C.menuImages, id);
+  return img ? <img src={img.dataUrl} alt="" style={{ width: 40, height: 30, objectFit: "cover", borderRadius: 6 }} /> : null;
+}
+
+/** Photo for the POS button: resized in the browser and saved with the item. */
+function MenuImageField({ doc, setDoc }: { doc: Record<string, any>; setDoc: (d: any) => void }) {
+  const { toast } = useApp();
+  const stored = useDoc<MenuImage>(C.menuImages, doc.id || undefined);
+  const pending = doc._image as { dataUrl: string; bytes: number } | null | undefined;
+  const shown = pending === null ? null : (pending?.dataUrl ?? (doc.hasImage ? stored?.dataUrl : undefined));
+  return (
+    <Field label="Photo on the POS (optional)" help="Shown on the item button when the POS theme has photos switched on. Resized to 400 px (about 30 KB); stored in the database, no file storage needed.">
+      <div className="row wrap">
+        {shown ? <img src={shown} alt="" style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 10, border: "1px solid var(--line)" }} /> : <div className="muted small" style={{ width: 120, height: 90, display: "grid", placeItems: "center", border: "1px dashed var(--line-strong)", borderRadius: 10 }}>No photo</div>}
+        <label className="btn sm">
+          Choose photo
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              try {
+                setDoc({ ...doc, _image: await resizeImage(f) });
+              } catch (err) {
+                toast((err as Error).message, true);
+              }
+            }}
+          />
+        </label>
+        {shown ? <button type="button" className="btn ghost sm" onClick={() => setDoc({ ...doc, _image: null })}>Remove</button> : null}
+        {pending ? <span className="tiny muted">{Math.round(pending.bytes / 1024)} KB · saved with the item</span> : null}
+      </div>
+    </Field>
+  );
+}
+
 export function MenuItemsPage() {
+  const store = useStore();
   const cats = useNames(C.menuCategories);
   return (
     <CrudPage
@@ -81,10 +123,20 @@ export function MenuItemsPage() {
         { key: "allergens", label: "Allergens", type: "multi", options: ALLERGENS, help: "Shown to staff on the POS and printed on kitchen tickets." },
         { key: "description", label: "Description", type: "textarea" },
         { key: "sortOrder", label: "Sort order", type: "number" },
+        { key: "buttonColor", label: "POS button colour", type: "color", help: "Leave empty to use the category colour." },
+        { key: "openPrice", label: "Open price (the price is entered at the POS, needs the open-price privilege)", type: "bool" },
         { key: "available", label: "Available (off = 86'd / out of stock)", type: "bool" },
         { key: "active", label: "Active", type: "bool" },
       ]}
+      extraEditor={(d, setDoc) => <MenuImageField doc={d} setDoc={setDoc} />}
+      beforeSave={async (d) => {
+        const { _image, ...rest } = d as typeof d & { _image?: { dataUrl: string; width: number; height: number; bytes: number } | null };
+        if (_image) await store.set(C.menuImages, { id: rest.id, ...(_image as object), updatedAt: new Date().toISOString() });
+        if (_image === null) await store.remove(C.menuImages, rest.id);
+        return { ...rest, hasImage: _image === null ? false : Boolean(_image) || Boolean(rest.hasImage) };
+      }}
       columns={[
+        { header: "", render: (d) => (d.hasImage ? <MenuThumb id={d.id} /> : null) },
         { header: "Code", render: (d) => <span className="mono">{d.code}</span> },
         { header: "Name", render: (d) => <div><div>{d.name}</div>{d.nameSi ? <div className="tiny muted">{d.nameSi}</div> : null}</div> },
         { header: "Category", render: (d) => cats.get(d.categoryId) ?? "—" },
@@ -550,61 +602,5 @@ export function CustomersPage() {
 
 // ───────────────────────────── People ─────────────────────────────
 
-function PinEditor({ doc, setDoc }: { doc: Record<string, any>; setDoc: (d: any) => void }) {
-  const [pin, setPin] = useState("");
-  return (
-    <Field label={doc.pinHash ? "Reset PIN" : "PIN *"} help="4–8 digits. Stored as a salted hash; nobody can read it back.">
-      <div className="row">
-        <input className="input mono" inputMode="numeric" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="••••" />
-        <button
-          type="button"
-          className="btn"
-          disabled={pin.length < 4}
-          onClick={async () => {
-            const { hash, salt } = await hashPin(pin);
-            setDoc({ ...doc, pinHash: hash, pinSalt: salt });
-            setPin("");
-          }}
-        >
-          Set PIN
-        </button>
-        {doc.pinHash ? <span className="badge good">PIN set</span> : null}
-      </div>
-    </Field>
-  );
-}
-
-export function StaffPage() {
-  const roles = useNames(C.roles);
-  return (
-    <CrudPage
-      title="POS staff"
-      subtitle="People who sign in to the POS with an employee number and PIN. Their role decides what they may do (People Management)."
-      col={C.staff}
-      idFrom="code"
-      codeKey="employeeNo"
-      noun="staff member"
-      search={(d) => `${d.employeeNo} ${d.name}`}
-      newDoc={() => ({ employeeNo: "", name: "", roleId: "server", propertyIds: [], status: "active" })}
-      validate={(d) => (d.pinHash ? null : "Set a PIN before saving")}
-      fields={[
-        { key: "employeeNo", label: "Employee number", type: "text", required: true, readOnlyOnEdit: true },
-        { key: "name", label: "Name", type: "text", required: true },
-        { key: "roleId", label: "Role", type: "select", optionsFrom: { col: C.roles }, required: true },
-        { key: "propertyIds", label: "Outlets", type: "multi", optionsFrom: { col: C.properties } },
-        { key: "phone", label: "Mobile", type: "text" },
-        { key: "cardId", label: "Staff card / NFC id", type: "text" },
-        { key: "status", label: "Status", type: "select", options: [{ value: "active", label: "Active" }, { value: "suspended", label: "Suspended" }, { value: "terminated", label: "Terminated (access removed)" }] },
-      ]}
-      extraEditor={(d, setDoc) => <PinEditor doc={d} setDoc={setDoc} />}
-      columns={[
-        { header: "No.", render: (d) => <span className="mono">{d.employeeNo ?? d.id}</span> },
-        { header: "Name", render: (d) => d.name },
-        { header: "Role", render: (d) => roles.get(d.roleId) ?? d.roleId },
-        { header: "Status", render: (d) => <span className={`badge ${d.status === "active" ? "good" : "bad"}`}>{d.status}</span> },
-      ]}
-    />
-  );
-}
 
 export type { InventoryItem, MenuCategory };

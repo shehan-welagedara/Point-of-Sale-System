@@ -20,6 +20,7 @@ import {
   type WriteOp,
   COLLECTIONS as C,
   DEFAULT_ROLES,
+  builtInEntitlements,
   MemoryStore,
   addDays,
   allModulesOn,
@@ -107,6 +108,12 @@ export function sampleSettings(): {
       printKotOnSend: true,
       loyaltyPointsPer100: 1,
       defaultPropertyId: SAMPLE_PROPERTY_ID,
+      signInMode: "idPin",
+      maxFailedSignIns: 5,
+      autoSignOutSeconds: 300,
+      requireClockIn: false,
+      pinMinLength: 4,
+      theme: { template: "modern", colors: {}, fontScale: 1, buttonSize: "regular", radius: 14, checkSide: "right", categoryStyle: "tabs", columns: 0, showImages: true, colorByCategory: true },
     },
     accounting: {
       id: "accounting",
@@ -202,11 +209,12 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
   put(C.properties, { id: SAMPLE_PROPERTY_ID, code: SAMPLE_PROPERTY_ID, name: "Colombo 03 (Galle Road)", addressLines: s.business.addressLines, phone: s.business.phone, active: true });
   put(C.revenueCenters, { id: "DINING", propertyId: SAMPLE_PROPERTY_ID, code: "DINING", name: "Restaurant", serviceMode: "table", defaultOrderTypeId: "dine-in", active: true });
   put(C.revenueCenters, { id: "TAKEAWAY", propertyId: SAMPLE_PROPERTY_ID, code: "TAKEAWAY", name: "Takeaway counter", serviceMode: "quick", defaultOrderTypeId: "takeaway", active: true });
+  put(C.revenueCenters, { id: "BAR", propertyId: SAMPLE_PROPERTY_ID, code: "BAR", name: "Bar & lounge", serviceMode: "quick", defaultOrderTypeId: "dine-in", active: true });
   put(C.printers, { id: "PRN-RECEIPT", propertyId: SAMPLE_PROPERTY_ID, name: "Counter bill printer", role: "receipt", model: "Epson TM-T82III", connection: "network", address: "192.168.1.100", port: 9100, paperWidthMm: 80, agentId: "AGENT-1", active: true });
   put(C.printers, { id: "PRN-KITCHEN", propertyId: SAMPLE_PROPERTY_ID, name: "Kitchen KOT printer", role: "kitchen", model: "Xprinter XP-Q80", connection: "network", address: "192.168.1.101", port: 9100, paperWidthMm: 80, agentId: "AGENT-1", backupPrinterId: "PRN-RECEIPT", active: true });
   put(C.printers, { id: "PRN-BAR", propertyId: SAMPLE_PROPERTY_ID, name: "Bar KOT printer", role: "bar", model: "Rongta RP326", connection: "network", address: "192.168.1.102", port: 9100, paperWidthMm: 80, agentId: "AGENT-1", backupPrinterId: "PRN-KITCHEN", active: true });
-  put(C.workstations, { id: "W01", propertyId: SAMPLE_PROPERTY_ID, rvcId: "DINING", code: "W01", name: "Counter POS (Windows touch terminal)", deviceProfile: "dedicated", receiptPrinterId: "PRN-RECEIPT", printMode: "agent", active: true });
-  put(C.workstations, { id: "T01", propertyId: SAMPLE_PROPERTY_ID, rvcId: "DINING", code: "T01", name: "Floor tablet 1 (Android / iPad)", deviceProfile: "mobile", receiptPrinterId: "PRN-RECEIPT", printMode: "agent", active: true });
+  put(C.workstations, { id: "W01", propertyId: SAMPLE_PROPERTY_ID, rvcId: "DINING", allowedRvcIds: ["DINING", "TAKEAWAY", "BAR"], code: "W01", name: "Counter POS (Windows touch terminal)", deviceProfile: "dedicated", receiptPrinterId: "PRN-RECEIPT", printMode: "agent", active: true });
+  put(C.workstations, { id: "T01", propertyId: SAMPLE_PROPERTY_ID, rvcId: "DINING", allowedRvcIds: ["DINING", "BAR"], code: "T01", name: "Floor tablet 1 (Android / iPad)", deviceProfile: "mobile", receiptPrinterId: "PRN-RECEIPT", printMode: "agent", active: true });
   put(C.workstations, { id: "W02", propertyId: SAMPLE_PROPERTY_ID, rvcId: "TAKEAWAY", code: "W02", name: "Takeaway counter (Windows PC)", deviceProfile: "dedicated", receiptPrinterId: "PRN-RECEIPT", printMode: "agent", active: true });
   const areas: [string, number, number][] = [["Indoor", 8, 4], ["Garden", 3, 6], ["Bar", 1, 2]];
   let t = 1;
@@ -274,9 +282,9 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
 
   // People
   DEFAULT_ROLES.forEach((r) => put(C.roles, r));
-  for (const [employeeNo, name, roleId, pin] of STAFF) {
+  for (const [employeeNo, name, roleId, pin, jobTitle, rvcIds, cardId] of STAFF) {
     const { hash, salt } = await hashPin(pin);
-    put(C.staff, { id: employeeNo, employeeNo, name, roleId, propertyIds: [SAMPLE_PROPERTY_ID], pinHash: hash, pinSalt: salt, status: "active" });
+    put(C.staff, { id: employeeNo, employeeNo, name, roleId, jobTitle, propertyIds: [SAMPLE_PROPERTY_ID], ...(rvcIds.length ? { rvcIds } : {}), ...(cardId ? { cardId } : {}), pinHash: hash, pinSalt: salt, status: "active", hireDate: "2026-09-01", pinChangedAt: now });
   }
 
   // CRM & finance masters
@@ -416,6 +424,6 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
 
   return {
     store,
-    tenant: { id: "demo-spice-lagoon", name: "Spice Lagoon (demo)", modules: allModulesOn(), plan: "demo", status: "active" },
+    tenant: { id: "demo-spice-lagoon", name: "Spice Lagoon (demo)", modules: allModulesOn(), plan: "demo", entitlements: builtInEntitlements("demo"), status: "active" },
   };
 }

@@ -47,7 +47,7 @@ export interface AuditSeal {
 }
 
 /** Collections whose changes are not audited one by one (append-only ledgers and counters). */
-export const UNAUDITED = new Set(["ledger", "accountBalances", "ledgerHead", "numberSeries", "sequences", "dailyStats", "printJobs", "auditEvents", "auditSeals"]);
+export const UNAUDITED = new Set(["ledger", "accountBalances", "ledgerHead", "numberSeries", "sequences", "dailyStats", "printJobs", "auditEvents", "auditSeals", "posJournal", "menuImages"]);
 
 /** Fields that only describe bookkeeping noise and are left out of diffs. */
 const NOISE = new Set(["updatedAt", "updatedBy"]);
@@ -105,7 +105,7 @@ export async function sealEvents(events: readonly AuditEvent[], prev: AuditSeal 
 }
 
 export interface IntegrityIssue {
-  area: "audit trail" | "ledger" | "balances" | "numbering" | "invoices" | "segregation of duties";
+  area: "audit trail" | "ledger" | "balances" | "numbering" | "invoices" | "POS journal" | "segregation of duties";
   severity: "critical" | "warning";
   message: string;
 }

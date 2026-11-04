@@ -3,7 +3,10 @@ import { Loading } from "./components/ui";
 import { useApp } from "./state/app";
 import { Login } from "./pages/auth/Login";
 import { Onboarding } from "./pages/auth/Onboarding";
-import { Shell } from "./pages/emc/Shell";
+import { Launchpad, Shell } from "./pages/emc/Shell";
+import { LicencePage } from "./pages/emc/Licence";
+import { PosThemesPage, SignInPolicyPage } from "./pages/emc/Appearance";
+import { EmployeesPage, RolesPage, TimeCardsPage } from "./pages/emc/People";
 import { Dashboard, MenuEngineering, Reports } from "./pages/emc/Reports";
 import {
   CategoriesPage,
@@ -15,7 +18,6 @@ import {
   OrderTypesPage,
   OrganisationPage,
   ReasonsPage,
-  StaffPage,
   StockItemsPage,
   TablesPage,
   TendersPage,
@@ -32,9 +34,9 @@ import { StatementsPage } from "./pages/finance/Statements";
 import { PeriodsPage } from "./pages/finance/Periods";
 import { BudgetsPage, ChartOfAccountsPage, FinanceSettingsPage } from "./pages/finance/Masters";
 import { AuditCenter } from "./pages/audit/AuditCenter";
-import { BrandingPage, BusinessTaxPage, IntegrationsPage, ModulesPage } from "./pages/emc/Setup";
-import { DataPage, LoginsPage, PrintQueuePage, RolesPage } from "./pages/emc/Admin";
-import { PosApp } from "./pages/pos/Pos";
+import { BrandingPage, BusinessTaxPage, IntegrationsPage } from "./pages/emc/Setup";
+import { DataPage, LoginsPage, PrintQueuePage } from "./pages/emc/Admin";
+import { PosApp } from "./pages/pos/SignIn";
 
 export function App() {
   const { ready, mode, user, tenant } = useApp();
@@ -45,6 +47,7 @@ export function App() {
     <Routes>
       <Route path="/pos" element={<PosApp />} />
       <Route path="/emc" element={<Shell />}>
+        <Route path="home" element={<Launchpad />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="reports" element={<Reports />} />
         <Route path="revenue/engineering" element={<MenuEngineering />} />
@@ -82,19 +85,23 @@ export function App() {
         <Route path="finance/settings" element={<FinanceSettingsPage />} />
         <Route path="accounting/*" element={<Navigate to="/emc/finance" replace />} />
         <Route path="audit" element={<AuditCenter />} />
-        <Route path="people/staff" element={<StaffPage />} />
+        <Route path="people/staff" element={<EmployeesPage />} />
+        <Route path="people/timecards" element={<TimeCardsPage />} />
+        <Route path="people/signin" element={<SignInPolicyPage />} />
+        <Route path="pos/appearance" element={<PosThemesPage />} />
+        <Route path="setup/licence" element={<LicencePage />} />
         <Route path="people/roles" element={<RolesPage />} />
         <Route path="people/logins" element={<LoginsPage />} />
         <Route path="setup/business" element={<BusinessTaxPage />} />
         <Route path="setup/branding" element={<BrandingPage />} />
         <Route path="setup/organisation" element={<OrganisationPage />} />
         <Route path="setup/devices" element={<DevicesPage />} />
-        <Route path="setup/modules" element={<ModulesPage />} />
+        <Route path="setup/modules" element={<Navigate to="/emc/setup/licence" replace />} />
         <Route path="setup/integrations" element={<IntegrationsPage />} />
         <Route path="setup/data" element={<DataPage />} />
-        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route index element={<Navigate to="home" replace />} />
       </Route>
-      <Route path="*" element={<Navigate to="/emc/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/emc/home" replace />} />
     </Routes>
   );
 }

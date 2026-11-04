@@ -3,13 +3,10 @@ import {
   type BrandingSettings,
   type BusinessSettings,
   type IntegrationSettings,
-  type ModuleKey,
   type TaxSettings,
   calculateCheckPreview,
-  MODULES,
   lankaQrPayload,
   payhereCheckout,
-  setModule,
 } from "./setup-helpers";
 import { Field, PageHead, Toggle } from "../../components/ui";
 import { QrCode } from "../../components/Receipt";
@@ -157,42 +154,6 @@ export function BrandingPage() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-export function ModulesPage() {
-  const { tenant, updateTenant, toast, role, mode } = useApp();
-  const mods = tenant?.modules ?? {};
-  const canEdit = mode === "local" || role === "owner" || role === "admin";
-  const groups = [...new Set(MODULES.map((m) => m.group))];
-  async function toggle(key: ModuleKey, on: boolean) {
-    const next = setModule(mods, key, on);
-    await updateTenant({ modules: next });
-    const changed = MODULES.filter((m) => Boolean(next[m.key]) !== Boolean(mods[m.key])).map((m) => m.name);
-    toast(`${on ? "Enabled" : "Disabled"}: ${changed.join(", ")}`);
-  }
-  return (
-    <div className="page">
-      <PageHead title="Modules" subtitle="Switch on only what this client has bought. Everything shares one database, so turning a module on later uses the data already there." />
-      {!canEdit ? <div className="callout warn">Only the owner or an administrator can change modules.</div> : null}
-      {groups.map((g) => (
-        <div key={g} className="stack tight">
-          <span className="section-title">{g}</span>
-          <div className="grid cols-2">
-            {MODULES.filter((m) => m.group === g).map((m) => (
-              <div key={m.key} className="card card-body row" style={{ alignItems: "flex-start" }}>
-                <div className="grow stack tight">
-                  <div className="row"><h3>{m.name}</h3>{m.status === "planned" ? <span className="badge">Planned</span> : null}</div>
-                  <p className="small muted">{m.description}</p>
-                  {m.requires.length ? <p className="tiny muted">Needs: {m.requires.map((r) => MODULES.find((x) => x.key === r)?.name).join(", ")}</p> : null}
-                </div>
-                <Toggle on={Boolean(mods[m.key])} disabled={!canEdit || m.status === "planned"} onChange={(v) => toggle(m.key, v)} label={m.name} />
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

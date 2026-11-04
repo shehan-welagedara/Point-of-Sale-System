@@ -40,7 +40,7 @@ describe("tenant onboarding", () => {
   it("lets a user create a tenant with themselves as owner in one batch", async () => {
     const db = as("alice");
     const b = writeBatch(db);
-    b.set(doc(db, "tenants", "alice-cafe"), { id: "alice-cafe", name: "Alice Cafe", ownerUid: "alice", modules: { pos: true } });
+    b.set(doc(db, "tenants", "alice-cafe"), { id: "alice-cafe", name: "Alice Cafe", ownerUid: "alice", modules: { pos: true }, plan: "trial", entitlements: { modules: ["pos"], limits: {} } });
     b.set(doc(db, "tenants", "alice-cafe", "members", "alice"), { id: "alice", uid: "alice", role: "owner", tenantId: "alice-cafe" });
     await assertSucceeds(b.commit());
     // …then seed settings in small batches (9 writes) under the rules.
@@ -175,3 +175,48 @@ describe("accounting and audit", () => {
   });
 });
 
+describe("licensing and POS controls", () => {
+  async function seedLicensed() {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "tenants", "lic"), { id: "lic", name: "Licensed", ownerUid: "owner", plan: "starter", entitlements: { modules: ["pos", "tables", "crm"], limits: { workstations: 3 } }, modules: { pos: true, tables: false }, status: "active" });
+      for (const [uid, role] of [["owner", "owner"], ["till", "terminal"], ["view", "viewer"], ["mgr", "manager"]] as const) await setDoc(doc(db, "tenants", "lic", "members", uid), { id: uid, uid, role, tenantId: "lic" });
+      await setDoc(doc(db, "tenants", "lic", "staff", "1002"), { id: "1002", employeeNo: "1002", name: "Nimali", roleId: "cashier", failedSignIns: 0 });
+      await setDoc(doc(db, "tenants", "lic", "timeCards", "tc-closed"), { id: "tc-closed", staffId: "1002", clockIn: "x", clockOut: "y" });
+    });
+  }
+
+  it("lets nobody but the licence function change the edition, entitlement or licence", async () => {
+    await seedLicensed();
+    const owner = as("owner");
+    await assertFails(updateDoc(doc(owner, "tenants", "lic"), { plan: "enterprise" }));
+    await assertFails(updateDoc(doc(owner, "tenants", "lic"), { "entitlements.modules": ["pos", "accounting"] }));
+    await assertFails(updateDoc(doc(owner, "tenants", "lic"), { licence: { edition: "enterprise" } }));
+    // Switching licensed modules is fine; unlicensed ones are refused.
+    await assertSucceeds(updateDoc(doc(owner, "tenants", "lic"), { "modules.tables": true }));
+    await assertFails(updateDoc(doc(owner, "tenants", "lic"), { "modules.accounting": true }));
+    // New businesses start as a trial or demo only.
+    await assertFails(setDoc(doc(as("bob"), "tenants", "bob-co"), { id: "bob-co", name: "Bob", ownerUid: "bob", plan: "enterprise", modules: {} }));
+  });
+
+  it("lets terminals record sign-in control on employees but nothing else", async () => {
+    await seedLicensed();
+    const till = as("till");
+    await assertSucceeds(updateDoc(doc(till, "tenants", "lic", "staff", "1002"), { failedSignIns: 5, lockedAt: "2026-11-04T10:00:00Z", updatedBy: "till", updatedAt: "2026-11-04T10:00:00Z" }));
+    await assertFails(updateDoc(doc(till, "tenants", "lic", "staff", "1002"), { roleId: "manager" }));
+    await assertSucceeds(updateDoc(doc(as("mgr"), "tenants", "lic", "staff", "1002"), { roleId: "supervisor" }));
+  });
+
+  it("keeps the POS journal append-only and closed time cards fixed", async () => {
+    await seedLicensed();
+    const till = as("till");
+    const ev = { id: "ev1", workstationId: "W01", type: "noSale", employeeId: "1002", prevHash: "", hash: "abc" };
+    await assertSucceeds(setDoc(doc(till, "tenants", "lic", "posJournal", "ev1"), ev));
+    await assertFails(updateDoc(doc(till, "tenants", "lic", "posJournal", "ev1"), { type: "signIn" }));
+    await assertFails(updateDoc(doc(as("owner"), "tenants", "lic", "posJournal", "ev1"), { amount: 0 }));
+    await assertFails(setDoc(doc(as("view"), "tenants", "lic", "posJournal", "ev2"), { ...ev, id: "ev2" }));
+    await assertSucceeds(setDoc(doc(till, "tenants", "lic", "timeCards", "tc1"), { id: "tc1", staffId: "1002", clockIn: "x" }));
+    await assertSucceeds(updateDoc(doc(till, "tenants", "lic", "timeCards", "tc1"), { clockOut: "y", minutes: 480 }));
+    await assertFails(updateDoc(doc(till, "tenants", "lic", "timeCards", "tc-closed"), { minutes: 1 }));
+  });
+});

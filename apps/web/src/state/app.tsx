@@ -15,8 +15,16 @@ import {
   COLLECTIONS as C,
   MemoryStore,
   allModulesOn,
-  isOn,
+  type Entitlements,
+  type ModuleKey as MK,
+  DEMO_LICENCE_PUBLIC_KEY,
+  TRIAL_DAYS,
+  builtInEntitlements,
+  clampModules,
+  licenceStatus,
   newId,
+  verifyLicence,
+  withValidation,
 } from "@pos/core";
 import { type Actor, type LedgerRequest, UNAUDITED, makeAuditEvent, runLedgerRequest, storeRunner } from "@pos/ledger";
 import { DEMO_PEOPLE, buildSampleStore, sampleSettings } from "@pos/sample-data";
@@ -77,7 +85,7 @@ interface AppState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
-  createTenant: (name: string, withSample: boolean) => Promise<void>;
+  createTenant: (name: string, withSample: boolean, modules?: MK[]) => Promise<void>;
   switchTenant: (id: string) => void;
   updateTenant: (patch: Partial<Tenant>) => Promise<void>;
   saveSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => Promise<void>;
@@ -91,6 +99,36 @@ interface AppState {
   ledger: <T = unknown>(req: LedgerRequest) => Promise<T>;
   /** Display name for a user id (members, demo people). */
   personName: (uid: string | undefined) => string;
+  /** Licence in force: edition, entitlement, validity. */
+  licence: LicenceInfo;
+  /** Verifies a vendor licence key and applies it to this business. */
+  activateLicence: (token: string) => Promise<void>;
+}
+
+export interface LicenceInfo {
+  edition: Tenant["plan"];
+  entitlements: Entitlements;
+  status: "demo" | "trial" | "valid" | "grace" | "expired";
+  daysLeft: number | null;
+  usable: boolean;
+  licensee?: string;
+  demoKey: boolean;
+}
+
+/** Public key that licence keys must be signed with (your own in production). */
+export const LICENCE_PUBLIC_KEY = (import.meta.env.VITE_LICENCE_PUBLIC_KEY as string | undefined) || DEMO_LICENCE_PUBLIC_KEY;
+
+export function licenceInfo(t: Tenant | null, now = new Date()): LicenceInfo {
+  const plan = t?.plan ?? "demo";
+  const entitlements = t?.entitlements ?? builtInEntitlements(plan);
+  if (t?.licence) {
+    const c = licenceStatus(t.licence, now);
+    return { edition: t.licence.edition, entitlements, status: c.status === "notYetValid" ? "expired" : c.status, daysLeft: c.daysLeft, usable: c.usable, licensee: t.licence.licensee, demoKey: Boolean(t.licence.demoKey) };
+  }
+  if (plan === "demo") return { edition: "demo", entitlements, status: "demo", daysLeft: null, usable: true, demoKey: true };
+  const end = t?.trialEndsAt ? Date.parse(t.trialEndsAt) : Date.parse(t?.createdAt ?? now.toISOString()) + TRIAL_DAYS * 86_400_000;
+  const daysLeft = Math.floor((end - now.getTime()) / 86_400_000);
+  return { edition: "trial", entitlements, status: daysLeft >= 0 ? "trial" : "expired", daysLeft, usable: daysLeft >= 0, demoKey: false };
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -211,7 +249,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStore.current = m;
     setTenant(save.tenant);
     setTenants([save.tenant]);
-    setStore(m);
+    setStore(withValidation(m));
     setReady(true);
   }, []);
 
@@ -251,7 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const preferred = localStorage.getItem("pos-suite.activeTenant");
     const active = ts.find((t) => t.id === preferred) ?? ts[0] ?? null;
     setTenant(active);
-    setStore(active ? new FirestoreStore(db, active.id, () => firebase().auth.currentUser?.uid) : null);
+    setStore(active ? withValidation(new FirestoreStore(db, active.id, () => firebase().auth.currentUser?.uid)) : null);
   }, []);
 
   useEffect(() => {
@@ -339,13 +377,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const createTenant = useCallback(
-    async (name: string, withSample: boolean) => {
+    async (name: string, withSample: boolean, chosen?: MK[]) => {
       const sample = withSample ? await sampleOps() : null;
+      // Demo data runs on the demo edition; a new client business starts a trial with the
+      // modules chosen at installation (always within the edition's entitlement).
+      const plan: Tenant["plan"] = withSample ? "demo" : "trial";
+      const ent = builtInEntitlements(plan);
+      const requested = chosen ? Object.fromEntries(chosen.map((k) => [k, true])) : (sample?.modules ?? { pos: true, tables: true, recipes: true, revenue: true });
+      const licensing = { plan, entitlements: ent, modules: clampModules(requested, ent), ...(plan === "trial" ? { trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString() } : {}) };
       const base = defaultSettings(name);
       const configOps: WriteOp[] = sample?.ops ?? Object.values(base).map((data): WriteOp => ({ op: "set", col: C.settings, data }));
       const now = new Date().toISOString();
       if (mode === "local") {
-        const t: Tenant = { id: "local", name, ownerUid: "local-owner", modules: sample?.modules ?? { pos: true, tables: true, recipes: true, revenue: true }, plan: "demo", status: "active", createdAt: now };
+        const t: Tenant = { id: "local", name, ownerUid: "local-owner", ...licensing, status: "active", createdAt: now };
         const m = new MemoryStore();
         await m.batch(configOps);
         if (withSample) {
@@ -360,7 +404,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const { db } = firebase();
         const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "tenant"}-${Math.random().toString(36).slice(2, 7)}`;
-        const t: Tenant = { id, name, ownerUid: user.uid, modules: sample?.modules ?? { pos: true, tables: true, recipes: true, revenue: true }, plan: withSample ? "demo" : "starter", status: "active", createdAt: now };
+        const t: Tenant = { id, name, ownerUid: user.uid, ...licensing, status: "active", createdAt: now };
         const b = writeBatch(db);
         b.set(doc(db, "tenants", id), t);
         b.set(doc(db, "tenants", id, "members", user.uid), { id: user.uid, uid: user.uid, email: user.email, name: user.name, role: "owner", tenantId: id, createdAt: now });
@@ -381,7 +425,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("pos-suite.activeTenant", id);
       const t = tenants.find((x) => x.id === id) ?? null;
       setTenant(t);
-      setStore(t && mode === "firebase" ? new FirestoreStore(firebase().db, t.id, () => firebase().auth.currentUser?.uid) : store);
+      setStore(t && mode === "firebase" ? withValidation(new FirestoreStore(firebase().db, t.id, () => firebase().auth.currentUser?.uid)) : store);
     },
     [tenants, mode, store],
   );
@@ -409,6 +453,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [store],
   );
 
+  const lic = useMemo(() => licenceInfo(tenant), [tenant]);
+
+  const activateLicence = useCallback(
+    async (token: string) => {
+      if (!tenant) return;
+      if (mode === "local") {
+        const { payload } = await verifyLicence(token, LICENCE_PUBLIC_KEY, { projectId: "local", tenantId: tenant.id }, new Date());
+        const licence = { token: token.trim(), licenceId: payload.licenceId, licensee: payload.licensee.name, edition: payload.edition, addOns: payload.addOns, billing: payload.billing, validFrom: payload.validFrom, expiresAt: payload.expiresAt, graceDays: payload.graceDays, activatedAt: new Date().toISOString(), activatedBy: actor?.uid ?? "local", demoKey: LICENCE_PUBLIC_KEY === DEMO_LICENCE_PUBLIC_KEY };
+        await updateTenant({ plan: payload.edition, entitlements: payload.entitlements, licence, modules: clampModules(tenant.modules, payload.entitlements) });
+        return;
+      }
+      await httpsCallable(firebase().functions, "licenceApi")({ tenantId: tenant.id, action: "activate", token: token.trim() });
+    },
+    [tenant, mode, actor, updateTenant],
+  );
+
   const value: AppState = {
     mode,
     ready,
@@ -418,7 +478,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     tenants,
     store,
     settings,
-    on: (m) => isOn(tenant?.modules, m),
+    on: (m) => Boolean(tenant?.modules?.[m]) && lic.usable && lic.entitlements.modules.includes(m),
     toast,
     signIn: async (email, password) => {
       await signInWithEmailAndPassword(firebase().auth, email, password);
@@ -434,6 +494,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     createTenant,
     switchTenant,
     updateTenant,
+    licence: lic,
+    activateLicence,
     saveSetting,
     resetLocalDemo: () => {
       localStorage.removeItem(LOCAL_KEY);

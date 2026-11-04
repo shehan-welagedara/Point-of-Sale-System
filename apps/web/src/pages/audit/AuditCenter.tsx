@@ -1,6 +1,26 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { type Account, type Customer, type Invoice, type Member, type MemberRole, type Vendor, COLLECTIONS as C, MEMBER_ROLE_INFO } from "@pos/core";
+import {
+  type Account,
+  type Check,
+  type Customer,
+  type HealthIssue,
+  type Invoice,
+  type Member,
+  type MemberRole,
+  type PosEvent,
+  type Staff,
+  type Vendor,
+  type Workstation,
+  COLLECTIONS as C,
+  EXCEPTION_EVENTS,
+  HEALTH_COLLECTIONS,
+  MEMBER_ROLE_INFO,
+  POS_EVENT_LABEL,
+  type PosEventType,
+  dataHealth,
+  employeeActivity,
+} from "@pos/core";
 import {
   type AccountBalance,
   type AuditEvent,
@@ -20,11 +40,11 @@ import {
 import { DEMO_PEOPLE } from "@pos/sample-data";
 import { tablesToWorkbook } from "@pos/excel";
 import { Drawer, Field, Loading, PageHead, Seg, Stat } from "../../components/ui";
-import { dateTimeColombo, downloadBuffer, todayColombo } from "../../lib/format";
+import { amount, dateTimeColombo, downloadBuffer, money, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 import { TYPE_LABEL, useFiscal, useLedgerAction } from "../finance/shared";
 
-type Tab = "integrity" | "trail" | "numbering" | "sod" | "access" | "exports";
+type Tab = "integrity" | "trail" | "journal" | "exceptions" | "quality" | "numbering" | "sod" | "access" | "exports";
 
 const AUDIT_ROLES: MemberRole[] = ["owner", "admin", "auditor"];
 
@@ -70,7 +90,7 @@ function IntegrityTab() {
             <Stat label="Posted documents" value={report.counts.vouchers} />
             <Stat label="Ledger lines" value={report.counts.ledgerLines} />
             <Stat label="POS invoices" value={report.counts.invoices} />
-            <Stat label="Audit events" value={report.counts.auditEvents} sub={`${report.counts.seals} seals · ${report.counts.unsealedEvents} not yet sealed`} />
+            <Stat label="Audit events" value={report.counts.auditEvents} sub={`${report.counts.seals} seals · ${report.counts.unsealedEvents} not yet sealed · ${report.counts.posEvents ?? 0} POS journal events`} />
           </div>
           <div className="card table-wrap">
             <div className="card-head"><h3>Findings</h3></div>
@@ -186,6 +206,198 @@ function TrailTab() {
         )}
       </div>
       {open ? <EventDetail e={open} onClose={() => setOpen(null)} /> : null}
+    </div>
+  );
+}
+
+// ───────────────────────────── POS transaction journal ─────────────────────────────
+
+function useRange() {
+  const [from, setFrom] = useState(todayColombo());
+  const [to, setTo] = useState(todayColombo());
+  const ui = (
+    <>
+      <Field label="From"><input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+      <Field label="To"><input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+    </>
+  );
+  return { from, to, ui };
+}
+
+function JournalTab() {
+  const { from, to, ui } = useRange();
+  const events = useCollection<PosEvent>(C.posJournal, { where: [["businessDate", ">=", from], ["businessDate", "<=", to]] });
+  const staff = useCollection<Staff>(C.staff) ?? [];
+  const workstations = useCollection<Workstation>(C.workstations) ?? [];
+  const [ws, setWs] = useState("");
+  const [emp, setEmp] = useState("");
+  const [type, setType] = useState("");
+  const [onlyExceptions, setOnlyExceptions] = useState(false);
+  const name = (id?: string) => staff.find((x) => x.id === id)?.name ?? id ?? "";
+  const rows = (events ?? [])
+    .filter((e) => (!ws || e.workstationId === ws) && (!emp || e.employeeId === emp || e.authorizedBy === emp) && (!type || e.type === type) && (!onlyExceptions || EXCEPTION_EVENTS.includes(e.type)))
+    .sort((a, b) => b.at.localeCompare(a.at));
+  async function exportXlsx() {
+    const buf = await tablesToWorkbook([{ name: "POS journal", title: `POS transaction journal ${from} to ${to}`, rows, columns: [
+      { header: "Time", value: (e) => e.at, width: 22 }, { header: "Business date", value: (e) => e.businessDate }, { header: "Workstation", value: (e) => e.workstationId }, { header: "Revenue centre", value: (e) => e.rvcId },
+      { header: "Event", value: (e) => POS_EVENT_LABEL[e.type as PosEventType], width: 22 }, { header: "Employee", value: (e) => name(e.employeeId), width: 20 }, { header: "Approved by", value: (e) => name(e.authorizedBy), width: 20 },
+      { header: "Check", value: (e) => e.checkNo ?? "" }, { header: "Item", value: (e) => e.itemName ?? "", width: 24 }, { header: "Qty", value: (e) => e.qty ?? "", format: "number" }, { header: "Amount", value: (e) => e.amount, format: "money", width: 14 },
+      { header: "Reason", value: (e) => e.reason ?? "", width: 20 }, { header: "Detail", value: (e) => e.detail ?? "", width: 30 }, { header: "Hash", value: (e) => e.hash, width: 30 },
+    ] }]);
+    downloadBuffer(buf, `pos-journal-${from}-${to}.xlsx`);
+  }
+  return (
+    <div className="stack">
+      <div className="callout small">Every operator action on every workstation: sign-ins and failed PINs, checks begun, sent and closed, voids, discounts, price overrides, refunds, no-sales, paid in/out, reprints and manager approvals. Each workstation's events are hash-chained; the integrity check proves none were changed or removed.</div>
+      <div className="row wrap">
+        {ui}
+        <Field label="Workstation"><select className="select" value={ws} onChange={(e) => setWs(e.target.value)}><option value="">All</option>{workstations.map((w) => <option key={w.id} value={w.id}>{w.code} {w.name}</option>)}</select></Field>
+        <Field label="Employee"><select className="select" value={emp} onChange={(e) => setEmp(e.target.value)}><option value="">Everyone</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>
+        <Field label="Event"><select className="select" value={type} onChange={(e) => setType(e.target.value)}><option value="">All events</option>{(Object.keys(POS_EVENT_LABEL) as PosEventType[]).map((t) => <option key={t} value={t}>{POS_EVENT_LABEL[t]}</option>)}</select></Field>
+        <label className="row small" style={{ alignSelf: "flex-end", gap: 6 }}><input type="checkbox" checked={onlyExceptions} onChange={(e) => setOnlyExceptions(e.target.checked)} /> Exceptions only</label>
+        <button className="btn" style={{ alignSelf: "flex-end" }} onClick={exportXlsx}>Export</button>
+      </div>
+      <div className="card table-wrap">
+        {!events ? <Loading /> : (
+          <table className="table">
+            <thead><tr><th>Time</th><th>WS</th><th>Event</th><th>Employee</th><th>Approved by</th><th>Check</th><th>Detail</th><th className="num">Amount</th></tr></thead>
+            <tbody>
+              {rows.slice(0, 1000).map((e) => (
+                <tr key={e.id}>
+                  <td className="small">{dateTimeColombo(e.at)}</td>
+                  <td className="mono small">{e.workstationId}</td>
+                  <td><span className={`badge ${EXCEPTION_EVENTS.includes(e.type) ? "warn" : ""}`}>{POS_EVENT_LABEL[e.type]}</span></td>
+                  <td>{name(e.employeeId)}</td>
+                  <td>{name(e.authorizedBy)}</td>
+                  <td>{e.checkNo ? `#${e.checkNo}` : ""}</td>
+                  <td className="small">{[e.itemName, e.qty ? `× ${e.qty}` : "", e.reason, e.detail].filter(Boolean).join(" · ")}</td>
+                  <td className="num">{e.amount !== undefined ? money(e.amount) : ""}</td>
+                </tr>
+              ))}
+              {!rows.length ? <tr><td colSpan={8} className="muted">No events in this range.</td></tr> : null}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExceptionsTab() {
+  const { from, to, ui } = useRange();
+  const events = useCollection<PosEvent>(C.posJournal, { where: [["businessDate", ">=", from], ["businessDate", "<=", to]] }) ?? [];
+  const checks = useCollection<Check>(C.checks, { where: [["businessDate", ">=", from], ["businessDate", "<=", to]] }) ?? [];
+  const staff = useCollection<Staff>(C.staff) ?? [];
+  const name = (id?: string) => staff.find((x) => x.id === id)?.name ?? id ?? "";
+  const rows = employeeActivity(checks.filter((c) => c.status === "closed"), events);
+  const pct = (part: number, whole: number) => (whole ? `${((part / whole) * 100).toFixed(1)}%` : "");
+  async function exportXlsx() {
+    const buf = await tablesToWorkbook([{ name: "Exceptions", title: `Exceptions by employee ${from} to ${to}`, totals: true, rows, columns: [
+      { header: "Employee", value: (r) => name(r.employeeId), width: 24 }, { header: "Checks", value: (r) => r.checksClosed, format: "number" }, { header: "Net sales", value: (r) => r.netSales, format: "money", width: 14 },
+      { header: "Voids", value: (r) => r.voids.count, format: "number" }, { header: "Void value", value: (r) => r.voids.amount, format: "money", width: 14 }, { header: "Discounts", value: (r) => r.discounts.count, format: "number" }, { header: "Discount value", value: (r) => r.discounts.amount, format: "money", width: 14 },
+      { header: "Price overrides", value: (r) => r.priceOverrides, format: "number" }, { header: "No sales", value: (r) => r.noSales, format: "number" }, { header: "Reprints", value: (r) => r.reprints, format: "number" }, { header: "Paid out", value: (r) => r.paidOut, format: "money" }, { header: "Wrong PINs", value: (r) => r.failedSignIns, format: "number" }, { header: "Approvals given", value: (r) => r.authorisationsGiven, format: "number" },
+    ] }]);
+    downloadBuffer(buf, `exceptions-${from}-${to}.xlsx`);
+  }
+  return (
+    <div className="stack">
+      <div className="callout small">Loss-prevention view: voids, discounts and drawer openings by employee against their sales. High void or discount rates, frequent no-sales and approvals concentrated on one manager are the classic red flags.</div>
+      <div className="row wrap">{ui}<button className="btn" style={{ alignSelf: "flex-end" }} onClick={exportXlsx}>Export</button></div>
+      <div className="card table-wrap">
+        <table className="table">
+          <thead><tr><th>Employee</th><th className="num">Checks</th><th className="num">Net sales</th><th className="num">Voids</th><th className="num">Void %</th><th className="num">Discounts</th><th className="num">Disc. %</th><th className="num">Overrides</th><th className="num">No sales</th><th className="num">Reprints</th><th className="num">Paid out</th><th className="num">Wrong PINs</th><th className="num">Approvals given</th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.employeeId}>
+                <td>{name(r.employeeId)}</td>
+                <td className="num">{r.checksClosed}</td>
+                <td className="num">{amount(r.netSales)}</td>
+                <td className="num">{r.voids.count ? `${r.voids.count} · ${amount(r.voids.amount)}` : ""}</td>
+                <td className="num">{pct(r.voids.amount, r.netSales + r.voids.amount)}</td>
+                <td className="num">{r.discounts.count ? `${r.discounts.count} · ${amount(r.discounts.amount)}` : ""}</td>
+                <td className="num">{pct(r.discounts.amount, r.netSales + r.discounts.amount)}</td>
+                <td className="num">{r.priceOverrides || ""}</td>
+                <td className="num">{r.noSales || ""}</td>
+                <td className="num">{r.reprints || ""}</td>
+                <td className="num">{r.paidOut ? amount(r.paidOut) : ""}</td>
+                <td className="num">{r.failedSignIns || ""}</td>
+                <td className="num">{r.authorisationsGiven || ""}</td>
+              </tr>
+            ))}
+            {!rows.length ? <tr><td colSpan={13} className="muted">No activity in this range.</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────── Data quality ─────────────────────────────
+
+const FIX_LINK: Record<string, string> = {
+  menuItems: "/emc/menu/items", menuCategories: "/emc/menu/categories", modifierGroups: "/emc/menu/modifiers", recipes: "/emc/recipes", staff: "/emc/people/staff", roles: "/emc/people/roles",
+  workstations: "/emc/setup/devices", printers: "/emc/setup/devices", revenueCenters: "/emc/setup/organisation", properties: "/emc/setup/organisation", tables: "/emc/pos/tables", tenderMedia: "/emc/pos/tenders",
+  discounts: "/emc/pos/discounts", inventoryItems: "/emc/inventory/items", vendors: "/emc/inventory/vendors", purchaseOrders: "/emc/inventory/po", goodsReceipts: "/emc/inventory/grn", accounts: "/emc/finance/accounts", settings: "/emc/finance/settings", customers: "/emc/crm/customers",
+};
+
+function QualityTab() {
+  const { store, tenant, toast } = useApp();
+  const [issues, setIssues] = useState<HealthIssue[] | null>(null);
+  const [checked, setChecked] = useState<{ at: string; docs: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function run() {
+    if (!store) return;
+    setBusy(true);
+    try {
+      const snapshot = Object.fromEntries(await Promise.all(HEALTH_COLLECTIONS.map(async (col) => [col, await store.list<Record<string, unknown>>(col)] as const)));
+      setIssues(dataHealth(snapshot, tenant?.modules ?? {}));
+      setChecked({ at: new Date().toISOString(), docs: Object.values(snapshot).reduce((a, l) => a + l.length, 0) });
+    } catch (e) {
+      toast((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const byModule = new Map<string, { errors: number; warnings: number }>();
+  for (const i of issues ?? []) {
+    const m = byModule.get(i.module) ?? { errors: 0, warnings: 0 };
+    if (i.severity === "error") m.errors++;
+    else m.warnings++;
+    byModule.set(i.module, m);
+  }
+  return (
+    <div className="stack">
+      <div className="callout small">Validates every master record in every module against its rules (types, ranges, formats) and checks every link between modules: items to categories and modifiers, recipes to stock items (including circular prep recipes), staff to roles, properties and revenue centres, workstations to revenue centres and printers, purchase documents to vendors and stock, tenders and mappings to ledger accounts, duplicate codes, cards and employee numbers. New and edited records are also validated as they are saved.</div>
+      <div className="row wrap">
+        <button className="btn primary" disabled={busy} onClick={run}>{busy ? "Checking…" : "Run data quality check"}</button>
+        {checked ? <span className="small muted">{checked.docs} records checked {dateTimeColombo(checked.at)}</span> : null}
+      </div>
+      {issues ? (
+        <>
+          <div className={`callout ${issues.some((i) => i.severity === "error") ? "bad" : issues.length ? "warn" : "good"}`}>
+            {issues.length ? `${issues.filter((i) => i.severity === "error").length} error(s) and ${issues.filter((i) => i.severity === "warning").length} warning(s).` : "No issues: every record is valid and every reference resolves."}
+          </div>
+          {byModule.size ? <div className="grid cols-4">{[...byModule].map(([m, c]) => <Stat key={m} label={m} value={c.errors + c.warnings} sub={`${c.errors} errors · ${c.warnings} warnings`} {...(c.errors ? { tone: "bad" as const } : { tone: "warn" as const })} />)}</div> : null}
+          {issues.length ? (
+            <div className="card table-wrap">
+              <table className="table">
+                <thead><tr><th>Severity</th><th>Module</th><th>Record</th><th>Issue</th><th /></tr></thead>
+                <tbody>
+                  {issues.map((i, n) => (
+                    <tr key={n}>
+                      <td><span className={`badge ${i.severity === "error" ? "bad" : "warn"}`}>{i.severity}</span></td>
+                      <td>{i.module}</td>
+                      <td className="mono small">{i.collection}/{i.id}</td>
+                      <td>{i.message}</td>
+                      <td>{FIX_LINK[i.collection] ? <a href={FIX_LINK[i.collection]}>Fix →</a> : null}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -438,13 +650,16 @@ export function AuditCenter() {
         options={[
           { value: "integrity", label: "Integrity" },
           { value: "trail", label: "Audit trail" },
+          { value: "journal", label: "POS journal" },
+          { value: "exceptions", label: "Exceptions" },
+          { value: "quality", label: "Data quality" },
           { value: "numbering", label: "Numbering" },
           { value: "sod", label: "Segregation of duties" },
           { value: "access", label: "Access review" },
           { value: "exports", label: "Auditor exports" },
         ]}
       />
-      {tab === "integrity" ? <IntegrityTab /> : tab === "trail" ? <TrailTab /> : tab === "numbering" ? <NumberingTab /> : tab === "sod" ? <SodTab /> : tab === "access" ? <AccessTab /> : <ExportsTab />}
+      {tab === "integrity" ? <IntegrityTab /> : tab === "trail" ? <TrailTab /> : tab === "journal" ? <JournalTab /> : tab === "exceptions" ? <ExceptionsTab /> : tab === "quality" ? <QualityTab /> : tab === "numbering" ? <NumberingTab /> : tab === "sod" ? <SodTab /> : tab === "access" ? <AccessTab /> : <ExportsTab />}
     </div>
   );
 }

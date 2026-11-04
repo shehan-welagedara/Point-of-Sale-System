@@ -32,7 +32,7 @@ export interface ModuleInfo {
 export const MODULES: readonly ModuleInfo[] = [
   { key: "pos", name: "Point of Sale", group: "POS", description: "Ordering, bills (IRD tax invoice format), tenders, cash drawer, KOT printing, End of Day.", requires: [], status: "available" },
   { key: "tables", name: "Table Service", group: "POS", description: "Floor plan, tables, covers and table status for dine-in.", requires: ["pos"], status: "available" },
-  { key: "kds", name: "Kitchen Display", group: "POS", description: "Kitchen and bar screens with bump and timers, alongside or instead of KOT printers.", requires: ["pos"], status: "available" },
+  { key: "kds", name: "Kitchen Display", group: "POS", description: "Kitchen and bar screens with bump and timers, alongside or instead of KOT printers (KOT printers work today).", requires: ["pos"], status: "planned" },
   { key: "recipes", name: "Recipes & Costing", group: "ERP", description: "Recipes, sub-recipes (prep items), portion cost, food cost % and gross profit per item.", requires: [], status: "available" },
   { key: "inventory", name: "Inventory", group: "ERP", description: "Stock by location with FIFO lots, recipe-based depletion from sales, waste, counts, transfers, valuation.", requires: ["recipes"], status: "available" },
   { key: "purchasing", name: "Purchasing", group: "ERP", description: "Vendors, purchase orders, goods receipts (GRN) with input VAT.", requires: ["inventory"], status: "available" },

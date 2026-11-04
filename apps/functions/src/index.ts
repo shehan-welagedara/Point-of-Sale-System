@@ -5,6 +5,7 @@
  *  - auditTrail   Firestore trigger: records every change to tenant data with the actor
  *  - auditTenant  Firestore trigger: records changes to the tenant record (licensed modules)
  *  - auditSealer  hourly: seals new audit events into the hash chain
+ *  - licenceApi   callable: verifies a vendor licence key and applies the entitlement
  */
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
@@ -12,7 +13,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWrittenWithAuthContext } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { type Member, type Tenant, isOn, newId } from "@pos/core";
+import { type Member, type Tenant, DEMO_LICENCE_PUBLIC_KEY, LicenceError, builtInEntitlements, clampModules, isOn, licenceStatus, newId, verifyLicence } from "@pos/core";
 import { type Actor, type LedgerRequest, LedgerError, PermissionError, UNAUDITED, makeAuditEvent, runLedgerRequest, sealPending } from "@pos/ledger";
 import { AdminStore, adminRunner, collectionRef } from "./admin-store.js";
 
@@ -36,6 +37,10 @@ export const ledgerApi = onCall<{ tenantId: string } & LedgerRequest>(async (req
   const { tenantId, ...req } = request.data;
   if (!tenantId || !req.action) throw new HttpsError("invalid-argument", "tenantId and action are required");
   const { actor, tenant } = await actorFor(tenantId, request.auth.uid, String(request.auth.token.email ?? ""));
+  if (!entitled(tenant, "accounting") && req.action !== "verify" && req.action !== "seal") {
+    if (req.action === "postPosDay") return null;
+    throw new HttpsError("failed-precondition", "the Accounting module is not in this business's licence");
+  }
   if (!isOn(tenant.modules, "accounting") && req.action !== "postPosDay" && req.action !== "verify" && req.action !== "seal") {
     throw new HttpsError("failed-precondition", "the Accounting module is not enabled for this business");
   }
@@ -47,6 +52,39 @@ export const ledgerApi = onCall<{ tenantId: string } & LedgerRequest>(async (req
   } catch (e) {
     if (e instanceof PermissionError) throw new HttpsError("permission-denied", e.message);
     if (e instanceof LedgerError) throw new HttpsError("failed-precondition", e.message);
+    throw e;
+  }
+});
+
+/** The licence (or built-in trial/demo) allows the module and has not lapsed. */
+function entitled(t: Tenant, module: "accounting"): boolean {
+  const ent = t.entitlements ?? builtInEntitlements(t.plan);
+  if (!ent.modules.includes(module)) return false;
+  if (t.licence) return licenceStatus(t.licence, new Date()).usable;
+  if (t.plan === "trial" && t.trialEndsAt) return Date.now() <= Date.parse(t.trialEndsAt);
+  return true;
+}
+
+const LICENCE_PUBLIC_KEY = process.env.LICENCE_PUBLIC_KEY || DEMO_LICENCE_PUBLIC_KEY;
+
+/**
+ * Licence activation. The signature is checked here with the vendor's public key, and only this
+ * function may write the licence, edition and entitlement (the security rules refuse clients).
+ */
+export const licenceApi = onCall<{ tenantId: string; action: "activate"; token: string }>(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "sign in first");
+  const { tenantId, action, token } = request.data;
+  if (!tenantId || action !== "activate" || !token) throw new HttpsError("invalid-argument", "tenantId and token are required");
+  const { actor, tenant } = await actorFor(tenantId, request.auth.uid, String(request.auth.token.email ?? ""));
+  if (actor.role !== "owner" && actor.role !== "admin") throw new HttpsError("permission-denied", "only the owner or an administrator can activate a licence");
+  const projectId = process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? "";
+  try {
+    const { payload } = await verifyLicence(token, LICENCE_PUBLIC_KEY, { projectId, tenantId }, new Date());
+    const licence = { token: token.trim(), licenceId: payload.licenceId, licensee: payload.licensee.name, edition: payload.edition, addOns: payload.addOns, billing: payload.billing, validFrom: payload.validFrom, expiresAt: payload.expiresAt, graceDays: payload.graceDays, activatedAt: new Date().toISOString(), activatedBy: actor.uid, demoKey: LICENCE_PUBLIC_KEY === DEMO_LICENCE_PUBLIC_KEY };
+    await db.collection("tenants").doc(tenantId).set({ plan: payload.edition, entitlements: payload.entitlements, licence, modules: clampModules(tenant.modules, payload.entitlements) }, { merge: true });
+    return { edition: payload.edition, expiresAt: payload.expiresAt };
+  } catch (e) {
+    if (e instanceof LicenceError) throw new HttpsError("failed-precondition", e.message);
     throw e;
   }
 });

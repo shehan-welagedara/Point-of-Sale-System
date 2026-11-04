@@ -1,4 +1,4 @@
-import { type DocStore, type Invoice, type Member, type MemberRole, COLLECTIONS as C } from "@pos/core";
+import { type DocStore, type Invoice, type Member, type MemberRole, type PosEvent, COLLECTIONS as C, verifyPosJournal } from "@pos/core";
 import { type AuditEvent, type AuditSeal, type IntegrityIssue, type Gap, type SodFinding, sealEvents, sequenceGaps, sodConflicts, sodViolations, verifyAuditTrail, verifyInvoices, verifyLedger } from "./audit.js";
 import {
   approveVoucher,
@@ -52,7 +52,7 @@ export class PermissionError extends Error {}
 export interface IntegrityReport {
   checkedAt: string;
   checkedBy: string;
-  counts: { vouchers: number; ledgerLines: number; invoices: number; auditEvents: number; seals: number; unsealedEvents: number };
+  counts: { vouchers: number; ledgerLines: number; invoices: number; auditEvents: number; seals: number; unsealedEvents: number; posEvents: number };
   issues: IntegrityIssue[];
   gaps: Gap[];
   sod: SodFinding[];
@@ -80,7 +80,7 @@ export async function sealPending(store: DocStore, now: Date, delayMs = SEAL_DEL
 }
 
 export async function integrityReport(store: DocStore, actor: Actor, now: string): Promise<IntegrityReport> {
-  const [vouchers, entries, balances, invoices, events, seals, members] = await Promise.all([
+  const [vouchers, entries, balances, invoices, events, seals, members, posEvents] = await Promise.all([
     store.list<Voucher>(L.vouchers),
     store.list<LedgerEntry>(L.ledger),
     store.list<AccountBalance>(L.balances),
@@ -88,11 +88,13 @@ export async function integrityReport(store: DocStore, actor: Actor, now: string
     store.list<AuditEvent>(L.auditEvents),
     store.list<AuditSeal>(L.auditSeals),
     store.list<Member>(C.members).catch(() => [] as Member[]),
+    store.list<PosEvent>(C.posJournal),
   ]);
   const issues = [
     ...(await verifyLedger(vouchers, entries, balances)),
     ...(await verifyInvoices(invoices)),
     ...(await verifyAuditTrail(events, seals)),
+    ...(await verifyPosJournal(posEvents)).map((i) => ({ area: "POS journal" as const, ...i })),
     ...sodViolations(vouchers),
   ];
   const numbers = [...vouchers.filter((v) => v.number).map((v) => v.number!), ...invoices.map((i) => i.id)];
@@ -101,7 +103,7 @@ export async function integrityReport(store: DocStore, actor: Actor, now: string
   return {
     checkedAt: now,
     checkedBy: actor.uid,
-    counts: { vouchers: vouchers.filter((v) => v.number).length, ledgerLines: entries.length, invoices: invoices.length, auditEvents: events.length, seals: seals.length, unsealedEvents: events.filter((e) => !sealed.has(e.id)).length },
+    counts: { vouchers: vouchers.filter((v) => v.number).length, ledgerLines: entries.length, invoices: invoices.length, auditEvents: events.length, seals: seals.length, unsealedEvents: events.filter((e) => !sealed.has(e.id)).length, posEvents: posEvents.length },
     issues,
     gaps,
     sod: sodConflicts(members),

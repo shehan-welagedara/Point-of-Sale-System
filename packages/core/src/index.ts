@@ -9,3 +9,6 @@ export * from "./inventory.js";
 export * from "./reports.js";
 export * from "./accounting.js";
 export * from "./integrations.js";
+export * from "./licensing.js";
+export * from "./journal.js";
+export * from "./validation.js";

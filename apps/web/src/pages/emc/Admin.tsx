@@ -14,9 +14,6 @@ import {
   type Vendor,
   COLLECTIONS as C,
   MEMBER_ROLE_INFO,
-  PRIVILEGES,
-  type PrivilegeKey,
-  codeToId,
 } from "@pos/core";
 import { type ImportResult, buildFeederWorkbook, importOps, parseFeederWorkbook } from "@pos/excel";
 import type { ReceiptDoc } from "@pos/printing";
@@ -26,60 +23,6 @@ import { ConfirmButton, Empty, Field, Loading, Modal, PageHead } from "../../com
 import { ReceiptView } from "../../components/Receipt";
 import { dateTimeColombo, downloadBuffer } from "../../lib/format";
 import { useApp, useCollection, useStore } from "../../state/app";
-
-// ───────────────────────────── Roles & privileges ─────────────────────────────
-
-export function RolesPage() {
-  const store = useStore();
-  const { toast } = useApp();
-  const roles = useCollection<Role>(C.roles);
-  const [newName, setNewName] = useState("");
-  if (!roles) return <div className="page"><Loading /></div>;
-  const keys = Object.keys(PRIVILEGES) as PrivilegeKey[];
-  const ordered = [...roles].sort((a, b) => b.privileges.length - a.privileges.length);
-
-  async function toggle(role: Role, p: PrivilegeKey) {
-    const has = role.privileges.includes(p);
-    await store.set(C.roles, { ...role, privileges: has ? role.privileges.filter((x) => x !== p) : [...role.privileges, p] });
-  }
-
-  return (
-    <div className="page">
-      <PageHead
-        title="Roles & privileges"
-        subtitle="What each POS role may do. Privileged actions (voids after send, refunds, manager discounts, no-sale) need a role that has them, or a manager's PIN."
-        actions={
-          <div className="row">
-            <input className="input" placeholder="New role name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-            <button className="btn primary" disabled={!newName.trim()} onClick={async () => { await store.set(C.roles, { id: codeToId(newName), name: newName.trim(), privileges: ["pos.signIn", "pos.openCheck"] }); setNewName(""); toast("Role added"); }}>Add role</button>
-          </div>
-        }
-      />
-      <div className="card table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Privilege</th>
-              {ordered.map((r) => <th key={r.id} style={{ textAlign: "center" }}>{r.name}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {keys.map((p) => (
-              <tr key={p}>
-                <td>{PRIVILEGES[p]}</td>
-                {ordered.map((r) => (
-                  <td key={r.id} style={{ textAlign: "center" }}>
-                    <input type="checkbox" aria-label={`${r.name}: ${PRIVILEGES[p]}`} checked={r.privileges.includes(p)} disabled={r.id === "owner"} onChange={() => toggle(r, p)} style={{ width: 18, height: 18 }} />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
 // ───────────────────────────── Back-office logins ─────────────────────────────
 

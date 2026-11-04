@@ -1,11 +1,17 @@
 import { useState } from "react";
+import { MODULES, type ModuleKey, builtInEntitlements, setModule } from "@pos/core";
 import { useApp } from "../../state/app";
+
+const STARTER: ModuleKey[] = ["pos", "tables", "recipes", "revenue", "crm", "lankaqr"];
 
 /** First run: create a business (tenant), optionally filled with the Sri Lankan sample restaurant. */
 export function Onboarding() {
   const { createTenant, mode, toast, acceptInvite, user, signOut } = useApp();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<Partial<Record<ModuleKey, boolean>>>(Object.fromEntries(STARTER.map((k) => [k, true])));
+  const trial = builtInEntitlements("trial");
+  const picked = MODULES.filter((m) => chosen[m.key]).map((m) => m.key);
 
   async function run(label: string, f: () => Promise<unknown>) {
     setBusy(label);
@@ -42,15 +48,23 @@ export function Onboarding() {
             <label htmlFor="bname">Business name</label>
             <input id="bname" className="input" value={name} placeholder="e.g. Lagoon Café" onChange={(e) => setName(e.target.value)} />
           </div>
+          <div className="field">
+            <label>Modules to provide to this client</label>
+            <div className="chips">
+              {MODULES.filter((m) => m.status === "available" && trial.modules.includes(m.key)).map((m) => (
+                <button key={m.key} type="button" className={`chip${chosen[m.key] ? " on" : ""}`} title={m.description} onClick={() => setChosen(setModule(chosen, m.key, !chosen[m.key]))}>
+                  {m.name}
+                </button>
+              ))}
+            </div>
+            <div className="help">Modules a chosen one needs are added automatically. The business starts a 30-day trial; activate the client's licence key under Administration → Licence &amp; modules, which limits modules and capacity to what they bought.</div>
+          </div>
           <div className="row wrap">
-            <button className="btn" disabled={!name.trim() || Boolean(busy)} onClick={() => run("empty", () => createTenant(name.trim(), false))}>
-              {busy === "empty" ? "Creating…" : "Create empty"}
-            </button>
-            <button className="btn" disabled={!name.trim() || Boolean(busy)} onClick={() => run("sample", () => createTenant(name.trim(), true))}>
-              {busy === "sample" ? "Creating…" : "Create with sample data"}
+            <button className="btn primary" disabled={!name.trim() || Boolean(busy) || !picked.length} onClick={() => run("empty", () => createTenant(name.trim(), false, picked))}>
+              {busy === "empty" ? "Creating…" : "Create business"}
             </button>
           </div>
-          <p className="tiny muted">Empty businesses start with Sri Lankan tax defaults. Feed the menu, recipes and stock from the Excel data feeder.</p>
+          <p className="tiny muted">New businesses start with Sri Lankan tax defaults. Feed the menu, recipes and stock from the Excel data feeder.</p>
         </div>
         {mode === "firebase" ? (
           <div className="row between">

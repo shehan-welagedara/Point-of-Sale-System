@@ -58,10 +58,20 @@ service cloud.firestore {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // Licence fields (edition, entitlement, activated licence) are written only by the licence
+    // function after it verifies the vendor's signature. Administrators switch modules on and off,
+    // but only modules inside the entitlement.
+    function licenceUnchanged() { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'entitlements', 'licence', 'trialEndsAt', 'ownerUid', 'createdAt']); }
+    function modulesWithinEntitlement() {
+      return resource.data.get('plan', '') == 'demo' || !('entitlements' in resource.data)
+          || request.resource.data.get('modules', {}).diff(resource.data.get('modules', {})).affectedKeys().hasOnly(resource.data.entitlements.modules);
+    }
+
     match /tenants/{t} {
       allow read: if isMember(t) || isPlatformAdmin();
-      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.id == t;
-      allow update: if (isAdmin(t) && request.resource.data.ownerUid == resource.data.ownerUid) || isPlatformAdmin();
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.id == t
+                    && request.resource.data.plan in ['trial', 'demo'] && !('licence' in request.resource.data);
+      allow update: if (isAdmin(t) && licenceUnchanged() && modulesWithinEntitlement()) || isPlatformAdmin();
       allow delete: if false;
 
       match /members/{uid} {
@@ -99,7 +109,25 @@ service cloud.firestore {
       match /reasonCodes/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
       match /tenderMedia/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
       match /roles/{id} { allow read: if isMember(t); allow write: if isAdmin(t) && idMatches(id); }
-      match /staff/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
+      match /staff/{id} {
+        allow read: if isMember(t);
+        allow create, delete: if isManager(t) && idMatches(id);
+        // POS terminals record sign-in control only: wrong-PIN count, lockout/unlock, last sign-in, clock state.
+        allow update: if (isManager(t) && idMatches(id)) || (canPos(t) && onlyChanges(['failedSignIns', 'lockedAt', 'lastSignInAt', 'clockedInAt']));
+      }
+      // POS transaction journal: append-only and hash-chained per workstation.
+      match /posJournal/{id} {
+        allow read: if canPos(t) || canAudit(t) || canSeeBooks(t);
+        allow create: if canPos(t) && request.resource.data.id == id && request.resource.data.workstationId is string && request.resource.data.hash is string;
+        allow update, delete: if false;
+      }
+      match /timeCards/{id} {
+        allow read: if isMember(t);
+        allow create: if canPos(t) && request.resource.data.id == id;
+        allow update: if canPos(t) && !('clockOut' in resource.data);
+        allow delete: if false;
+      }
+      match /menuImages/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
       match /budgets/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
       match /menuItems/{id} {
         allow read: if isMember(t);

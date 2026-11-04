@@ -9,10 +9,12 @@ import {
   type ReasonCode,
   type Role,
   type Staff,
+  type LimitKind,
   COLLECTIONS as C,
   PRIVILEGES,
-  hasPrivilege,
+  canAuthorize,
   newId,
+  roleFor,
   verifyPin,
 } from "@pos/core";
 import { Field, Modal } from "../../components/ui";
@@ -127,23 +129,69 @@ export function ModifierDialog({ item, groups, onAdd, onClose }: { item: MenuIte
   );
 }
 
-/** Asks for the PIN of someone holding a privilege (manager override). */
-export function ManagerAuth({ privilege, staff, roles, onApproved, onClose }: { privilege: PrivilegeKey; staff: Staff[]; roles: Role[]; onApproved: (by: Staff) => void; onClose: () => void }) {
+/**
+ * Manager override: a senior employee swipes their card or enters their PIN. Only people whose
+ * role holds the privilege and "manager override", is the same level or more senior than the
+ * requester's, and whose limit covers the amount can approve.
+ */
+export function ManagerAuth({ privilege, requester, propertyId, staff, roles, limit, onApproved, onClose }: { privilege: PrivilegeKey; requester: Staff; propertyId: string; staff: Staff[]; roles: Role[]; limit?: { kind: LimitKind; value: number; label: string }; onApproved: (by: Staff) => void; onClose: () => void }) {
   const [err, setErr] = useState("");
-  const eligible = staff.filter((s) => s.status === "active" && hasPrivilege(roles.find((r) => r.id === s.roleId), privilege));
+  const [card, setCard] = useState("");
+  const requesterRole = roleFor(requester, propertyId, roles);
+  const check = (s: Staff) => canAuthorize({ authorizer: s, authorizerRole: roleFor(s, propertyId, roles), requester, requesterRole, privilege, ...(limit ? { limit } : {}) });
+  const eligible = staff.filter((s) => s.status === "active" && (!s.propertyIds?.length || s.propertyIds.includes(propertyId)) && check(s).ok);
   return (
     <Modal title="Manager approval" onClose={onClose}>
       <div className="stack" style={{ alignItems: "center" }}>
-        <p className="muted" style={{ textAlign: "center" }}>“{PRIVILEGES[privilege]}” needs approval. A manager enters their PIN.</p>
+        <p className="muted" style={{ textAlign: "center" }}>
+          “{PRIVILEGES[privilege]}”{limit ? ` (${limit.label})` : ""} needs approval by a senior employee.
+        </p>
+        <input
+          className="input"
+          style={{ maxWidth: 280, textAlign: "center" }}
+          placeholder="Swipe manager card"
+          autoComplete="off"
+          value={card}
+          onChange={(e) => setCard(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            const s = staff.find((x) => x.cardId && x.cardId === card.trim());
+            setCard("");
+            if (!s) return setErr("Unknown card");
+            const r = check(s);
+            return r.ok ? onApproved(s) : setErr(r.reason ?? "Not authorised");
+          }}
+        />
         <PinEntry
           error={err}
           onSubmit={async (pin) => {
             for (const s of eligible) {
               if (await verifyPin(pin, s.pinHash, s.pinSalt)) return onApproved(s);
             }
-            setErr("Not authorised");
+            setErr(eligible.length ? "Not authorised" : "Nobody on duty can approve this");
           }}
         />
+        <p className="tiny muted">The approval is recorded in the POS journal with both names.</p>
+      </div>
+    </Modal>
+  );
+}
+
+/** Amount entry (price override, open price, paid in/out). */
+export function AmountDialog({ title, help, initial = 0, onDone, onClose }: { title: string; help?: string; initial?: number; onDone: (cents: number) => void; onClose: () => void }) {
+  const [text, setText] = useState(initial ? String(initial / 100) : "");
+  const press = (k: string) => setText((t) => (k === "C" ? "" : k === "⌫" ? t.slice(0, -1) : (t + k).slice(0, 10)));
+  const cents = Math.round(Number(text || 0) * 100);
+  return (
+    <Modal title={title} onClose={onClose} footer={<button className="btn primary" disabled={!Number.isFinite(cents) || cents < 0} onClick={() => onDone(cents)}>OK {money(cents)}</button>}>
+      <div className="stack">
+        {help ? <p className="small muted">{help}</p> : null}
+        <div style={{ fontSize: 30, fontWeight: 700, textAlign: "center" }} className="num">{money(cents)}</div>
+        <div className="keypad">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"].map((k) => (
+            <button key={k} type="button" onClick={() => press(k)}>{k}</button>
+          ))}
+        </div>
       </div>
     </Modal>
   );

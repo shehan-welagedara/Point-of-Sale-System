@@ -1,5 +1,6 @@
 import type { CheckTotals, Cents, BasisPoints } from "@pos/engine";
 import type { ModuleKey } from "./modules.js";
+import type { Edition, Entitlements } from "./licensing.js";
 
 /**
  * Domain model. Every document lives in a tenant-scoped collection (see `COLLECTIONS`) and carries
@@ -17,10 +18,33 @@ export interface Entity {
 export interface Tenant extends Entity {
   name: string;
   ownerUid: string;
+  /** Modules the administrator has switched on (always within the entitlement). */
   modules: Partial<Record<ModuleKey, boolean>>;
-  plan: "demo" | "starter" | "standard" | "enterprise";
+  /** Edition in force: "demo"/"trial" until a licence key is activated. */
+  plan: Edition;
+  /** What the business may use (from the licence, or the built-in trial/demo). */
+  entitlements?: Entitlements;
+  /** Activated licence (written by the server after verifying the vendor's signature). */
+  licence?: TenantLicence;
+  trialEndsAt?: string;
   status: "active" | "suspended";
   createdAt: string;
+}
+
+export interface TenantLicence {
+  token: string;
+  licenceId: string;
+  licensee: string;
+  edition: Edition;
+  addOns: ModuleKey[];
+  billing: "subscription" | "perpetual" | "trial";
+  validFrom: string;
+  expiresAt: string;
+  graceDays: number;
+  activatedAt: string;
+  activatedBy: string;
+  /** True when signed with the public demo key (not for live trading). */
+  demoKey?: boolean;
 }
 
 export interface BusinessSettings extends Entity {
@@ -69,8 +93,37 @@ export interface TaxSettings extends Entity {
   invoiceSequenceReset: SequenceReset;
 }
 
+/** POS look: one of the templates plus any overrides (colours, sizes, layout). */
+export interface PosTheme {
+  template: "classic" | "modern" | "midnight";
+  /** CSS colours; empty = the template's value. */
+  colors: Partial<Record<"brand" | "accent" | "bg" | "surface" | "text" | "muted" | "line" | "button" | "buttonText" | "checkBg" | "danger", string>>;
+  fontScale: number;
+  buttonSize: "compact" | "regular" | "large";
+  radius: number;
+  /** Where the check is: left or right of the menu. */
+  checkSide: "left" | "right";
+  /** Category navigation as a top bar or a left rail. */
+  categoryStyle: "tabs" | "rail";
+  /** Menu grid columns on a wide screen (0 = automatic). */
+  columns: number;
+  showImages: boolean;
+  /** Colour each item button with its category colour. */
+  colorByCategory: boolean;
+}
+
 export interface PosSettings extends Entity {
   id: "pos";
+  /** How employees sign in: employee ID + PIN, tap a name then PIN, or card swipe/ID. */
+  signInMode?: "idPin" | "tapName" | "card";
+  /** Wrong PINs before the employee is locked out (a manager unlocks). */
+  maxFailedSignIns?: number;
+  /** Sign the employee out after this many seconds without a touch (0 = never). */
+  autoSignOutSeconds?: number;
+  /** Employees must clock in before they can start checks. */
+  requireClockIn?: boolean;
+  pinMinLength?: number;
+  theme?: PosTheme;
   /** Local hour at which the business day rolls over. */
   businessDayRolloverHour: number;
   requireCoversForDineIn: boolean;
@@ -139,7 +192,12 @@ export type DeviceProfile = "dedicated" | "mobile";
 
 export interface Workstation extends Entity {
   propertyId: string;
+  /** Default revenue centre. */
   rvcId: string;
+  /** Revenue centres employees may choose at sign-in on this device (empty = only `rvcId`). */
+  allowedRvcIds?: string[];
+  /** Overrides the property-wide automatic sign-out (seconds, 0 = never). */
+  autoSignOutSeconds?: number;
   /** Also the IRD invoice classification code (1–15 uppercase letters/digits), e.g. W01. */
   code: string;
   name: string;
@@ -217,6 +275,21 @@ export interface MenuItem extends Entity {
   sortOrder: number;
   /** Cached recipe cost per portion (cents), refreshed by costing. */
   cost?: Cents;
+  /** A photo is stored in `menuImages/{id}` (kept out of the item so menus load fast). */
+  hasImage?: boolean;
+  /** Button colour on the POS (CSS colour). */
+  buttonColor?: string;
+  /** Price is entered at the POS (needs the open-price privilege). */
+  openPrice?: boolean;
+}
+
+/** Menu item photo, resized in the browser (≤ 400 px, ~30 KB) and stored in Firestore. */
+export interface MenuImage extends Entity {
+  dataUrl: string;
+  width: number;
+  height: number;
+  bytes: number;
+  updatedAt: string;
 }
 
 export interface ModifierOption {
@@ -270,22 +343,73 @@ export interface TenderMedia extends Entity {
 
 // ───────────────────────────── People Management ─────────────────────────────
 
+export interface RoleLimits {
+  /** Largest discount the role may give, basis points of the line or check. */
+  maxDiscountBp?: number;
+  /** Largest single void (value of the voided line). */
+  maxVoidAmount?: Cents;
+  /** Largest price change, basis points of the menu price. */
+  maxPriceOverrideBp?: number;
+  maxRefundAmount?: Cents;
+  maxPaidOut?: Cents;
+}
+
 export interface Role extends Entity {
   name: string;
+  /** 1 = most senior. People may authorise or manage only roles at their level or below. */
+  level: number;
   privileges: string[];
+  limits?: RoleLimits;
+  /** Privileges the role has but that still need a second person's authorisation. */
+  requireAuth?: string[];
+  description?: string;
 }
 
 /** A POS operator (signs in with employee number + PIN). */
 export interface Staff extends Entity {
+  /** Employee number, also the sign-in ID on the POS. */
   employeeNo: string;
   name: string;
+  /** Default role (used at every property without its own entry in `propertyRoles`). */
   roleId: string;
+  /** Role per property for groups where a person works in several hotels. */
+  propertyRoles?: Record<string, string>;
   propertyIds: string[];
+  /** Revenue centres this employee may sign in to (Simphony operator records; empty = all). */
+  rvcIds?: string[];
+  jobTitle?: string;
+  department?: string;
   pinHash: string;
   pinSalt: string;
+  /** Magnetic/RFID card number for swipe sign-in and authorisations. */
   cardId?: string;
   phone?: string;
+  email?: string;
   status: "active" | "suspended" | "terminated";
+  hireDate?: string;
+  terminationDate?: string;
+  /** Sign-in control. */
+  failedSignIns?: number;
+  lockedAt?: string;
+  lastSignInAt?: string;
+  pinChangedAt?: string;
+  /** Time and attendance: set while clocked in. */
+  clockedInAt?: string;
+  /** Linked back-office login (Firebase uid), if the person also uses the back office. */
+  backOfficeUid?: string;
+}
+
+/** Time and attendance record (one per shift). */
+export interface TimeCard extends Entity {
+  staffId: string;
+  propertyId: string;
+  rvcId: string;
+  businessDate: string;
+  clockIn: string;
+  clockOut?: string;
+  workstationId: string;
+  /** Minutes worked (set at clock-out). */
+  minutes?: number;
 }
 
 /** Back-office login (Firebase Auth user) and its access level for this tenant. */

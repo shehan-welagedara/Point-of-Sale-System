@@ -7,6 +7,9 @@ import { deleteApp, initializeApp } from "firebase/app";
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { collection, connectFirestoreEmulator, doc, getDoc, getDocs, initializeFirestore, setDoc, writeBatch } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { buildEntitlements, signLicence } from "@pos/core";
 import { buildFiscalYear, defaultChartOfAccounts, defaultCostCenters, defaultLedgerSettings } from "@pos/ledger";
 
 const PROJECT = "demo-pos-suite";
@@ -135,4 +138,35 @@ describe("ledger on Cloud Functions", () => {
     await expect(call({ action: "verify" })).rejects.toThrow(/cannot verify/);
     await expect(getDocs(collection(db, "auditLog", T, "events"))).rejects.toMatchObject({ code: "permission-denied" });
   }, 60_000);
+});
+
+describe("licence activation on Cloud Functions", () => {
+  const demoKey = readFileSync(resolve(__dirname, "../../../tools/licence/demo-key.txt"), "utf8").match(/^private=(.+)$/m)![1]!;
+  const licence = (projectId: string) =>
+    signLicence(
+      { v: 1, licenceId: "LIC-E2E", licensee: { name: "E2E Hotels" }, edition: "starter", addOns: ["accounting"], entitlements: buildEntitlements("starter", ["accounting"]), projectId, tenantId: T, billing: "subscription", issuedAt: "2026-11-01T00:00:00Z", validFrom: "2026-11-01T00:00:00Z", expiresAt: "2099-12-31T00:00:00Z", graceDays: 14 },
+      demoKey,
+    );
+  const activate = httpsCallable(fns, "licenceApi");
+
+  it("verifies the vendor signature and project binding, and lets only the owner activate", async () => {
+    await as(`acc-${T}@demo.lk`);
+    await expect(activate({ tenantId: T, action: "activate", token: await licence(PROJECT) })).rejects.toMatchObject({ code: "functions/permission-denied" });
+    await as(`own-${T}@demo.lk`);
+    await expect(activate({ tenantId: T, action: "activate", token: await licence("someone-elses-project") })).rejects.toThrow(/project/);
+    const good = await licence(PROJECT);
+    const [pre, body, sig] = good.split(".");
+    const forged = JSON.parse(Buffer.from(body!, "base64url").toString());
+    forged.edition = "enterprise";
+    await expect(activate({ tenantId: T, action: "activate", token: `${pre}.${Buffer.from(JSON.stringify(forged)).toString("base64url")}.${sig}` })).rejects.toThrow(/signature/);
+
+    await activate({ tenantId: T, action: "activate", token: good });
+    const t = (await getDoc(doc(db, "tenants", T))).data()!;
+    expect(t.plan).toBe("starter");
+    expect(t.licence.licenceId).toBe("LIC-E2E");
+    expect(t.entitlements.modules).toContain("accounting");
+    expect(t.modules.accounting).toBe(true);
+    // The owner still can't raise the entitlement directly.
+    await expect(setDoc(doc(db, "tenants", T), { plan: "enterprise" }, { merge: true })).rejects.toThrow(/PERMISSION_DENIED/);
+  });
 });
