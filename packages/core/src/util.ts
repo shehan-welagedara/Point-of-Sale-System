@@ -1,3 +1,5 @@
+import { pbkdf2Sha256, randomBytes, sha256Bytes } from "./cryptox.js";
+
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 /** ULID-style id: time-sortable, generated on the device (works during internet drops). */
@@ -39,8 +41,7 @@ export function canonicalJson(value: unknown): string {
 }
 
 export async function sha256Hex(text: string): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return toHex(await sha256Bytes(new TextEncoder().encode(text)));
 }
 
 function toHex(bytes: Uint8Array): string {
@@ -50,11 +51,10 @@ function toHex(bytes: Uint8Array): string {
 /** PBKDF2-SHA256 PIN hash. Production verifies PINs server-side; the demo verifies on the device. */
 export async function hashPin(pin: string, saltHex?: string): Promise<{ hash: string; salt: string }> {
   if (!/^\d{4,8}$/.test(pin)) throw new Error("PIN must be 4–8 digits");
-  const salt = saltHex ?? toHex(globalThis.crypto.getRandomValues(new Uint8Array(16)));
+  const salt = saltHex ?? toHex(randomBytes(16));
   const saltBytes = new Uint8Array(salt.match(/../g)!.map((h) => parseInt(h, 16)));
-  const key = await globalThis.crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
-  const bits = await globalThis.crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations: 50_000 }, key, 256);
-  return { hash: toHex(new Uint8Array(bits)), salt };
+  const bits = await pbkdf2Sha256(new TextEncoder().encode(pin), saltBytes, 50_000, 32);
+  return { hash: toHex(bits), salt };
 }
 
 export async function verifyPin(pin: string, hash: string, salt: string): Promise<boolean> {
