@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+verifyDepsBeforeRun: install
+ignoredBuiltDependencies:
+  - "@firebase/util"
