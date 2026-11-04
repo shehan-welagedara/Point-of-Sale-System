@@ -83,7 +83,7 @@ export function PosThemesPage() {
   const tpl = TEMPLATES[theme.template];
   const set = (patch: Partial<PosTheme>) => setTheme({ ...theme, ...patch });
   return (
-    <div className="page">
+    <div className="page fill">
       <PageHead
         title="POS themes"
         subtitle="Pick a template, then change any colour, size or layout. Every workstation and tablet uses this look from the next screen refresh."
@@ -94,6 +94,8 @@ export function PosThemesPage() {
           </>
         }
       />
+      <div className="appearance-grid">
+      <div className="stack appearance-col">
       <div className="grid cols-3">
         {Object.values(TEMPLATES).map((t) => (
           <button key={t.key} className="card card-body stack tight" style={{ textAlign: "left", cursor: "pointer", font: "inherit", color: "var(--text)", outline: theme.template === t.key ? "2px solid var(--brand)" : undefined }} onClick={() => setTheme(applyTemplate(t.key))}>
@@ -108,7 +110,8 @@ export function PosThemesPage() {
         ))}
       </div>
       <Preview theme={theme} />
-      <div className="grid cols-2">
+      </div>
+      <div className="stack appearance-col">
         <div className="card card-body stack">
           <h3>Layout</h3>
           <Field label="Check panel"><Seg<PosTheme["checkSide"]> value={theme.checkSide} onChange={(v) => set({ checkSide: v })} options={[{ value: "left", label: "Left" }, { value: "right", label: "Right" }]} /></Field>
@@ -141,6 +144,7 @@ export function PosThemesPage() {
             );
           })}
         </div>
+      </div>
       </div>
     </div>
   );

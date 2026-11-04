@@ -280,7 +280,7 @@ export function VoucherList({ types, title, subtitle, actions, editor, initialSt
     .filter((v) => types.includes(v.type) && (!filter || filter(v)) && (status === "all" || v.status === status) && (!q || `${v.number ?? ""} ${v.remarks} ${v.id}`.toLowerCase().includes(q.toLowerCase())))
     .sort((a, b) => b.postingDate.localeCompare(a.postingDate) || (b.number ?? "").localeCompare(a.number ?? ""));
   return (
-    <div className={head ? "page" : "stack"}>
+    <div className={head ? "page fill" : "stack"}>
       {head ? (
         <div className="page-head">
           <div>
@@ -298,7 +298,7 @@ export function VoucherList({ types, title, subtitle, actions, editor, initialSt
           </button>
         ))}
       </div>
-      <div className="card table-wrap">
+      <div className="card table-wrap fill-card">
         {!vouchers ? (
           <Loading />
         ) : (

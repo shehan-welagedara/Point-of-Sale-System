@@ -7,7 +7,7 @@ import { type Workspace, WORKSPACES, visibleWorkspaces, workspaceFor } from "../
 
 function LicenceBadge() {
   const { licence } = useApp();
-  const label = licence.status === "demo" ? "Demo licence" : licence.status === "trial" ? `Trial · ${licence.daysLeft} days left` : licence.status === "grace" ? "Licence expired · grace period" : licence.status === "expired" ? "Licence expired" : `${editionInfo(licence.edition).name}${licence.daysLeft !== null && licence.daysLeft < 30 ? ` · renews in ${licence.daysLeft} days` : ""}`;
+  const label = licence.status === "demo" ? (licence.daysLeft !== null ? `Demo · ${licence.daysLeft} days left` : "Demo licence") : licence.status === "trial" ? `Trial · ${licence.daysLeft} days left` : licence.status === "grace" ? "Licence expired · grace period" : licence.status === "expired" ? "Licence expired" : `${editionInfo(licence.edition).name}${licence.daysLeft !== null && licence.daysLeft < 30 ? ` · renews in ${licence.daysLeft} days` : ""}`;
   const tone = licence.status === "expired" || licence.status === "grace" ? "bad" : licence.status === "trial" || licence.status === "demo" ? "warn" : "good";
   return (
     <Link to="/emc/setup/licence" className={`badge ${tone}`} title="Licence and modules">
@@ -58,6 +58,9 @@ function TopBar({ workspace, onMenu }: { workspace?: Workspace; onMenu?: () => v
           ))}
         </select>
       ) : null}
+      {mode === "firebase" && (role === "owner" || role === "admin") ? (
+        <Link to="/new-business" className="btn ghost sm hide-sm" title="Create another business (for example a training copy with demo data)">+ Business</Link>
+      ) : null}
       {mode === "local" ? (
         <select className="select" style={{ minHeight: 30, width: "auto", padding: "2px 8px", fontSize: 13 }} value={persona} onChange={(e) => setPersona(e.target.value as keyof typeof DEMO_PEOPLE)} title="Acting as (demo): switch to see maker-checker and auditor access" aria-label="Acting as">
           {(Object.keys(DEMO_PEOPLE) as (keyof typeof DEMO_PEOPLE)[]).map((k) => (
@@ -95,6 +98,7 @@ export function Launchpad() {
           <p>{settings.business.tradingName} · choose a module</p>
         </div>
       </div>
+      <div className="launch-groups">
       {groups.map((g) => {
         const ws = visible.filter((w) => w.group === g);
         if (!ws.length) return null;
@@ -113,6 +117,7 @@ export function Launchpad() {
           </section>
         );
       })}
+      </div>
       {locked.length ? (
         <section className="stack tight">
           <span className="section-title">Not in your licence</span>

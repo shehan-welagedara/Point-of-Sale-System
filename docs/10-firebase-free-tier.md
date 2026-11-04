@@ -38,9 +38,8 @@ Deploy the functions for every client: licence activation and the server-side au
    - Cloud Console → *Billing → Reports*: filter by this project, and check it shows USD 0.00.
 5. **Cloud Functions settings** (before the first `pnpm firebase:deploy`)
    - Copy `apps/functions/.env.example` to `apps/functions/.env`. Set `LOCATION` to **the same region as your Firestore database** (for example `asia-south1`). Set `VITE_FUNCTIONS_REGION` in `apps/web/.env.local` to the same value. Firestore triggers must run in the database's region.
-   - Run the Artifact Registry clean-up policy once per project and region, so old build images are deleted:
-     `npx firebase functions:artifacts:setpolicy --location asia-south1 --days 1`
-     (the CLI also offers this on the first deploy; accept it).
+   - Set the Artifact Registry clean-up policy once per project and region, so old build images are deleted. The first deploy usually offers it: answer yes. If it doesn't, run this **after** the first deploy (the image repository only exists from then):
+     `pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1`
    - Leave **minimum instances at 0** (the code sets it). Each warm instance kept alive is billed.
    - Do not enable "Retry on failure" for the triggers.
 6. **Firestore TTL policy** (keeps the print queue from growing)
@@ -112,6 +111,6 @@ npx firebase use --add          # pick your demo project, alias "demo"
 # deploy the web app, security rules, indexes and functions (no Storage)
 cp apps/web/.env.example apps/web/.env.local          # paste the Firebase web config
 cp apps/functions/.env.example apps/functions/.env    # LOCATION = your Firestore region
-npx firebase functions:artifacts:setpolicy --location asia-south1 --days 1
 pnpm firebase:deploy
+pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1   # after the first deploy, if it didn't ask
 ```

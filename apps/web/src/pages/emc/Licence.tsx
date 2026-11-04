@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { type Member, type ModuleKey, COLLECTIONS as C, EDITIONS, LIMIT_LABEL, MODULES, type UsageLimits, clampModules, editionInfo, setModule, usageReport } from "@pos/core";
-import { Bar, Field, PageHead, Toggle } from "../../components/ui";
+import { Bar, Field, PageHead, Seg, Toggle } from "../../components/ui";
 import { firebaseConfig } from "../../lib/firebase";
 import { dateTimeColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
@@ -10,6 +10,7 @@ export function LicencePage() {
   const { tenant, licence, activateLicence, updateTenant, toast, role, mode } = useApp();
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"licence" | "modules" | "editions">("licence");
   const counts: UsageLimits = {
     properties: (useCollection<{ active: boolean }>(C.properties) ?? []).filter((p) => p.active).length,
     revenueCenters: (useCollection<{ active: boolean }>(C.revenueCenters) ?? []).filter((p) => p.active).length,
@@ -50,6 +51,8 @@ export function LicencePage() {
       {licence.status === "expired" ? <div className="callout bad">The licence has expired. Modules are switched off until a renewed licence key is activated; data is kept.</div> : null}
       {licence.status === "grace" ? <div className="callout warn">The licence has expired and is in its grace period ({l?.graceDays} days). Activate the renewal key to avoid interruption.</div> : null}
       {l?.demoKey && mode === "firebase" ? <div className="callout warn">This licence is signed with the public demo key. Generate your own key pair (<code>pnpm licence keygen</code>) before selling licences.</div> : null}
+      <Seg value={tab} onChange={setTab} options={[{ value: "licence", label: "Licence and usage" }, { value: "modules", label: "Modules" }, { value: "editions", label: "Editions" }]} />
+      {tab === "licence" ? (
       <div className="grid cols-2">
         <div className="card card-body stack">
           <div className="row between">
@@ -97,7 +100,9 @@ export function LicencePage() {
           <p className="tiny muted">Adding beyond a limit is refused (new workstations, employees, revenue centres). Ask the vendor for a higher tier or a capacity add-on.</p>
         </div>
       </div>
-      <h2>Modules</h2>
+      ) : null}
+      {tab === "modules" ? (
+      <>
       {!canEdit ? <div className="callout warn">Only the owner or an administrator can switch modules.</div> : null}
       {groups.map((g) => (
         <div key={g} className="stack tight">
@@ -122,7 +127,9 @@ export function LicencePage() {
           </div>
         </div>
       ))}
-      <h2>Editions</h2>
+      </>
+      ) : null}
+      {tab === "editions" ? (
       <div className="grid cols-3">
         {EDITIONS.filter((e) => e.key !== "demo" && e.key !== "trial").map((e) => (
           <div key={e.key} className="card card-body stack tight" style={e.key === licence.edition ? { outline: "2px solid var(--brand)" } : undefined}>
@@ -134,6 +141,7 @@ export function LicencePage() {
           </div>
         ))}
       </div>
+      ) : null}
     </div>
   );
 }

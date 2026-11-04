@@ -118,10 +118,70 @@ try {
   await page.waitForTimeout(1000);
   check("licence key activates the Professional edition", (await page.locator("h3").first().textContent())?.includes("Professional"));
 
+  // ── Responsive: 16:9 PCs and landscape tablets fit without page scrolling; nothing overflows sideways anywhere.
+  const state = await page.context().storageState();
+  const measure = (p) => p.evaluate(() => {
+    const se = document.scrollingElement;
+    const els = [se, document.querySelector(".main"), document.querySelector(".pos"), document.querySelector(".auth")].filter(Boolean);
+    return { hx: se.scrollWidth - window.innerWidth, vy: Math.max(...els.map((e) => e.scrollHeight - e.clientHeight)) };
+  });
+  const FIT = ["/emc/home", "/emc/dashboard", "/emc/finance", "/emc/menu/items", "/emc/people/roles", "/emc/finance/statements", "/emc/inventory/stock", "/emc/pos/appearance"];
+  const views = [["PC 1920×1080", 1920, 1080, true], ["PC 1366×768", 1366, 768, true], ["PC 1280×720", 1280, 720, true], ["tablet landscape", 1180, 820, true], ["tablet portrait", 820, 1180, false], ["phone", 390, 844, false]];
+  for (const [label, width, height, fit] of views) {
+    const ctx = await browser.newContext({ viewport: { width, height }, storageState: state });
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errors.push(`${label}: ${e.message}`));
+    const bad = [];
+    for (const path of FIT) {
+      await p.goto(`${B}${path}?mode=local`);
+      await p.waitForTimeout(500);
+      const m = await measure(p);
+      if (m.hx > 1 || (fit && m.vy > 1)) bad.push(`${path} (${m.hx > 1 ? `${m.hx}px wider` : `${m.vy}px taller`})`);
+    }
+    await p.goto(`${B}/pos?mode=local`);
+    await p.waitForTimeout(500);
+    if (await p.getByRole("button", { name: /Counter POS/ }).count()) await p.getByRole("button", { name: /Counter POS/ }).click();
+    await p.getByLabel("Employee number or card").fill("1001");
+    await p.keyboard.press("Enter");
+    for (const d of "1111") await p.locator(".keypad button", { hasText: new RegExp(`^${d}$`) }).first().click();
+    await p.waitForTimeout(700);
+    await p.locator(".rvc-btn").first().click();
+    await p.waitForTimeout(600);
+    for (const tab of ["Order", "Tables", "Reports", "Functions"]) {
+      await p.getByRole("tab", { name: tab }).click();
+      await p.waitForTimeout(400);
+      const m = await measure(p);
+      if (m.hx > 1 || m.vy > 1) bad.push(`POS ${tab} (${m.hx > 1 ? `${m.hx}px wider` : `${m.vy}px taller`})`);
+    }
+    check(`${label}: ${fit ? "every screen fits without scrolling" : "nothing overflows sideways"}`, bad.length === 0, bad.join(", "));
+    await ctx.close();
+  }
+  // Item buttons page like a terminal when they don't fit (no scrolling on PCs and tablets).
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 600 }, storageState: state });
+    const p = await ctx.newPage();
+    await p.goto(`${B}/pos?mode=local`);
+    await p.waitForTimeout(500);
+    if (await p.getByRole("button", { name: /Counter POS/ }).count()) await p.getByRole("button", { name: /Counter POS/ }).click();
+    await p.getByLabel("Employee number or card").fill("1001");
+    await p.keyboard.press("Enter");
+    for (const d of "1111") await p.locator(".keypad button", { hasText: new RegExp(`^${d}$`) }).first().click();
+    await p.waitForTimeout(700);
+    await p.locator(".rvc-btn").first().click();
+    await p.getByPlaceholder("Search item or code").fill("a");
+    await p.waitForTimeout(600);
+    const pager = await p.locator(".pos-pager").textContent().catch(() => null);
+    const overflow = await p.evaluate(() => { const g = document.querySelector(".pos-grid"); return g.scrollHeight - g.clientHeight; });
+    await p.getByRole("button", { name: "Next page" }).click().catch(() => {});
+    const after = await p.locator(".pos-pager").textContent().catch(() => null);
+    check("item buttons page instead of scrolling", Boolean(pager) && overflow <= 1 && /Page 2/.test(after ?? ""), `${pager} → ${after}`);
+    await ctx.close();
+  }
+
   check("no browser errors", errors.length === 0, errors.slice(0, 5).join(" | "));
 } catch (e) {
-  await page.screenshot({ path: resolve(root, "e2e-failure.png") }).catch(() => {});
-  check("run completed", false, `${e.message.split("\n")[0]} (screenshot: e2e-failure.png)`);
+  for (const c of browser.contexts()) for (const pg of c.pages()) await pg.screenshot({ path: resolve(root, `e2e-failure-${browser.contexts().indexOf(c)}.png`) }).catch(() => {});
+  check("run completed", false, `${e.message.split("\n")[0]} (screenshots: e2e-failure-*.png)`);
 } finally {
   await browser.close();
   await server.close();

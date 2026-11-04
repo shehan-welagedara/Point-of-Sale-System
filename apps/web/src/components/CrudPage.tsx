@@ -260,7 +260,7 @@ export function CrudPage(p: CrudProps) {
   }
 
   return (
-    <div className="page">
+    <div className="page fill">
       <PageHead
         title={p.title}
         subtitle={p.subtitle}
@@ -273,7 +273,7 @@ export function CrudPage(p: CrudProps) {
           </>
         }
       />
-      <div className="card">
+      <div className="card fill-card">
         <div className="card-head">
           <input className="input" style={{ maxWidth: 320 }} placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
           <span className="muted small">{docs ? `${rows.length} of ${docs.filter((d) => (p.filter ? p.filter(d) : true)).length}` : ""}</span>

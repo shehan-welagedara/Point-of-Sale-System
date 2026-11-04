@@ -125,7 +125,13 @@ export function licenceInfo(t: Tenant | null, now = new Date()): LicenceInfo {
     const c = licenceStatus(t.licence, now);
     return { edition: t.licence.edition, entitlements, status: c.status === "notYetValid" ? "expired" : c.status, daysLeft: c.daysLeft, usable: c.usable, licensee: t.licence.licensee, demoKey: Boolean(t.licence.demoKey) };
   }
-  if (plan === "demo") return { edition: "demo", entitlements, status: "demo", daysLeft: null, usable: true, demoKey: true };
+  if (plan === "demo") {
+    // Unlimited only in the vendor's own demo environment (public demo key). In a client deployment
+    // a demo business is a 30-day training copy, so it can't be used to trade without a licence.
+    if (LICENCE_PUBLIC_KEY === DEMO_LICENCE_PUBLIC_KEY) return { edition: "demo", entitlements, status: "demo", daysLeft: null, usable: true, demoKey: true };
+    const left = Math.floor((Date.parse(t?.createdAt ?? now.toISOString()) + TRIAL_DAYS * 86_400_000 - now.getTime()) / 86_400_000);
+    return { edition: "demo", entitlements, status: left >= 0 ? "demo" : "expired", daysLeft: left, usable: left >= 0, demoKey: false };
+  }
   const end = t?.trialEndsAt ? Date.parse(t.trialEndsAt) : Date.parse(t?.createdAt ?? now.toISOString()) + TRIAL_DAYS * 86_400_000;
   const daysLeft = Math.floor((end - now.getTime()) / 86_400_000);
   return { edition: "trial", entitlements, status: daysLeft >= 0 ? "trial" : "expired", daysLeft, usable: daysLeft >= 0, demoKey: false };

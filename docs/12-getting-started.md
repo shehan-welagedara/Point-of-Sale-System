@@ -77,8 +77,8 @@ cp apps/web/.env.example apps/web/.env.client-spice   # the client's web config
 cp apps/web/.env.client-spice apps/web/.env.local
 cp apps/functions/.env.example apps/functions/.env    # LOCATION = the client's Firestore region
 npx firebase use client-spice
-npx firebase functions:artifacts:setpolicy --location asia-south1 --days 1
 pnpm firebase:deploy                    # hosting, rules, indexes and the accounting/audit functions
+npx firebase functions:artifacts:setpolicy --location asia-south1 --days 1   # after the first deploy, if it didn't ask
 ```
 - Create the owner's account on the deployed site and create the business: empty, or import their Excel data feeder.
 - Configuration that differs per client lives in **their data**: settings, modules, branding and menus. Do not keep a separate code branch per client. Client-specific code (rare) goes behind a module flag or into an extension package on `main`, so every client keeps receiving fixes ([01 §4](01-architecture.md)).

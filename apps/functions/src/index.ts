@@ -13,7 +13,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWrittenWithAuthContext } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { type Member, type Tenant, DEMO_LICENCE_PUBLIC_KEY, LicenceError, builtInEntitlements, clampModules, isOn, licenceStatus, newId, verifyLicence } from "@pos/core";
+import { type Member, type Tenant, DEMO_LICENCE_PUBLIC_KEY, LicenceError, TRIAL_DAYS, builtInEntitlements, clampModules, isOn, licenceStatus, newId, verifyLicence } from "@pos/core";
 import { type Actor, type LedgerRequest, LedgerError, PermissionError, UNAUDITED, makeAuditEvent, runLedgerRequest, sealPending } from "@pos/ledger";
 import { AdminStore, adminRunner, collectionRef } from "./admin-store.js";
 
@@ -62,6 +62,8 @@ function entitled(t: Tenant, module: "accounting"): boolean {
   if (!ent.modules.includes(module)) return false;
   if (t.licence) return licenceStatus(t.licence, new Date()).usable;
   if (t.plan === "trial" && t.trialEndsAt) return Date.now() <= Date.parse(t.trialEndsAt);
+  // A demo business in a client deployment is a 30-day training copy (see the web app's licenceInfo).
+  if (t.plan === "demo" && LICENCE_PUBLIC_KEY !== DEMO_LICENCE_PUBLIC_KEY) return Date.now() <= Date.parse(t.createdAt) + TRIAL_DAYS * 86_400_000;
   return true;
 }
 
