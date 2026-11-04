@@ -90,7 +90,7 @@ export function StockOnHand() {
   }
 
   return (
-    <div className="page">
+    <div className="page fill">
       <PageHead
         title="Stock on hand"
         subtitle="Quantities and FIFO value per item. Sales deduct stock through recipes; deduction runs in batches to keep cloud usage low."
@@ -110,7 +110,7 @@ export function StockOnHand() {
           <span className="badge brand">Value {money(total)}</span>
         </div>
       </div>
-      <div className="card table-wrap">
+      <div className="card table-wrap fill-card">
         <table className="table">
           <thead>
             <tr>

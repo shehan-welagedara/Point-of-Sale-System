@@ -38,6 +38,7 @@ sequenceDiagram
   - Accounting operations check the entitlement on the server.
   - The app refuses to add workstations or employees beyond the limits.
 - **New businesses** start as a 30-day trial with the modules chosen at installation, or as the demo.
+- **Demo businesses** are unlimited only where the deployment uses the public demo key (your own demo environment). In a client deployment with your key, a demo business works for 30 days as a training copy, so it can't be used to trade without a licence.
 
 ## 3. Your vendor workflow
 

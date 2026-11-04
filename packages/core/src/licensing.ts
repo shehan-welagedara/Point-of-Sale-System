@@ -13,6 +13,7 @@
  * - The licence is bound to a deployment (Firebase project id) and optionally to one business.
  * - Inside the entitlement, the client's administrator switches modules on or off.
  */
+import { ecdsaP256Verify, requireSubtle } from "./cryptox.js";
 import { MODULES, type ModuleKey } from "./modules.js";
 
 export type Edition = "demo" | "trial" | "starter" | "professional" | "enterprise";
@@ -162,16 +163,18 @@ const SIGN = { name: "ECDSA", hash: "SHA-256" } as const;
 
 /** New vendor key pair. Keep the private key secret (never in the repository or the app). */
 export async function generateLicenceKeys(): Promise<{ publicKey: string; privateKey: string }> {
-  const kp = (await crypto.subtle.generateKey(ALG, true, ["sign", "verify"])) as CryptoKeyPair;
-  const pub = new Uint8Array(await crypto.subtle.exportKey("spki", kp.publicKey));
-  const priv = new Uint8Array(await crypto.subtle.exportKey("pkcs8", kp.privateKey));
+  const s = requireSubtle("Generating licence keys");
+  const kp = (await s.generateKey(ALG, true, ["sign", "verify"])) as CryptoKeyPair;
+  const pub = new Uint8Array(await s.exportKey("spki", kp.publicKey));
+  const priv = new Uint8Array(await s.exportKey("pkcs8", kp.privateKey));
   return { publicKey: b64url(pub), privateKey: b64url(priv) };
 }
 
 export async function signLicence(payload: LicencePayload, privateKey: string): Promise<string> {
-  const key = await crypto.subtle.importKey("pkcs8", unb64url(privateKey) as BufferSource, ALG, false, ["sign"]);
+  const s = requireSubtle("Signing licences");
+  const key = await s.importKey("pkcs8", unb64url(privateKey) as BufferSource, ALG, false, ["sign"]);
   const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
-  const sig = new Uint8Array(await crypto.subtle.sign(SIGN, key, new TextEncoder().encode(`${PREFIX}.${body}`)));
+  const sig = new Uint8Array(await s.sign(SIGN, key, new TextEncoder().encode(`${PREFIX}.${body}`)));
   return `${PREFIX}.${body}.${b64url(sig)}`;
 }
 
@@ -181,8 +184,7 @@ export class LicenceError extends Error {}
 export async function decodeLicence(token: string, publicKey: string): Promise<LicencePayload> {
   const parts = token.trim().split(".");
   if (parts.length !== 3 || parts[0] !== PREFIX) throw new LicenceError("Not a licence key");
-  const key = await crypto.subtle.importKey("spki", unb64url(publicKey) as BufferSource, ALG, false, ["verify"]);
-  const ok = await crypto.subtle.verify(SIGN, key, unb64url(parts[2]!) as BufferSource, new TextEncoder().encode(`${PREFIX}.${parts[1]}`));
+  const ok = await ecdsaP256Verify(unb64url(publicKey), unb64url(parts[2]!), new TextEncoder().encode(`${PREFIX}.${parts[1]}`));
   if (!ok) throw new LicenceError("The licence key's signature is not valid (altered, or issued with another key)");
   const payload = JSON.parse(new TextDecoder().decode(unb64url(parts[1]!))) as LicencePayload;
   if (payload.v !== 1) throw new LicenceError("Unsupported licence version");

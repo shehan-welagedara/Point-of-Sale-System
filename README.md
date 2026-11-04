@@ -22,6 +22,7 @@ pnpm install
 pnpm dev                 # open http://localhost:5173 → "Load the demo restaurant"
 ```
 - The back office opens on a **launchpad**: each module (POS Configuration, Menu, Inventory, Finance, Audit Center, People & Security, Administration…) opens as its own workspace.
+- On a phone or tablet: run `pnpm demo` on your PC and open `http://<your-PC-IP>:5173` on the same Wi-Fi.
 - POS: **Point of Sale** → pick a workstation → employee number **1001**, PIN **1111** (manager). Others: 1002/2222 cashier, 1006/6666 supervisor, 1007/7777 bartender.
 - Finance: **Finance → Overview**. Switch **Acting as** (bottom of the sidebar) between Owner, Accountant and External auditor to see maker–checker approvals and read-only audit access.
 - All demo data is fictional sample data: "Spice Lagoon", Colombo. VAT-registered, SSCL not liable.
@@ -65,11 +66,13 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | 14 | [**Feature coverage vs Simphony and S/4HANA**](docs/14-feature-coverage.md) |
 | 15 | [**Licensing and modules**](docs/15-licensing-and-modules.md) |
 | 16 | [**Users, access control, audit and QA**](docs/16-users-access-and-audit.md) |
+| 18 | [**Client deployment manual (A to Z)**](docs/18-deployment-manual.md) (Cloud Restaurant Edition) |
 | E | [**Enterprise Hotel Edition (this branch)**](docs/enterprise/README.md) |
 
 ## Commands
 ```bash
 pnpm dev               # web app (local demo mode unless apps/web/.env.local has a Firebase config)
+pnpm demo              # production build served to phones and tablets on your network (http://<your-PC-IP>:5173)
 pnpm test              # unit tests (engine, core, ledger, printing, sample data, Excel, print agent, functions)
 pnpm test:rules        # Firestore security rules on the emulator (needs Java)
 pnpm test:functions    # Cloud Functions end to end on the emulators (needs Java)
