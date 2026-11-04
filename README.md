@@ -7,6 +7,15 @@ A restaurant platform for the Sri Lankan market. It combines **POS + back office
 
 > **Status:** working product foundation with full demo data. Runs locally with no setup, or on Firebase within the free tier. Integrations (PayHere, LankaQR, WhatsApp) run as templates in mock mode until client accounts are approved.
 
+## Editions
+
+| Edition | For | Stack | Branch |
+|---|---|---|---|
+| **Cloud Restaurant Edition** (Model 1, this branch) | Small to medium restaurants and cafés | Fully on Firebase, within the free tier | `claude/vigilant-allen-7sp0m4` (PR #1, to become `main`) |
+| **Enterprise Hotel Edition** (Model 2) | Medium to large hotels, up to 5-star | POS, guest system (OPERA Cloud-level functions) and ERPNext with HR on MariaDB, in each hotel and in Google Cloud; configured from the same Firebase console | [`enterprise/hotel-suite`](https://github.com/shehan-welagedara/Point-of-Sale-System/tree/enterprise/hotel-suite) (design and build documentation) |
+
+Shared code (`packages/*`) is changed on this branch first and merged into the enterprise branch regularly.
+
 ## Try it in one minute
 ```bash
 pnpm install
