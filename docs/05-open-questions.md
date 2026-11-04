@@ -41,6 +41,7 @@
 | D29 | Users and access | Simphony-style hierarchy (enterprise → property → revenue centre), roles per property with levels and limits, operator records per revenue centre, manager override by seniority. See [16](16-users-access-and-audit.md). |
 | D30 | POS look | Three templates (Classic, Modern, Midnight) plus full customisation; item photos stored resized in Firestore (no Cloud Storage cost). |
 | D31 | Quality | Schema validation on every save, cross-module data-quality check, browser end-to-end tests in CI-style scripts. |
+| D32 | Editions | Two editions in one repository: this Cloud Restaurant Edition, and an Enterprise Hotel Edition (MariaDB POS + guest system + ERPNext, hotel servers + Google Cloud, Firebase console) on branch `enterprise/hotel-suite`. Shared packages change here first and are merged into the enterprise branch. |
 | D26 | Audit | Field-level audit trail of every business record, captured by a server trigger, sealed hourly in a hash chain. Plus integrity verification, segregation of duties, an auditor role, and SAF-T and auditor exports. |
 
 ## Remaining questions (as of 2026-10-30; items 1, 2, 4 and 6 are now covered by sample data or D16–D19)
