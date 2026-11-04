@@ -46,6 +46,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/pos" element={<PosApp />} />
+      <Route path="/new-business" element={<Onboarding />} />
       <Route path="/emc" element={<Shell />}>
         <Route path="home" element={<Launchpad />} />
         <Route path="dashboard" element={<Dashboard />} />

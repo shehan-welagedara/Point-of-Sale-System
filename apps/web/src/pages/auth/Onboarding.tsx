@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { MODULES, type ModuleKey, builtInEntitlements, setModule } from "@pos/core";
 import { useApp } from "../../state/app";
 
@@ -6,7 +7,8 @@ const STARTER: ModuleKey[] = ["pos", "tables", "recipes", "revenue", "crm", "lan
 
 /** First run: create a business (tenant), optionally filled with the Sri Lankan sample restaurant. */
 export function Onboarding() {
-  const { createTenant, mode, toast, acceptInvite, user, signOut } = useApp();
+  const { createTenant, mode, toast, acceptInvite, user, signOut, tenant } = useApp();
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [chosen, setChosen] = useState<Partial<Record<ModuleKey, boolean>>>(Object.fromEntries(STARTER.map((k) => [k, true])));
@@ -17,6 +19,7 @@ export function Onboarding() {
     setBusy(label);
     try {
       await f();
+      if (tenant) navigate("/emc/home");
     } catch (e) {
       toast(`Could not finish: ${(e as Error).message}`, true);
     } finally {
@@ -27,6 +30,7 @@ export function Onboarding() {
   return (
     <div className="auth">
       <div className="card auth-card" style={{ width: "min(560px, 100%)" }}>
+        {tenant ? <Link to="/emc/home" className="small">← Back to {tenant.name}</Link> : null}
         <h1>Set up a business</h1>
         <p className="muted">
           {mode === "local"
