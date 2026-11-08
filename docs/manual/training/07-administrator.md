@@ -11,6 +11,12 @@
 - Add employees, roles, back-office logins and the sign-in policy
 - Activate the licence and keep the system healthy
 
+## 0. The Setup checklist (10 min)
+
+![Setup checklist](../img/setup-checklist.jpg)
+
+**Administration → Setup checklist** lists what the business still needs, in order, for its modules, each with a button to do it. Work down it; the rest of this training follows the same order. The **configuration guide** explains each setting with examples (accounts, approval limits, stock units, modifiers, tenders, the Excel workbooks).
+
 ## 1. Business, tax and branding (30 min)
 
 ![Business and tax](../img/admin-business.jpg)
@@ -83,7 +89,8 @@ Switch elements on and off, change titles and wording, and check the live previe
 
 ![Licence](../img/admin-licence.jpg)
 
-- **Licence & modules:** paste the licence key from your supplier and **Activate licence**. Switch modules on or off within the licence.
+- **Licence & modules:** paste the licence key from your supplier and **Activate licence**. Switch modules on or off within the licence. A business that starts with its books and stores (no POS yet) turns on **Accounting**, **Inventory** and **Purchasing**; the POS can be added later without redoing anything.
+- **Finance settings** (owner or administrator only): choose the approval limits for who keeps the books. With one person keeping the books, raise the journal limit; with 0, every journal waits for a second person (configuration guide, section 4.2).
 - **Integrations:** LankaQR, PayHere and WhatsApp settings stay in *mock* mode until your bank or gateway approves your account; your installer then switches them to live.
 
 ## 7. Keeping the system healthy (25 min)
@@ -108,6 +115,7 @@ Switch elements on and off, change titles and wording, and check the live previe
 - [ ] Roles reviewed, employees added with PINs, sign-in policy set
 - [ ] Back-office logins given, with two administrators
 - [ ] Licence activated
+- [ ] Setup checklist complete; approval limits chosen for who keeps the books
 - [ ] Knows the routine health checks
 
 Trainee: ____________________ Trainer: ____________________ Date: __________

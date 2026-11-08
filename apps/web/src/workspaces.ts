@@ -115,9 +115,10 @@ export const WORKSPACES: Workspace[] = [
     roles: BOOKS,
     sections: [
       { items: [{ to: "/emc/finance", label: "Overview", ico: "◎" }, { to: "/emc/finance/approvals", label: "Approvals", ico: "✓" }] },
+      { label: "Everyday", items: [{ to: "/emc/finance/expense", label: "Record an expense", ico: "＋" }, { to: "/emc/finance/sales", label: "Daily sales (manual bills)", ico: "₨" }, { to: "/emc/finance/bills", label: "Bills & receipts", ico: "📎" }] },
       { label: "Transactions", items: [{ to: "/emc/finance/journals", label: "Journals", ico: "⎘" }, { to: "/emc/finance/payables", label: "Payables", ico: "↗" }, { to: "/emc/finance/receivables", label: "Receivables", ico: "↙" }, { to: "/emc/finance/bank", label: "Bank reconciliation", ico: "⌂" }, { to: "/emc/finance/assets", label: "Fixed assets", ico: "▣" }, { to: "/emc/finance/documents", label: "All documents", ico: "≡" }] },
       { label: "Reporting and close", items: [{ to: "/emc/finance/statements", label: "Financial statements", ico: "Σ" }, { to: "/emc/finance/budgets", label: "Budgets", ico: "◔" }, { to: "/emc/finance/periods", label: "Period close", ico: "⏏" }] },
-      { label: "Setup", items: [{ to: "/emc/finance/accounts", label: "Chart of accounts", ico: "#" }, { to: "/emc/finance/settings", label: "Finance settings", ico: "↔" }] },
+      { label: "Setup", items: [{ to: "/emc/finance/suppliers", label: "Suppliers", ico: "⌂" }, { to: "/emc/finance/customers", label: "Customers", ico: "☺" }, { to: "/emc/finance/accounts", label: "Chart of accounts", ico: "#" }, { to: "/emc/finance/settings", label: "Finance settings", ico: "↔" }, { to: "/emc/finance/import", label: "Excel import", ico: "⇪" }] },
     ],
   },
   {
@@ -153,7 +154,7 @@ export const WORKSPACES: Workspace[] = [
     tone: "#475569",
     group: "Administration",
     sections: [
-      { items: [{ to: "/emc/setup/business", label: "Business & tax", ico: "⚙" }, { to: "/emc/setup/branding", label: "Branding", ico: "✦" }, { to: "/emc/setup/licence", label: "Licence & modules", ico: "⧉" }, { to: "/emc/setup/integrations", label: "Integrations", ico: "⟲" }, { to: "/emc/setup/data", label: "Excel import & export", ico: "⇪" }, { to: "/emc/setup/status", label: "System status", ico: "◉" }] },
+      { items: [{ to: "/emc/setup/checklist", label: "Setup checklist", ico: "☑" }, { to: "/emc/setup/business", label: "Business & tax", ico: "⚙" }, { to: "/emc/setup/branding", label: "Branding", ico: "✦" }, { to: "/emc/setup/licence", label: "Licence & modules", ico: "⧉" }, { to: "/emc/setup/integrations", label: "Integrations", ico: "⟲" }, { to: "/emc/setup/data", label: "Excel import & export", ico: "⇪" }, { to: "/emc/setup/status", label: "System status", ico: "◉" }] },
     ],
   },
 ];

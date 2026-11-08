@@ -695,7 +695,9 @@ export function postPosDay(runner: TxRunner, args: { propertyId: string; busines
       postingDate: args.businessDate,
       businessDate: args.businessDate,
       sequence: seq,
-      remarks: posted.length === 0 ? `POS day ${args.businessDate}` : `POS day ${args.businessDate} – adjustment for late sales`,
+      remarks: (stats?.checks ?? 0) > 0
+        ? posted.length === 0 ? `POS day ${args.businessDate}` : `POS day ${args.businessDate} – adjustment for late sales`
+        : `Stock and purchases ${args.businessDate}${posted.length ? " – later entries" : ""}`,
       currency: ctx.settings.baseCurrency,
       exchangeRateMicros: BASE_RATE,
       propertyId: args.propertyId,

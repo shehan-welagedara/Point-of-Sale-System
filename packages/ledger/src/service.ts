@@ -37,7 +37,8 @@ export const ACTION_ROLES: Record<LedgerRequest["action"], MemberRole[]> = {
   approve: BOOKS,
   reject: BOOKS,
   reverse: BOOKS,
-  postPosDay: [...BOOKS, "manager", "terminal"],
+  // Also the storekeeper: receiving or counting stock posts that day's stock journal.
+  postPosDay: [...BOOKS, "manager", "terminal", "storekeeper"],
   runDepreciation: BOOKS,
   disposeAsset: BOOKS,
   ensureFiscalYear: [...BOOKS, "manager", "terminal"],

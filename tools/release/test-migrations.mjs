@@ -23,6 +23,7 @@ const check = (ok, msg) => {
 await db.doc("tenants/old-co").set({ id: "old-co", ownerUid: "owner-1", createdAt: "2026-10-01T00:00:00Z" });
 await db.doc("tenants/later-co").set({ id: "later-co", ownerUid: "owner-2", createdAt: "2026-11-01T00:00:00Z" });
 await db.doc("tenants/old-co/staff/1001").set({ id: "1001", name: "Kasun", pinHash: "h".repeat(64), pinSalt: "s".repeat(32), cardId: "CARD1001", status: "active" });
+await db.doc("tenants/old-co/accounts/3000").set({ id: "3000", code: "3000", name: "Stated capital", type: "equity" });
 await db.doc("tenants/old-co/staff/1002").set({ id: "1002", name: "Nimali", pinSet: true, status: "active" });
 
 const migrate = () => execFileSync("node", ["tools/release/migrate.mjs", "--project", PROJECT], { cwd: root, env: process.env, encoding: "utf8" });
@@ -36,4 +37,6 @@ check(sec?.pinHash === "h".repeat(64) && sec.cardId === "CARD1001", "hash and ca
 check(!(await db.doc("tenants/old-co/staffSecrets/1002").get()).exists, "records without secrets untouched");
 const again = migrate();
 check(/0 applied/.test(again), "second run applies nothing (recorded, idempotent)");
-check((await db.collection("deployment/config/migrations").get()).size === 2, "both migrations recorded");
+check((await db.doc("tenants/old-co/accounts/3900").get()).data()?.name === "Opening balances (temporary)", "opening balances account added where books exist");
+check(!(await db.doc("tenants/later-co/accounts/3900").get()).exists, "businesses without books untouched");
+check((await db.collection("deployment/config/migrations").get()).size === 3, "every migration recorded");

@@ -1,4 +1,4 @@
-/** Writes the Excel data feeder templates to /templates (sample-filled and blank). */
+/** Writes the Excel templates to /templates: the data feeder and the accounting workbook, each sample-filled and blank. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,8 +12,9 @@ import {
   type Vendor,
   COLLECTIONS as C,
 } from "@pos/core";
+import { defaultChartOfAccounts } from "@pos/ledger";
 import { buildSampleStore } from "@pos/sample-data";
-import { buildFeederWorkbook } from "../src/index.js";
+import { buildAccountingWorkbook, buildFeederWorkbook } from "../src/index.js";
 
 const out = resolve(dirname(fileURLToPath(import.meta.url)), "../../../templates");
 mkdirSync(out, { recursive: true });
@@ -32,4 +33,8 @@ writeFileSync(
   resolve(out, "data-feeder-blank.xlsx"),
   Buffer.from(await buildFeederWorkbook({ categories: [], menuItems: [], modifierGroups: [], inventoryItems: [], recipes: [], vendors: [], customers: [] }, { title: "Restaurant data feeder" })),
 );
+// Accounting workbook: the worked example (a restaurant whose books start on 1 April) and a blank copy.
+const chart = defaultChartOfAccounts();
+writeFileSync(resolve(out, "accounting-workbook-sample.xlsx"), Buffer.from(await buildAccountingWorkbook({ chart, items: data.inventoryItems, asAt: "2026-04-01", sample: true, businessName: "SAMPLE DATA" })));
+writeFileSync(resolve(out, "accounting-workbook-blank.xlsx"), Buffer.from(await buildAccountingWorkbook({ chart, asAt: "2026-04-01", sample: false })));
 console.log(`Templates written to ${out}`);

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { type DailyStats, COLLECTIONS as C, addDays } from "@pos/core";
 import { type AccountBalance, type PosDayVoucher, type PurchaseInvoice, type SalesInvoice, type Voucher, LEDGER as L } from "@pos/ledger";
@@ -8,7 +9,7 @@ import { TYPE_LABEL, canBooks, voucherAmount, useAccounts, useFiscal, useLedgerA
 
 /** Finance cockpit: position, results, work waiting and POS days to post. */
 export function FinanceOverview() {
-  const { on, role, personName } = useApp();
+  const { on, role, personName, settings } = useApp();
   const { byId } = useAccounts();
   const ls = useLedgerSettings();
   const fiscal = useFiscal();
@@ -20,6 +21,10 @@ export function FinanceOverview() {
   const stats = useCollection<DailyStats>(C.dailyStats, { where: [["businessDate", ">=", since]] }) ?? [];
   const posDays = useCollection<PosDayVoucher>(L.vouchers, { where: [["businessDate", ">=", since]] }) ?? [];
   const invoices = useCollection<PurchaseInvoice | SalesInvoice>(L.vouchers, { where: [["outstanding", ">", 0]] }) ?? [];
+  // Stock received, wasted, counted or used without POS sales also needs its day posted.
+  const grnDays = useCollection<{ date: string; status: string }>(on("purchasing") ? C.goodsReceipts : null, { where: [["date", ">=", since]] }) ?? [];
+  const moveDays = useCollection<{ businessDate: string; type: string }>(on("inventory") ? C.stockMovements : null, { where: [["businessDate", ">=", since]] }) ?? [];
+  const [postDate, setPostDate] = useState(addDays(today, -1));
   const { run, busy } = useLedgerAction();
   if (!on("accounting")) return <ModuleOff name="Accounting" />;
   if (!balances) return <Loading />;
@@ -37,7 +42,13 @@ export function FinanceOverview() {
   const profitYtd = -sum(isRoot("income", "expense"), fyStart, month);
   const vat = ls ? -sum((id) => id === ls.accounts.vatOutput || id === ls.accounts.vatInput) : 0;
   const posted = new Set(posDays.filter((v) => v.type === "posDay" && v.status === "posted").map((v) => `${v.propertyId}__${v.businessDate}`));
-  const unposted = stats.filter((s) => s.checks > 0 && s.businessDate < today && !posted.has(`${s.propertyId}__${s.businessDate}`)).sort((a, b) => a.businessDate.localeCompare(b.businessDate));
+  const home = settings.pos.defaultPropertyId;
+  const unposted = [
+    ...stats.filter((s) => s.checks > 0 && s.businessDate < today && !posted.has(`${s.propertyId}__${s.businessDate}`)).map((s) => ({ id: s.id, propertyId: s.propertyId, businessDate: s.businessDate, label: `${s.checks} checks · ${money(s.netSales)}` })),
+    ...[...new Set([...grnDays.filter((g) => g.status === "posted").map((g) => g.date), ...moveDays.filter((m) => m.type !== "sale" && m.type !== "transferIn" && m.type !== "transferOut").map((m) => m.businessDate)])]
+      .filter((d) => d < today && !posted.has(`${home}__${d}`) && !stats.some((s) => s.businessDate === d && s.checks > 0))
+      .map((d) => ({ id: `stock-${d}`, propertyId: home, businessDate: d, label: "stock and purchases" })),
+  ].sort((a, b) => a.businessDate.localeCompare(b.businessDate));
   const overdue = invoices.filter((i) => i.status === "posted" && i.dueDate < today);
   const overdueAr = overdue.filter((i) => i.type === "salesInvoice").reduce((a, i) => a + (i.outstanding ?? 0), 0);
   const overdueAp = overdue.filter((i) => i.type === "purchaseInvoice").reduce((a, i) => a + (i.outstanding ?? 0), 0);
@@ -70,15 +81,21 @@ export function FinanceOverview() {
           </div>
         </div>
         <div className="card">
-          <div className="card-head"><h3>POS days to post</h3></div>
+          <div className="card-head"><h3>Days to post</h3></div>
           <div className="card-body stack tight">
             {unposted.map((s) => (
               <div key={s.id} className="row between small">
-                <span>{s.businessDate} · {s.propertyId} · {s.checks} checks · {money(s.netSales)}</span>
+                <span>{s.businessDate} · {s.propertyId} · {s.label}</span>
                 {canBooks(role) || role === "manager" ? <button className="btn sm" disabled={busy} onClick={() => run<{ number?: string } | null>({ action: "postPosDay", propertyId: s.propertyId, businessDate: s.businessDate }, (r) => (r ? `Posted ${r.number ?? ""}` : "Nothing new to post"))}>Post</button> : null}
               </div>
             ))}
-            {!unposted.length ? <span className="small muted">Every trading day of the last two weeks is posted. The POS posts the day at End of Day.</span> : null}
+            {!unposted.length ? <span className="small muted" title="The POS posts each day at End of Day; stock is posted when it is received, counted or wasted.">Every day of the last two weeks is posted.</span> : null}
+            {canBooks(role) || role === "manager" ? (
+              <div className="row tight small" title="Post sales and stock for any day (only what is not yet in the books is posted)">
+                <input className="input sm" type="date" style={{ width: "auto", minWidth: 0 }} value={postDate} onChange={(e) => setPostDate(e.target.value)} aria-label="Day to post" />
+                <button className="btn sm" disabled={busy} onClick={() => run<{ number?: string } | null>({ action: "postPosDay", propertyId: home, businessDate: postDate }, (r) => (r ? `Posted ${r.number ?? ""}` : "Nothing new to post for that day"))}>Post day</button>
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="card">

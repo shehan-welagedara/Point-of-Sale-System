@@ -36,13 +36,17 @@
 4. **Goods receipts:** open the draft and enter the quantities **actually** received, the supplier invoice number, the real costs and the input VAT on the invoice.
 5. **Post to stock.** Stock increases as a new FIFO lot at the received cost, and the latest price updates recipe costs. A posted receipt can no longer be changed. Give the supplier's invoice to the accountant, who enters it under Finance → Payables and matches it against your order and receipt.
 
-**Exercise 2.** Order 20 kg chicken from Island Poultry; receive 18 kg at Rs 1,480 per kg; post.
+**Photos of delivery notes and bills:** on the goods receipt, **Add photo or scan** and photograph the supplier's delivery note or bill. Bills you can't record yet go to **Finance → Bills & receipts** for the accountant.
+
+> A delivery of stock items is entered **once**, as a goods receipt. The accountant then enters the supplier's bill against it; it must not also be recorded as an expense.
+
+**Exercise 2.** Order 20 kg chicken from Island Poultry; receive 18 kg at Rs 1,480 per kg, attach a photo of the delivery note; post.
 
 ## 3. Counts, waste, transfers, production (45 min)
 
 | Task | Where | Effect |
 |---|---|---|
-| **Stock count** | Stock counts → **Start a count** → enter the counted quantities → **Post count** | Differences adjust stock: losses at FIFO cost, gains at standard cost |
+| **Stock count** | Stock counts → choose the **type of count** → **Start a count** → enter the counted quantities → **Post count** | *Regular count:* differences are losses or errors. *Kitchen usage* (no POS sales): what is missing is what the kitchen used, to cost of sales. *Opening stock:* the first count. Losses at FIFO cost, gains at standard cost |
 | **Waste** | Waste & transfers → **Record waste**: item, quantity, reason | Stock reduced; cost goes to wastage |
 | **Transfer** | Waste & transfers → **Transfer stock**: from and to store | Stock moves between locations |
 | **Production** | Waste & transfers → Production (prep batch) → **Produce batch** | Consumes ingredients at FIFO cost, adds the prep item |
@@ -78,7 +82,7 @@ Sales deduct ingredients through recipes when End of Day runs.
 
 - [ ] Adds a stock item with correct units and conversion
 - [ ] Raises (or suggests), approves and receives a purchase order, and posts the goods receipt with the real quantities and costs
-- [ ] Posts a stock count
+- [ ] Posts a stock count, and knows when to use the opening-stock and kitchen-usage types
 - [ ] Records waste with a reason and a transfer
 - [ ] Produces a prep batch
 - [ ] Explains a stock difference from Movements

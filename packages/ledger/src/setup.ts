@@ -58,6 +58,7 @@ const CHART: Row[] = [
   ["3", "Equity", null, "equity", null, true, "equity"],
   ["3000", "Stated capital", "3", "equity", "Equity", false],
   ["3100", "Retained earnings", "3", "equity", "RetainedEarnings", false],
+  ["3900", "Opening balances (temporary)", "3", "equity", null, false],
   ["4", "Income", null, "income", null, true],
   ["40", "Revenue", "4", "income", null, true, "revenue"],
   ["4000", "Sales – food", "40", "income", "Income", false],

@@ -31,6 +31,7 @@ const issued = new Date().toLocaleDateString("en-GB", { month: "long", year: "nu
 
 const docs = [
   { file: join(manual, "user-manual.md"), name: "User-Manual", kind: "User manual" },
+  { file: join(manual, "configuration-guide.md"), name: "Configuration-Guide", kind: "Configuration guide" },
   ...readdirSync(join(manual, "training"))
     .filter((f) => /^\d\d-.*\.md$/.test(f))
     .sort()
@@ -91,7 +92,7 @@ try {
     const md = readFileSync(d.file, "utf8");
     const title = (md.match(/^# (.+)$/m)?.[1] ?? d.name).replace(/^Training: /, "");
     const body = toHtml(md);
-    const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${pathToFileURL(dirname(d.file)).href}/"><style>${CSS}</style></head><body class="${d.kind === "User manual" ? "manual" : "training"}">
+    const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${pathToFileURL(dirname(d.file)).href}/"><style>${CSS}</style></head><body class="${d.kind === "Training manual" ? "training" : "manual"}">
 <section class="cover">
   <div class="band"></div>
   <div class="kind">${d.kind}</div>

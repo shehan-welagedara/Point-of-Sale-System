@@ -12,6 +12,6 @@
     "typecheck": "tsc --noEmit",
     "templates": "tsx scripts/generate-templates.ts"
   },
-  "dependencies": { "@pos/core": "workspace:*", "@pos/sample-data": "workspace:*", "exceljs": "4.4.0" },
+  "dependencies": { "@pos/core": "workspace:*", "@pos/ledger": "workspace:*", "@pos/sample-data": "workspace:*", "exceljs": "4.4.0" },
   "devDependencies": { "typescript": "5.9.3", "vitest": "3.2.4", "tsx": "4.19.4", "@types/node": "22.15.3" }
 }
