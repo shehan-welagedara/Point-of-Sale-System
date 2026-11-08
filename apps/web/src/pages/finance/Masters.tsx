@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { type Account, type AccountType, type AccountingSettings, type TenderMedia, COLLECTIONS as C } from "@pos/core";
 import { type AccountBalance, type CostCenter, type ExchangeRate, type GlBudget, type LedgerSettings, LEDGER as L, budgetVsActual, defaultLedgerSettings } from "@pos/ledger";
-import { tablesToWorkbook } from "@pos/excel";
+import { tablesToWorkbook } from "../../lib/excel";
 import { Bar, Field, Modal, ModuleOff, PageHead, Toggle } from "../../components/ui";
 import { amount, downloadBuffer, toCents, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";

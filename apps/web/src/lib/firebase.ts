@@ -11,7 +11,22 @@ import {
 
 const env = import.meta.env;
 
-export const firebaseConfig = {
+export interface WebConfig {
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+}
+
+/**
+ * The client's Firebase project. One build serves every client: on Firebase Hosting the config is
+ * read at start-up from /__/firebase/init.json, which Hosting serves for whichever project the
+ * site is deployed to. A build-time config (apps/web/.env.local) still wins, for development
+ * and the emulators.
+ */
+export const firebaseConfig: WebConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY as string | undefined,
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
   projectId: env.VITE_FIREBASE_PROJECT_ID as string | undefined,
@@ -19,6 +34,20 @@ export const firebaseConfig = {
   messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
   appId: env.VITE_FIREBASE_APP_ID as string | undefined,
 };
+
+/** Call once before rendering. Never throws: without a config the app runs in local demo mode. */
+export async function loadFirebaseConfig(): Promise<void> {
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) return;
+  if (new URLSearchParams(location.search).get("mode") === "local") return;
+  try {
+    const res = await fetch("/__/firebase/init.json", { cache: "no-store" });
+    if (!res.ok || !(res.headers.get("content-type") ?? "").includes("json")) return;
+    const c = (await res.json()) as WebConfig;
+    if (c.apiKey && c.projectId) Object.assign(firebaseConfig, { apiKey: c.apiKey, authDomain: c.authDomain, projectId: c.projectId, storageBucket: c.storageBucket, messagingSenderId: c.messagingSenderId, appId: c.appId });
+  } catch {
+    /* not on Firebase Hosting (local demo, vite dev) */
+  }
+}
 
 /** Firebase mode when a web config is present (and `?mode=local` is not forced). */
 export function firebaseConfigured(): boolean {

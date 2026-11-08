@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { newId } from "@pos/core";
 import { type BankRecon, type BankStatement, type BankStatementLine, type LedgerEntry, LEDGER as L, bankAmount, parseStatementCsv, suggestMatches } from "@pos/ledger";
-import { tablesToWorkbook } from "@pos/excel";
+import { tablesToWorkbook } from "../../lib/excel";
 import { Field, Modal, ModuleOff, PageHead, Stat } from "../../components/ui";
 import { amount, downloadBuffer, money, toCents, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";

@@ -40,6 +40,27 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Who may create businesses in this project. The first person to set up a business claims the
+    // deployment (the installer or the client's owner); after that only they, the people they list
+    // in `creators`, owners/administrators of an existing business, or platform admins can.
+    // Set openSignup to true only on your own demo/SaaS project.
+    function deploymentPath() { return /databases/$(database)/documents/deployment/config; }
+    function mayCreateBusiness() {
+      return isPlatformAdmin()
+        || (!exists(deploymentPath()) && getAfter(deploymentPath()).data.ownerUid == request.auth.uid)
+        || (exists(deploymentPath()) && (get(deploymentPath()).data.get('openSignup', false) == true
+                                         || get(deploymentPath()).data.ownerUid == request.auth.uid
+                                         || request.auth.uid in get(deploymentPath()).data.get('creators', [])))
+        || (request.resource.data.get('createdFromTenant', '') != '' && hasRole(request.resource.data.createdFromTenant, ['owner', 'admin']));
+    }
+    match /deployment/{docId} {
+      allow read: if signedIn();
+      allow create: if docId == 'config' && signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.get('openSignup', false) == false;
+      allow update: if docId == 'config' && signedIn() && (resource.data.ownerUid == request.auth.uid || isPlatformAdmin())
+                    && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+    }
+
     // Invitations are keyed by lower-case email; the invited person can read and accept theirs.
     match /invites/{email} {
       allow read: if signedIn() && request.auth.token.email != null && request.auth.token.email.lower() == email;
@@ -70,7 +91,8 @@ service cloud.firestore {
     match /tenants/{t} {
       allow read: if isMember(t) || isPlatformAdmin();
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.id == t
-                    && request.resource.data.plan in ['trial', 'demo'] && !('licence' in request.resource.data);
+                    && request.resource.data.plan in ['trial', 'demo'] && !('licence' in request.resource.data)
+                    && mayCreateBusiness();
       allow update: if (isAdmin(t) && licenceUnchanged() && modulesWithinEntitlement()) || isPlatformAdmin();
       allow delete: if false;
 
@@ -79,7 +101,7 @@ service cloud.firestore {
         // Owner joining their new tenant (same batch as the tenant), an accepted invite, or an admin.
         allow create: if signedIn() && uid == request.auth.uid && request.resource.data.uid == uid && request.resource.data.tenantId == t && (
                           (request.resource.data.role == 'owner' && getAfter(tenantPath(t)).data.ownerUid == request.auth.uid)
-                       || (request.auth.token.email != null
+                       || (request.auth.token.email != null && request.auth.token.email_verified == true
                            && exists(/databases/$(database)/documents/invites/$(request.auth.token.email.lower()))
                            && get(/databases/$(database)/documents/invites/$(request.auth.token.email.lower())).data.tenantId == t
                            && get(/databases/$(database)/documents/invites/$(request.auth.token.email.lower())).data.role == request.resource.data.role)
@@ -109,11 +131,38 @@ service cloud.firestore {
       match /reasonCodes/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
       match /tenderMedia/{id} { allow read: if isMember(t); allow write: if isManager(t) && idMatches(id); }
       match /roles/{id} { allow read: if isMember(t); allow write: if isAdmin(t) && idMatches(id); }
+      // PIN hashes and card numbers never go on staff records (everyone in the business reads those):
+      // they live in staffSecrets, which only the server (posAuth) reads. Old records may still carry
+      // them until moved; a client may keep or remove them, never add or change them.
+      function secretUnchanged(k) { return !(k in request.resource.data) || (resource != null && k in resource.data && request.resource.data[k] == resource.data[k]); }
+      function noNewSecrets() { return secretUnchanged('pinHash') && secretUnchanged('pinSalt') && secretUnchanged('cardId'); }
       match /staff/{id} {
         allow read: if isMember(t);
-        allow create, delete: if isManager(t) && idMatches(id);
-        // POS terminals record sign-in control only: wrong-PIN count, lockout/unlock, last sign-in, clock state.
-        allow update: if (isManager(t) && idMatches(id)) || (canPos(t) && onlyChanges(['failedSignIns', 'lockedAt', 'lastSignInAt', 'clockedInAt']));
+        allow create: if isManager(t) && idMatches(id) && noNewSecrets();
+        allow delete: if isManager(t);
+        // POS terminals record sign-in control only: unlock, last sign-in, clock state (wrong PINs are counted by the server).
+        allow update: if (isManager(t) && idMatches(id) && noNewSecrets()) || (canPos(t) && onlyChanges(['failedSignIns', 'lockedAt', 'lastSignInAt', 'clockedInAt']));
+      }
+      match /staffSecrets/{id} {
+        allow read: if false;
+        allow create, update: if isManager(t) && idMatches(id)
+                              && request.resource.data.keys().hasOnly(['id', 'pinHash', 'pinSalt', 'cardId', 'pinChangedAt', 'updatedBy', 'updatedAt']);
+        allow delete: if isManager(t);
+      }
+      // Each device reports its app version and last contact (System status page; release management).
+      match /deviceStatus/{id} {
+        allow read: if isMember(t);
+        allow write: if isMember(t) && request.resource.data.id == id && request.resource.data.uid == request.auth.uid
+                     && request.resource.data.size() <= 20;
+      }
+      // Errors seen in the app, for support. Append-only, small.
+      match /clientErrors/{id} {
+        allow read: if isManager(t) || canAudit(t);
+        allow create: if isMember(t) && request.resource.data.uid == request.auth.uid
+                      && request.resource.data.message is string && request.resource.data.message.size() <= 2000
+                      && request.resource.data.get('stack', '').size() <= 8000;
+        allow update: if false;
+        allow delete: if isAdmin(t);
       }
       // POS transaction journal: append-only and hash-chained per workstation.
       match /posJournal/{id} {

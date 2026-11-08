@@ -17,7 +17,7 @@ beforeAll(async () => {
 afterAll(async () => env?.cleanup());
 beforeEach(async () => env.clearFirestore());
 
-const as = (uid: string, email = `${uid}@example.lk`) => env.authenticatedContext(uid, { email }).firestore();
+const as = (uid: string, email = `${uid}@example.lk`, verified = true) => env.authenticatedContext(uid, { email, email_verified: verified }).firestore();
 
 async function seedTenant(modules: Record<string, boolean> = { pos: true, recipes: true, inventory: true, purchasing: true, crm: true, accounting: true }) {
   await env.withSecurityRulesDisabled(async (ctx) => {
@@ -40,6 +40,8 @@ describe("tenant onboarding", () => {
   it("lets a user create a tenant with themselves as owner in one batch", async () => {
     const db = as("alice");
     const b = writeBatch(db);
+    // The first business in a new project claims the deployment in the same batch.
+    b.set(doc(db, "deployment", "config"), { ownerUid: "alice", openSignup: false });
     b.set(doc(db, "tenants", "alice-cafe"), { id: "alice-cafe", name: "Alice Cafe", ownerUid: "alice", modules: { pos: true }, plan: "trial", entitlements: { modules: ["pos"], limits: {} } });
     b.set(doc(db, "tenants", "alice-cafe", "members", "alice"), { id: "alice", uid: "alice", role: "owner", tenantId: "alice-cafe" });
     await assertSucceeds(b.commit());
@@ -49,6 +51,29 @@ describe("tenant onboarding", () => {
     await assertSucceeds(b2.commit());
     const found = await getDocs(query(collectionGroup(db, "members"), where("uid", "==", "alice")));
     if (found.size !== 1) throw new Error("membership lookup failed");
+  });
+
+  it("lets only the deployment owner, existing owners or listed creators add businesses", async () => {
+    await seedTenant();
+    await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), "deployment", "config"), { ownerUid: "installer", openSignup: false }));
+    const newBiz = (uid: string, id: string, extra: Record<string, unknown> = {}) => {
+      const db = as(uid);
+      const b = writeBatch(db);
+      b.set(doc(db, "tenants", id), { id, name: id, ownerUid: uid, modules: { pos: true }, plan: "trial", ...extra });
+      b.set(doc(db, "tenants", id, "members", uid), { id: uid, uid, role: "owner", tenantId: id });
+      return b.commit();
+    };
+    // A stranger who signs up can't create a business (or claim the deployment).
+    await assertFails(newBiz("mallory", "mallory-co"));
+    await assertFails(setDoc(doc(as("mallory"), "deployment", "config"), { ownerUid: "mallory", openSignup: true }));
+    // The installer, and the owner of an existing business adding a training copy, can.
+    await assertSucceeds(newBiz("installer", "real-co"));
+    await assertSucceeds(newBiz("owner", "training-co", { createdFromTenant: T }));
+    // A manager of an existing business can't.
+    await assertFails(newBiz("mgr", "mgr-co", { createdFromTenant: T }));
+    // Opening sign-up (demo/SaaS projects) lets anyone in.
+    await assertSucceeds(updateDoc(doc(as("installer"), "deployment", "config"), { openSignup: true }));
+    await assertSucceeds(newBiz("mallory", "mallory-co"));
   });
 
   it("refuses ownership of someone else's tenant and outsiders' reads", async () => {
@@ -63,6 +88,8 @@ describe("tenant onboarding", () => {
     await seedTenant();
     await assertSucceeds(setDoc(doc(as("owner"), "invites", "bob@example.lk"), { tenantId: T, role: "manager" }));
     await assertFails(setDoc(doc(as("mgr"), "invites", "x@example.lk"), { tenantId: T, role: "manager" }));
+    // An unverified address can't take the invitation (someone else may have registered that email).
+    await assertFails(setDoc(doc(as("bob", "bob@example.lk", false), "tenants", T, "members", "bob"), { id: "bob", uid: "bob", role: "manager", tenantId: T }));
     const bob = as("bob", "bob@example.lk");
     await assertSucceeds(getDoc(doc(bob, "invites", "bob@example.lk")));
     await assertFails(setDoc(doc(bob, "tenants", T, "members", "bob"), { id: "bob", uid: "bob", role: "admin", tenantId: T }));
@@ -205,6 +232,30 @@ describe("licensing and POS controls", () => {
     await assertSucceeds(updateDoc(doc(till, "tenants", "lic", "staff", "1002"), { failedSignIns: 5, lockedAt: "2026-11-04T10:00:00Z", updatedBy: "till", updatedAt: "2026-11-04T10:00:00Z" }));
     await assertFails(updateDoc(doc(till, "tenants", "lic", "staff", "1002"), { roleId: "manager" }));
     await assertSucceeds(updateDoc(doc(as("mgr"), "tenants", "lic", "staff", "1002"), { roleId: "supervisor" }));
+  });
+
+  it("keeps PIN hashes and card numbers unreadable to every client", async () => {
+    await seedLicensed();
+    const mgr = as("mgr");
+    await assertSucceeds(setDoc(doc(mgr, "tenants", "lic", "staffSecrets", "1002"), { id: "1002", pinHash: "a".repeat(64), pinSalt: "b".repeat(32), cardId: "CARD9" }));
+    for (const who of ["owner", "mgr", "till", "aud"]) await assertFails(getDoc(doc(as(who), "tenants", "lic", "staffSecrets", "1002")));
+    await assertFails(setDoc(doc(as("till"), "tenants", "lic", "staffSecrets", "1003"), { id: "1003", pinHash: "x".repeat(64), pinSalt: "y".repeat(32) }));
+    await assertFails(setDoc(doc(mgr, "tenants", "lic", "staffSecrets", "1004"), { id: "1004", pinHash: "x".repeat(64), note: "extra" }));
+    // Staff records may not carry new hashes or card numbers.
+    await assertFails(setDoc(doc(mgr, "tenants", "lic", "staff", "2001"), { id: "2001", name: "New", pinHash: "x".repeat(64), pinSalt: "y".repeat(32) }));
+    await assertSucceeds(setDoc(doc(mgr, "tenants", "lic", "staff", "2001"), { id: "2001", name: "New", pinSet: true }));
+    await assertFails(updateDoc(doc(mgr, "tenants", "lic", "staff", "2001"), { cardId: "CARD1" }));
+  });
+
+  it("lets devices report status and errors, readable by managers", async () => {
+    await seedLicensed();
+    const till = as("till");
+    await assertSucceeds(setDoc(doc(till, "tenants", "lic", "deviceStatus", "W01"), { id: "W01", uid: "till", appVersion: "1.2.0", lastSeenAt: "2026-11-08T10:00:00Z" }));
+    await assertFails(setDoc(doc(till, "tenants", "lic", "deviceStatus", "W02"), { id: "W02", uid: "someone-else", appVersion: "1.2.0" }));
+    await assertSucceeds(setDoc(doc(till, "tenants", "lic", "clientErrors", "e1"), { id: "e1", uid: "till", message: "boom", stack: "at x" }));
+    await assertFails(setDoc(doc(till, "tenants", "lic", "clientErrors", "e2"), { id: "e2", uid: "till", message: "x".repeat(3000) }));
+    await assertFails(getDoc(doc(till, "tenants", "lic", "clientErrors", "e1")));
+    await assertSucceeds(getDoc(doc(as("mgr"), "tenants", "lic", "clientErrors", "e1")));
   });
 
   it("keeps the POS journal append-only and closed time cards fixed", async () => {

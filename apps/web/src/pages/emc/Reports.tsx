@@ -26,7 +26,7 @@ import {
   salesByHour,
   tenderSummary,
 } from "@pos/core";
-import { tablesToWorkbook } from "@pos/excel";
+import { tablesToWorkbook } from "../../lib/excel";
 import { Bar, Empty, Loading, Modal, PageHead, Seg, Stat } from "../../components/ui";
 import { downloadBuffer, money, pct, timeColombo, todayColombo } from "../../lib/format";
 import { useApp, useCollection, useStore } from "../../state/app";

@@ -148,12 +148,12 @@ export const WORKSPACES: Workspace[] = [
   {
     key: "admin",
     name: "Administration",
-    tagline: "Business and tax, branding, licence and modules, integrations",
+    tagline: "Business and tax, branding, licence and modules, integrations, system status",
     ico: "⚙",
     tone: "#475569",
     group: "Administration",
     sections: [
-      { items: [{ to: "/emc/setup/business", label: "Business & tax", ico: "⚙" }, { to: "/emc/setup/branding", label: "Branding", ico: "✦" }, { to: "/emc/setup/licence", label: "Licence & modules", ico: "⧉" }, { to: "/emc/setup/integrations", label: "Integrations", ico: "⟲" }, { to: "/emc/setup/data", label: "Excel import & export", ico: "⇪" }] },
+      { items: [{ to: "/emc/setup/business", label: "Business & tax", ico: "⚙" }, { to: "/emc/setup/branding", label: "Branding", ico: "✦" }, { to: "/emc/setup/licence", label: "Licence & modules", ico: "⧉" }, { to: "/emc/setup/integrations", label: "Integrations", ico: "⟲" }, { to: "/emc/setup/data", label: "Excel import & export", ico: "⇪" }, { to: "/emc/setup/status", label: "System status", ico: "◉" }] },
     ],
   },
 ];

@@ -216,7 +216,14 @@ try {
     await s("reports");
     await ctx.close();
   }
-  // put the business back to Bright for anyone re-using the demo
+  // Devices report from the POS (the local demo keeps its data per browser profile, so use this one).
+  await page.goto(`${B}/pos?mode=local`);
+  await wait(page);
+  if (await page.getByRole("button", { name: /Counter POS/ }).count()) await page.getByRole("button", { name: /Counter POS/ }).click();
+  await wait(page, 1200);
+  await page.goto(`${B}/emc/setup/status?mode=local`);
+  await wait(page, 900);
+  await shot(page, "admin-status");
 } finally {
   await browser.close();
   await server.close();

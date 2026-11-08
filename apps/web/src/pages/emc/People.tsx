@@ -28,7 +28,7 @@ function PinEditor({ doc, setDoc }: { doc: Record<string, any>; setDoc: (d: any)
   const [pin, setPin] = useState("");
   const min = settings.pos.pinMinLength ?? DEFAULT_SIGN_IN.pinMinLength;
   return (
-    <Field label={doc.pinHash ? "Reset PIN" : "PIN *"} help={`${min}–8 digits, not easy to guess. Stored as a salted hash; nobody can read it back.`}>
+    <Field label={doc.pinSet || doc.pinHash ? "Reset PIN" : "PIN *"} help={`${min}–8 digits, not easy to guess. Stored as a salted hash that only the server can check; nobody can read it back.`}>
       <div className="row">
         <input className="input mono" inputMode="numeric" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="••••" />
         <button
@@ -45,7 +45,7 @@ function PinEditor({ doc, setDoc }: { doc: Record<string, any>; setDoc: (d: any)
         >
           Set PIN
         </button>
-        {doc.pinHash ? <span className="badge good">PIN set</span> : null}
+        {doc.pinSet || doc.pinHash ? <span className="badge good">PIN set</span> : null}
       </div>
     </Field>
   );
@@ -93,10 +93,9 @@ export function EmployeesPage() {
       search={(d) => `${d.employeeNo} ${d.name} ${d.jobTitle ?? ""} ${d.department ?? ""}`}
       newDoc={() => ({ employeeNo: "", name: "", roleId: "server", propertyIds: [], rvcIds: [], status: "active", hireDate: todayColombo() })}
       validate={(d) => {
-        if (!d.pinHash) return "Set a PIN before saving";
+        if (!d.pinHash && !d.pinSet) return "Set a PIN before saving";
         const isNew = !staff.some((s) => s.id === d.employeeNo);
         if (isNew && d.status === "active" && !canAdd(licence.entitlements, "employees", active).ok) return `The licence allows ${licence.entitlements.limits.employees} active employees`;
-        if (d.cardId && staff.some((s) => s.cardId === d.cardId && s.id !== (d.id ?? d.employeeNo))) return "That card is already assigned to someone else";
         return null;
       }}
       fields={[
@@ -107,7 +106,7 @@ export function EmployeesPage() {
         { key: "roleId", label: "Role (default at every property)", type: "select", optionsFrom: { col: C.roles }, required: true },
         { key: "propertyIds", label: "Properties", type: "multi", optionsFrom: { col: C.properties }, help: "Empty = every property." },
         { key: "rvcIds", label: "Revenue centres (operator records)", type: "multi", optionsFrom: { col: C.revenueCenters }, help: "Empty = every revenue centre of their properties." },
-        { key: "cardId", label: "Staff card (mag stripe / RFID)", type: "text", help: "Swipe the card into this field. Cards sign in and authorise manager overrides." },
+        { key: "cardId", label: "Staff card (mag stripe / RFID)", type: "text", help: "Swipe a new card into this field. Leave empty to keep the current card. Card numbers are stored where only the server can read them." },
         { key: "phone", label: "Mobile", type: "text" },
         { key: "email", label: "Email", type: "text" },
         { key: "hireDate", label: "Start date", type: "date" },
@@ -117,6 +116,12 @@ export function EmployeesPage() {
       extraEditor={(d, setDoc) => (
         <>
           <PinEditor doc={d} setDoc={setDoc} />
+          {d.hasCard && !d.cardId ? (
+            <div className="row between small">
+              <span>{d.removeCard ? "The card will be removed when you save." : "A staff card is registered."}</span>
+              <button type="button" className="btn sm" onClick={() => setDoc({ ...d, removeCard: !d.removeCard })}>{d.removeCard ? "Keep card" : "Remove card"}</button>
+            </div>
+          ) : null}
           <PropertyRoles doc={d} setDoc={setDoc} />
           {d.lockedAt ? (
             <div className="callout warn row between">

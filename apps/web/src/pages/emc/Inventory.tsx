@@ -19,7 +19,7 @@ import {
   reorderSuggestions,
   transferStock,
 } from "@pos/core";
-import { tablesToWorkbook } from "@pos/excel";
+import { tablesToWorkbook } from "../../lib/excel";
 import { CrudPage, type FieldDef } from "../../components/CrudPage";
 import { Empty, Field, Loading, Modal, ModuleOff, PageHead, Seg } from "../../components/ui";
 import { downloadBuffer, money, stockQty, todayColombo } from "../../lib/format";

@@ -18,7 +18,7 @@ When an employee does something their role does not allow, or above their limit,
 
 1. **Look at what is being approved**: the window names the action and the amount.
 2. Ask why. For a void: was the item really not served? For a discount: which discount and why?
-3. Swipe your card or enter your PIN.
+3. Swipe your card, or tap your name and enter your PIN. Wrong PINs count towards your lockout, as at sign-in.
 
 Both names are recorded in the transaction journal and the exceptions report. **Never tell anyone your PIN, and never let staff use your card.**
 
@@ -30,7 +30,7 @@ You can only approve:
 
 **Exercise 1.** A cashier voids a sent item: approve it.
 
-**Exercise 2.** Try to approve your own void (you are the one asking). It is refused: approvals need a different person.
+**Exercise 2.** Ask for a void yourself and look at the approver list: you are not on it, because approvals need a different person.
 
 **Exercise 3.** A steward applies a manager-only discount: approve it, then find it in **Reports → Exceptions**.
 

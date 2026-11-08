@@ -39,6 +39,7 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | **Mobile POS app** | Two phone/tablet app styles, **Bright** and **Indigo**: sign-in with the restaurant's picture, home dashboard, tables, photo menu, cart with steppers, full-screen payment and "payment successful", orders, reports. The administrator picks the style and where it applies (phones, phones and tablets, every screen); each workstation can override. Same privileges, approvals, journal and printing as the terminal |
 | **Bill designer** | Administrators choose every element of guest checks and invoices (titles, header, check details, items, totals, payments, QR codes, footer, 80/58 mm) with a live preview; IRD tax invoice particulars stay locked for VAT-registered businesses |
 | **Transaction journal** | Every operator action (voids, discounts, overrides, transfers, splits, no-sales, paid in/out, approvals, sign-ins) hash-chained per workstation; on-POS **reports** (daily sales, employee financial, items, open checks, exceptions) |
+| **Security and operations** | PINs and cards checked on the server with lockout (also for approvals); secrets unreadable to clients; business creation locked to the deployment owner; verified email for invitations; strict CSP and security headers; offline-tolerant POS writes and offline sign-in; error reporting; device status; one build for every client with update notices and a minimum version; release pipeline with staging, approved waves, backups and data migrations. [Review](docs/21-security-review.md) · [Releases](docs/20-release-and-updates.md) |
 | **Quality assurance** | Every save validated against schemas; cross-module **data quality** check; integrity check of invoices, ledger, audit trail and POS journal; unit, rules, server and browser end-to-end tests |
 | **Recipes & costing** | Recipes and prep sub-recipes, portion cost, food cost %, gross profit, price at target cost % |
 | **Inventory & purchasing** | Stock items with purchase/stock units, locations, **FIFO** lots, recipe-based depletion of every sale, purchase orders (suggested from par levels), goods receipts with input VAT, waste, transfers, production batches, blind stock counts, movements, valuation |
@@ -70,6 +71,8 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | 16 | [**Users, access control, audit and QA**](docs/16-users-access-and-audit.md) |
 | 18 | [**Client deployment manual (A to Z)**](docs/18-deployment-manual.md) (Cloud Restaurant Edition) |
 | 19 | [**User manual and role-based training manuals for clients**](docs/manual/README.md) (Cloud Restaurant Edition; PDFs: `pnpm manual:pdf`) |
+| 20 | [**Releases and updates**](docs/20-release-and-updates.md): versions, waves, approvals, backups, migrations, rollback, support levels |
+| 21 | [**Security and reliability review**](docs/21-security-review.md) and the go-live security checklist |
 | E | [**Enterprise Hotel Edition (this branch)**](docs/enterprise/README.md) |
 
 ## Commands
@@ -80,6 +83,9 @@ pnpm test              # unit tests (engine, core, ledger, printing, sample data
 pnpm test:rules        # Firestore security rules on the emulator (needs Java)
 pnpm test:functions    # Cloud Functions end to end on the emulators (needs Java)
 pnpm test:e2e          # browser end-to-end in local demo mode (needs Playwright + Chromium)
+pnpm test:migrations   # data migrations on the Firestore emulator (needs Java)
+pnpm release:version 1.1.0       # start a release: version + CHANGELOG entry (then tag vX.Y.Z and push)
+pnpm release:deploy --target …   # deploy the build: staging, wave:N or client ids (backup → indexes → migrations → rules/functions → hosting)
 pnpm manual:screenshots  # refresh the manual screenshots from the demo restaurant
 pnpm manual:pdf -- --client "Name"  # user and training manuals as A4 PDFs in manual-pdf/
 pnpm licence keygen    # vendor: create your licence signing key (once)

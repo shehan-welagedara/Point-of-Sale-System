@@ -375,9 +375,11 @@ When you try something your role does not allow, or that is above your limit, th
 
 ![Manager approval](img/pos-approval.jpg)
 
-1. A more senior employee swipes their card or enters their PIN.
+1. A more senior employee **swipes their card**, or **taps their name** in the list of people who may approve and enters their PIN. Only people allowed to approve this action are listed; the person asking is never among them.
 2. The approver must be a *different* person, hold that privilege and the *manager override* privilege, be at the same or a more senior level, and be within **their** limit.
 3. The action goes ahead and is recorded with **both names**.
+
+PINs are checked by the server. Wrong PINs at the approval window count towards that person's lockout, just like at sign-in, so PINs can't be guessed.
 
 Some roles have privileges marked **approval** (for example a cashier's paid-outs and reprints): they always need a second person, even though the role has the privilege.
 
@@ -738,6 +740,18 @@ Mock mode works with sample data until your accounts with the bank or gateway ar
 2. Fill in or change categories, menu items, prices, modifiers, stock items, recipes, vendors and customers.
 3. **Import:** choose the filled workbook. Every row is checked and the results are shown; nothing is saved until you confirm. Codes are the keys, so re-importing updates existing records instead of duplicating them.
 
+
+### 14.7 System status
+
+![System status](img/admin-status.jpg)
+
+**Administration → System status** shows:
+
+- the version running on the server and in this browser;
+- each POS device: version, last contact, who is signed in (a device on an older version shows *update pending*);
+- recent errors seen on screens, for support;
+- **Employee PINs: Secure** when every PIN and card is stored where only the server can read it. Owners and administrators can secure older records with one click.
+
 ---
 
 ## 15. Daily, weekly and monthly routines
@@ -781,7 +795,12 @@ Mock mode works with sample data until your accounts with the bank or gateway ar
 | Bills show the wrong name or TIN | Administration → Business & tax. Changes apply to new bills. |
 | Figures on the phone home screen are missing | Your role has no reports privilege, or the administrator switched off *Show today's sales*. |
 | "Ledger posting failed" at End of Day | Post the day later from Finance → Overview (**Post** next to that day). |
-| No internet | Screens already open keep working from their local copy and synchronise when the connection returns. Signing in on a new device, LankaQR and PayHere need the internet. Restore the connection as soon as possible. |
+| "No internet" notice | Orders and cash payments are kept on the device and sent when the connection returns. Employees who signed in on this device in the last 7 days can still sign in. Card approval codes can be entered; LankaQR, PayHere and printing through the Print Agent need the connection. Restore it as soon as possible (4G backup router). |
+| "Version x is available" | A new release is live. Tap **Update now** when convenient; devices where nobody is signed in update by themselves. |
+| "Update required" | This screen is too old to be used safely. Tap **Update now** (a few seconds; nothing saved is lost). |
+| "Workstation … is also open on another device" | Two devices are using the same workstation, so bills may fail to number. Set one of them up as a different workstation (sign-in screen → Change device). |
+| "Something went wrong on this screen" | Tap **Reload**. The error is reported to System status; nothing already saved is lost. |
+| "Verify your email address first" | When accepting an invitation, open the link in the verification email (check spam), then press **Accept invitation** again. |
 
 ---
 

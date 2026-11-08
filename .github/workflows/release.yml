@@ -1,0 +1,173 @@
+# Releases one tested build to every client, in waves:
+#   push tag vX.Y.Z  →  test + build once  →  staging  →  [approve] wave 1 (pilot)  →  [approve] wave 2 (everyone)
+# Approvals come from GitHub environments: create "staging", "production-wave-1" and
+# "production-wave-2" under Settings → Environments, with yourself as required reviewer on the
+# production ones (and a wait timer if you like). See docs/20-release-and-updates.md.
+#
+# Repository variables (Settings → Secrets and variables → Actions → Variables):
+#   GCP_WORKLOAD_IDENTITY_PROVIDER  projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+#   GCP_DEPLOY_SERVICE_ACCOUNT      pos-release@<your-vendor-project>.iam.gserviceaccount.com
+#   LICENCE_PUBLIC_KEY              your licence public key (pnpm licence keygen); not a secret
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Redeploy the current main build to: staging, wave:1, wave:2 or client ids (comma-separated)"
+        required: true
+        default: staging
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - name: Tag matches the version in apps/web/package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: test "v$(node -p "require('./apps/web/package.json').version")" = "${GITHUB_REF_NAME}"
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:rules
+      - run: pnpm test:migrations
+      - name: Build once for every client (Firebase config is read at start-up on each client's site)
+        run: pnpm build
+        env:
+          VITE_LICENCE_PUBLIC_KEY: ${{ vars.LICENCE_PUBLIC_KEY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 30
+
+  staging:
+    if: github.event_name == 'push'
+    needs: build
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy
+        run: node tools/release/deploy.mjs --target "${TARGET}"
+        env:
+          TARGET: staging
+          LICENCE_PUBLIC_KEY: ${{ vars.LICENCE_PUBLIC_KEY }}
+
+  wave-1:
+    if: github.event_name == 'push'
+    needs: staging
+    environment: production-wave-1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy
+        run: node tools/release/deploy.mjs --target "${TARGET}"
+        env:
+          TARGET: "wave:1"
+          LICENCE_PUBLIC_KEY: ${{ vars.LICENCE_PUBLIC_KEY }}
+
+  wave-2:
+    if: github.event_name == 'push'
+    needs: wave-1
+    environment: production-wave-2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy
+        run: node tools/release/deploy.mjs --target "${TARGET}"
+        env:
+          TARGET: "wave:2"
+          LICENCE_PUBLIC_KEY: ${{ vars.LICENCE_PUBLIC_KEY }}
+
+  redeploy:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    environment: ${{ github.event.inputs.target == 'staging' && 'staging' || 'production-wave-1' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy
+        run: node tools/release/deploy.mjs --target "${TARGET}"
+        env:
+          TARGET: ${{ github.event.inputs.target }}
+          LICENCE_PUBLIC_KEY: ${{ vars.LICENCE_PUBLIC_KEY }}

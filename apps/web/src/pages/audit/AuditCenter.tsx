@@ -38,7 +38,7 @@ import {
   trialBalance,
 } from "@pos/ledger";
 import { DEMO_PEOPLE } from "@pos/sample-data";
-import { tablesToWorkbook } from "@pos/excel";
+import { tablesToWorkbook } from "../../lib/excel";
 import { Drawer, Field, Loading, PageHead, Seg, Stat } from "../../components/ui";
 import { amount, dateTimeColombo, downloadBuffer, money, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
