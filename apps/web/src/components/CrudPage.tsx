@@ -286,7 +286,7 @@ export function CrudPage(p: CrudProps) {
           </Empty>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table cards-sm">
               <thead>
                 <tr>
                   {p.columns.map((c) => (
@@ -301,7 +301,7 @@ export function CrudPage(p: CrudProps) {
                 {rows.map((d) => (
                   <tr key={d.id} className={p.canEdit && !p.canEdit(d) ? "" : "clickable"} onClick={() => (p.canEdit && !p.canEdit(d) ? undefined : setEditing({ doc: d, isNew: false }))}>
                     {p.columns.map((c) => (
-                      <td key={c.header} className={c.num ? "num" : ""}>
+                      <td key={c.header} className={c.num ? "num" : ""} data-label={c.header}>
                         {c.render(d)}
                       </td>
                     ))}

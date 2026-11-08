@@ -75,6 +75,88 @@ export interface BrandingSettings extends Entity {
   receiptFooterLines: string[];
   /** Product name of the software itself ("Powered by …"). */
   poweredBy: string;
+  /** Picture at the top of the mobile sign-in screen (resized, kept in Firestore). */
+  heroImageDataUrl?: string;
+  /** Which elements the printed bills show (empty = the standard layout). */
+  bill?: Partial<BillLayout>;
+}
+
+/**
+ * What a guest check / invoice prints, set by the administrator (Bill designer). Elements the
+ * Inland Revenue requires on a tax invoice (VAT-registered sellers) are always printed there,
+ * whatever these switches say: the title, the seller's name, address and TIN, the invoice number,
+ * invoice and supply dates, the items, the value excluding VAT, the VAT and the total, and the
+ * purchaser's details when the buyer gives a TIN.
+ */
+export interface BillLayout {
+  // Header
+  showLogo: boolean;
+  headerAlign: "center" | "left";
+  titleSize: 1 | 2;
+  /** Titles for the non-tax documents (a tax invoice is always titled TAX INVOICE). */
+  guestCheckTitle: string;
+  invoiceTitle: string;
+  showAddress: boolean;
+  showPhone: boolean;
+  showEmail: boolean;
+  showWebsite: boolean;
+  showTradingName: boolean;
+  // Check details
+  showCheckNo: boolean;
+  showOrderType: boolean;
+  showTable: boolean;
+  showServer: boolean;
+  /** What to call the employee on the bill: Server, Steward, Cashier… */
+  serverLabel: string;
+  showCovers: boolean;
+  showPrintedTime: boolean;
+  // Items
+  showColumnHeader: boolean;
+  qtyStyle: "before" | "after";
+  showUnitPrice: boolean;
+  combineSameItems: boolean;
+  showModifiers: boolean;
+  showModifierPrices: boolean;
+  showNotes: boolean;
+  showSeat: boolean;
+  // Totals
+  showItemCount: boolean;
+  showSubtotal: boolean;
+  discountDetail: "each" | "total";
+  showSavings: boolean;
+  totalLabel: string;
+  totalSize: 1 | 2;
+  // Payments
+  showPayments: boolean;
+  showPaymentRefs: boolean;
+  showChange: boolean;
+  // Guest check
+  guestCheckNote: string;
+  /** LankaQR pay-by-QR on guest checks (when the LankaQR module is on). */
+  showPayQr: boolean;
+  // Footer
+  showCustomer: boolean;
+  showFeedbackQr: boolean;
+  /** Feedback link; {invoice} is replaced by the invoice number, {website} by the business website. */
+  feedbackUrl: string;
+  feedbackCaption: string;
+  showPoweredBy: boolean;
+  /** Blank lines before the cut. */
+  extraFeed: number;
+}
+
+/** POS app styles for phones and tablets (mobile apps), besides the terminal layout. */
+export type MobileStyle = "bright" | "indigo";
+
+export interface MobileUi {
+  /** "terminal" keeps the till layout on every device. */
+  style: "terminal" | MobileStyle;
+  /** Screens that get the app style: phones, phones and tablets, or every screen. Workstations set to the mobile hardware model always do. */
+  useOn: "phones" | "phonesTablets" | "all";
+  /** Accent colour (empty = the style's own colour). */
+  accent?: string;
+  /** Show today's sales on the home screen (only to employees allowed to see reports). */
+  showSalesOnHome: boolean;
 }
 
 export type SequenceReset = "never" | "monthly" | "yearly";
@@ -124,6 +206,8 @@ export interface PosSettings extends Entity {
   requireClockIn?: boolean;
   pinMinLength?: number;
   theme?: PosTheme;
+  /** Phone and tablet app style. */
+  mobile?: MobileUi;
   /** Local hour at which the business day rolls over. */
   businessDayRolloverHour: number;
   requireCoversForDineIn: boolean;
@@ -205,6 +289,8 @@ export interface Workstation extends Entity {
   receiptPrinterId: string;
   /** Print through a Print Agent (always for tablets) or directly from the POS Shell. */
   printMode: "agent" | "direct" | "preview";
+  /** Screen style on this device: the business setting, the terminal layout, or one of the app styles. */
+  uiStyle?: "default" | "terminal" | MobileStyle;
   active: boolean;
 }
 

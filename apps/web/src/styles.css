@@ -411,7 +411,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .page.fill > .fill-card { flex: 1 1 auto; min-height: 120px; display: flex; flex-direction: column; }
   .page.fill > .fill-card > .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
   .page.fill > .card.table-wrap.fill-card { overflow: auto; display: block; }
-  .page.fill > .appearance-grid { flex: 1 1 auto; min-height: 0; }
+  .page.fill > .appearance-grid { flex: 1 1 auto; min-height: 0; overflow: auto; }
 }
 @media (min-width: 1200px) and (min-height: 540px) {
   .appearance-grid { grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr); }
@@ -456,3 +456,31 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .auth-card { padding: 20px 16px; }
   .signin-grid { gap: 14px; }
 }
+
+/* Bill designer */
+.bill-grid { align-items: start; }
+.bill-preview { display: flex; justify-content: center; overflow: auto; max-height: calc(100dvh - 260px); padding: 4px; }
+.bill-preview .paper { margin: 0; }
+.bill-switch { padding: 4px 0; border-bottom: 1px solid var(--line); gap: 12px; }
+.bill-switch:last-child { border-bottom: 0; }
+@media (min-width: 901px) { .bill-preview-col { position: sticky; top: 0; } }
+@media (max-width: 900px) { .bill-preview { max-height: none; } }
+
+/* Phones: list tables become one card per row, each value labelled with its column. */
+@media (max-width: 600px) {
+  .table.cards-sm thead { display: none; }
+  .table.cards-sm, .table.cards-sm tbody, .table.cards-sm tr { display: block; width: 100%; }
+  .table.cards-sm tr { border: 1px solid var(--line); border-radius: 14px; margin: 0 0 10px; padding: 4px 14px; background: var(--surface); box-shadow: var(--shadow-sm); }
+  .table.cards-sm td { display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 0; padding: 7px 0; text-align: right; min-width: 0 !important; }
+  .table.cards-sm td + td { border-top: 1px dashed var(--line); }
+  .table.cards-sm td::before { content: attr(data-label); color: var(--text-2); font-size: 12.5px; font-weight: 600; text-align: left; flex: none; max-width: 45%; }
+  .table.cards-sm td:not([data-label])::before, .table.cards-sm td[data-label=""]::before { content: none; }
+  .table.cards-sm td:first-child { font-weight: 600; }
+  .table-wrap:has(> .table.cards-sm) { overflow: visible; border: 0; background: none; }
+  .page.fill .fill-card:has(.table.cards-sm) { overflow: visible; }
+  .sample-banner { font-size: 12px; line-height: 1.35; }
+}
+
+/* Phone preview on the Mobile app style page: smaller on short 16:9 screens so it fits. */
+@media (min-width: 901px) and (max-height: 820px) { .phone-frame { zoom: 0.82; } }
+@media (min-width: 901px) and (max-height: 730px) { .phone-frame { zoom: 0.74; } }

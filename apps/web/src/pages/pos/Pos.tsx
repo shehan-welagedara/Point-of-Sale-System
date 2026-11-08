@@ -47,7 +47,7 @@ import {
   statsId,
   withinLimit,
 } from "@pos/core";
-import { type ReceiptDoc, buildBill, buildDaySummary, buildKot, widthForPaper } from "@pos/printing";
+import { type ReceiptDoc, buildBill, buildDaySummary, buildKot, feedbackLink, resolveBillLayout, widthForPaper } from "@pos/printing";
 import { Empty, Modal, Seg } from "../../components/ui";
 import { ReceiptView } from "../../components/Receipt";
 import { minutesSince, money, timeColombo } from "../../lib/format";
@@ -57,6 +57,8 @@ import { AmountDialog, CustomerDialog, DiscountDialog, ManagerAuth, ModifierDial
 import { PayDialog } from "./PayDialog";
 import { PosReports } from "./PosReports";
 import { gridColumns, resolveTheme, themeClass, themeStyle } from "./theme";
+import { MobilePos, type PaidResult, type PosApi } from "./mobile/MobilePos";
+import { useUiStyle } from "./mobile/ui";
 
 type View = "order" | "tables" | "checks" | "reports" | "functions";
 
@@ -79,7 +81,8 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
   const customers = useCollection<Customer>(on("crm") ? C.customers : null) ?? [];
   const openChecks = (useCollection<Check>(C.checks, { where: [["status", "==", "open"]] }) ?? []).filter((c) => c.propertyId === ws.propertyId && (c.rvcId ?? rvcId) === rvcId);
   const theme = resolveTheme(settings.pos.theme);
-  const images = useCollection<MenuImage>(theme.showImages ? C.menuImages : null) ?? [];
+  const ui = useUiStyle(settings.pos.mobile, ws);
+  const images = useCollection<MenuImage>(theme.showImages || ui !== "terminal" ? C.menuImages : null) ?? [];
   const imageOf = useMemo(() => new Map(images.map((i) => [i.id, i.dataUrl])), [images]);
 
   const role = roleFor(user, ws.propertyId, roles);
@@ -227,31 +230,43 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
     const saved = await send(check, false);
     if (!saved) return;
     const printer = printers.find((p) => p.id === ws.receiptPrinterId);
-    const qr = on("lankaqr") ? { data: lankaQrPayload({ ...settings.integrations.lankaqr, amount: totals.amountDue, reference: `CHK${saved.checkNo}` }), caption: "Scan to pay with LankaQR" } : undefined;
-    await print("bill", buildBill({ kind: "guestCheck", check: saved, totals, business: settings.business, branding: settings.branding, width: paperWidth(printer), staffName: staffName(saved.staffId), orderTypeName: orderTypeName(saved.orderTypeId), tableName: tableName(saved.tableId), tenders: ctx.tenders, ...(qr ? { qr } : {}) }), printer);
+    const layout = resolveBillLayout(settings.branding.bill);
+    const qr = on("lankaqr") && layout.showPayQr ? { data: lankaQrPayload({ ...settings.integrations.lankaqr, amount: totals.amountDue, reference: `CHK${saved.checkNo}` }), caption: "Scan to pay with LankaQR" } : undefined;
+    await print("bill", buildBill({ kind: "guestCheck", check: saved, totals, business: settings.business, branding: settings.branding, width: paperWidth(printer), staffName: staffName(saved.staffId), orderTypeName: orderTypeName(saved.orderTypeId), tableName: tableName(saved.tableId), tenders: ctx.tenders, ...customerOnBill(saved), ...(qr ? { qr } : {}) }), printer);
     void journal.log({ type: "guestCheck", employeeId: user.id, ...onCheck(saved), amount: totals.amountDue });
     toast("Bill printed");
   }
 
-  async function finish() {
-    if (!check) return;
+  /** Closes the check (issues the invoice). `paid` is the check with its final payments, when just added. */
+  async function finish(paid: Check | null = check, showReceipt = true): Promise<PaidResult | null> {
+    if (!paid) return null;
     try {
-      const sent = sendRound(check).sent.length ? await send(check, false) : check;
-      if (!sent) return;
+      const sent = sendRound(paid).sent.length ? await send(paid, false) : paid;
+      if (!sent) return null;
       const { check: closed, invoice } = await closeCheck(store, sent, ctx, { workstationCode: ws.code });
       for (const p of closed.payments) void journal.log({ type: "payment", employeeId: p.by, ...onCheck(closed), amount: p.applied, detail: `${ctx.tenders.get(p.tenderId)?.name ?? p.tenderId}${p.reference ? ` ref ${p.reference}` : ""}` });
       void journal.log({ type: "checkClose", employeeId: user.id, ...onCheck(closed), amount: invoice.totals.amountDue, detail: `invoice ${invoice.id}` });
       const printer = printers.find((p) => p.id === ws.receiptPrinterId);
       const drawer = closed.payments.some((p) => ctx.tenders.get(p.tenderId)?.opensDrawer);
-      const doc = buildBill({ kind: "invoice", check: closed, totals: invoice.totals, business: settings.business, branding: settings.branding, width: paperWidth(printer), staffName: staffName(closed.staffId), orderTypeName: orderTypeName(closed.orderTypeId), tableName: tableName(closed.tableId), tenders: ctx.tenders, invoiceNo: invoice.id, issuedAt: invoice.issuedAt, openDrawer: drawer, printLogo: Boolean(settings.branding.logoDataUrl), qr: { data: `https://${settings.business.website ?? "example.lk"}/feedback?inv=${invoice.id}`, caption: "Tell us how we did" } });
-      if (settings.pos.autoPrintBillOnClose && ws.printMode !== "preview") await print("receipt", doc, printer);
+      const feedback = feedbackLink(resolveBillLayout(settings.branding.bill), invoice.id, settings.business.website);
+      const doc = buildBill({ kind: "invoice", check: closed, totals: invoice.totals, business: settings.business, branding: settings.branding, width: paperWidth(printer), staffName: staffName(closed.staffId), orderTypeName: orderTypeName(closed.orderTypeId), tableName: tableName(closed.tableId), tenders: ctx.tenders, invoiceNo: invoice.id, issuedAt: invoice.issuedAt, openDrawer: drawer, printLogo: Boolean(settings.branding.logoDataUrl), ...customerOnBill(closed), ...(feedback ? { qr: { data: feedback, caption: resolveBillLayout(settings.branding.bill).feedbackCaption } } : {}) });
+      const printed = settings.pos.autoPrintBillOnClose && ws.printMode !== "preview" && Boolean(printer);
+      if (printed) await print("receipt", doc, printer);
       setLastInvoice(doc);
       setCheck(null);
+      setSel(null);
       setSheetOpen(false);
-      setDialog({ t: "receipt", doc, change: closed.change, title: `Invoice ${invoice.id}` });
+      if (showReceipt) setDialog({ t: "receipt", doc, change: closed.change, title: `Invoice ${invoice.id}` });
+      return { invoiceNo: invoice.id, checkNo: closed.checkNo, ...(closed.tableId ? { tableName: tableName(closed.tableId) ?? closed.tableId } : {}), total: invoice.totals.amountDue, change: closed.change ?? 0, doc, printed, tenders: closed.payments.map((p) => ctx.tenders.get(p.tenderId)?.name ?? p.tenderId) };
     } catch (e) {
       toast((e as Error).message, true);
+      return null;
     }
+  }
+
+  function customerOnBill(c: Check): { customer?: { name: string; points?: number } } {
+    const cu = customers.find((x) => x.id === c.customerId);
+    return cu ? { customer: { name: cu.name, ...(on("loyalty") ? { points: cu.points } : {}) } } : {};
   }
 
   function voidLine(line: CheckLine) {
@@ -433,6 +448,103 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
     return () => ro.disconnect();
   }, [view, theme.buttonSize, theme.showImages, theme.columns, theme.fontScale, items.length > 0]);
 
+  const dialogs = (
+    <>
+      {dialog?.t === "mods" ? (
+        <ModifierDialog item={dialog.item} groups={dialog.item.modifierGroupIds.map((id) => modifierGroups.find((g) => g.id === id)).filter((g): g is ModifierGroup => Boolean(g))} onAdd={(mods, qty, note) => addItem(dialog.item, mods, qty, note)} onClose={() => setDialog(null)} />
+      ) : null}
+      {dialog?.t === "allergy" ? (
+        <Modal title="Allergy alert" onClose={() => setDialog(null)} footer={<><button className="btn" onClick={() => setDialog(null)}>Don't add</button><button className="btn danger solid" onClick={() => { const item = dialog.item; setDialog(null); const groups = item.modifierGroupIds.map((id) => modifierGroups.find((g) => g.id === id)).filter((g): g is ModifierGroup => Boolean(g)); if (groups.length) setDialog({ t: "mods", item }); else addItem(item, [], 1, `ALLERGY CHECKED: ${dialog.hits.join(", ")}`); }}>Add anyway</button></>}>
+          <div className="callout bad"><strong>{dialog.item.name}</strong> contains <strong>{dialog.hits.join(", ")}</strong>, which this guest is allergic to.</div>
+        </Modal>
+      ) : null}
+      {dialog?.t === "auth" ? <ManagerAuth privilege={dialog.privilege} requester={user} propertyId={ws.propertyId} staff={staff} roles={roles} {...(dialog.limit ? { limit: dialog.limit } : {})} onApproved={dialog.then} onClose={() => setDialog(null)} /> : null}
+      {dialog?.t === "transfer" && check ? (
+        <Modal title={`Transfer check #${check.checkNo}`} onClose={() => setDialog(null)}>
+          <div className="stack">
+            <span className="section-title">To another employee</span>
+            <div className="chips">
+              {staff.filter((s) => s.status === "active" && s.id !== check.staffId && (!s.propertyIds?.length || s.propertyIds.includes(ws.propertyId))).map((s) => <button key={s.id} className="chip" onClick={() => transferCheck({ staffId: s.id })}>{s.name}</button>)}
+            </div>
+            {tables.length ? (
+              <>
+                <span className="section-title">To another table</span>
+                <div className="chips">
+                  {tables.filter((t) => t.id !== check.tableId && !openChecks.some((c) => c.tableId === t.id)).map((t) => <button key={t.id} className="chip" onClick={() => transferCheck({ tableId: t.id })}>Table {t.name}</button>)}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </Modal>
+      ) : null}
+      {dialog?.t === "amount" ? <AmountDialog title={dialog.title} {...(dialog.help ? { help: dialog.help } : {})} {...(dialog.initial ? { initial: dialog.initial } : {})} onDone={dialog.then} onClose={() => setDialog(null)} /> : null}
+      {dialog?.t === "reason" ? <ReasonDialog title={dialog.title} reasons={reasons.filter((r) => r.type === dialog.type)} onPick={dialog.then} onClose={() => setDialog(null)} /> : null}
+      {dialog?.t === "discount" ? <DiscountDialog discounts={discounts} scope={dialog.scope} onPick={(d) => applyDiscount(d, dialog.scope)} onClose={() => setDialog(null)} /> : null}
+      {dialog?.t === "customer" && check ? (
+        <CustomerDialog
+          customers={customers}
+          current={check.customerId}
+          allergies={check.allergies ?? []}
+          buyer={check.buyer}
+          onPick={(c) => setCheck((cur) => (cur ? (c ? { ...cur, customerId: c.id } : (({ customerId: _x, ...rest }) => rest)(cur)) : cur))}
+          onAllergies={(a) => setCheck((cur) => (cur ? { ...cur, allergies: a } : cur))}
+          onBuyer={(b) => setCheck((cur) => (cur ? (b ? { ...cur, buyer: b } : (({ buyer: _b, ...rest }) => rest)(cur)) : cur))}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+      {dialog?.t === "covers" ? (
+        <Modal title="Number of guests" onClose={() => setDialog(null)}>
+          <div className="keypad">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15].map((n) => <button key={n} onClick={() => dialog.then(n)}>{n}</button>)}
+          </div>
+        </Modal>
+      ) : null}
+      {dialog?.t === "pay" && check && totals ? (
+        <PayDialog
+          check={check}
+          amountDue={totals.amountDue}
+          tenders={tenders}
+          staffId={user.id}
+          reference={`CHK${check.checkNo}-${ws.code}`}
+          onPayments={(payments) => setCheck({ ...check, payments })}
+          onClose={() => setDialog(null)}
+          onFinish={() => void finish()}
+        />
+      ) : null}
+      {dialog?.t === "receipt" ? (
+        <Modal title={dialog.title} onClose={() => setDialog(null)} footer={<><button className="btn" onClick={() => window.print()}>Print from this device</button><button className="btn primary" onClick={() => setDialog(null)}>New check</button></>}>
+          <div className="stack" style={{ alignItems: "center" }}>
+            {dialog.change ? <div className="callout good" style={{ fontSize: 20 }}>Change due: <strong className="num">{money(dialog.change)}</strong></div> : null}
+            <ReceiptView doc={dialog.doc} logo={settings.branding.logoDataUrl} />
+          </div>
+        </Modal>
+      ) : null}
+    </>
+  );
+
+  const functionsPanel = <Functions ws={ws} user={user} role={role} roles={roles} staff={staff} printers={printers} ctx={ctx} lastInvoice={lastInvoice} menuItems={menuItems} withPrivilege={withPrivilege} print={print} journal={journal} openAmount={(title, help, then) => setDialog({ t: "amount", title, ...(help ? { help } : {}), then: (c) => { setDialog(null); then(c); } })} onPreview={(doc, title) => setDialog({ t: "receipt", doc, title })} />;
+  const reportsPanel = <PosReports ws={ws} user={user} role={role} rvcId={rvcId} staff={staff} rvcs={rvcs} ctx={ctx} journal={journal} withPrivilege={withPrivilege} print={print} printers={printers} />;
+
+  if (ui !== "terminal") {
+    const api: PosApi = {
+      ws, user, role, staff, rvcs, rvcId, rvc, myRvcs, ctx, bd,
+      menuItems, categories: visibleCats, tables, openChecks, orderTypes, tenders, printers, imageOf, catColor, customer,
+      check, setCheck, totals, itemCount,
+      startCheck, tapItem, changeQty, voidLine, overridePrice, splitLine, send, printGuestCheck, cancelCheck, pickUp, openTable,
+      withPrivilege, finish: (paid) => finish(paid, false), print, journal, lastInvoice,
+      openDiscount: (scope, lineId) => { if (lineId) setSel(lineId); setDialog({ t: "discount", scope }); },
+      openTransfer: () => setDialog({ t: "transfer" }),
+      openCustomer: async () => { if (!check) await startCheck(); setDialog({ t: "customer" }); },
+      openCovers: () => { if (check) withPrivilege("pos.changeCovers", () => setDialog({ t: "covers", then: (n) => { setCheck({ ...check, covers: n }); setDialog(null); } })); },
+      setOrderType: async (id) => { const c = check ?? (await startCheck({ orderTypeId: id })); setCheck({ ...c, orderTypeId: id }); },
+      previewReceipt: (doc, title) => setDialog({ t: "receipt", doc, title }),
+      changeRvc: (to) => withPrivilege("pos.changeRvc", () => { setCheck(null); onChangeRvc(to); }),
+      onSignOut, tableName, staffName, orderTypeName,
+      functionsPanel, reportsPanel,
+    };
+    return <MobilePos style={ui} api={api}>{dialogs}</MobilePos>;
+  }
+
   return (
     <div className={themeClass(theme)} style={themeStyle(theme, settings.branding.primaryColor)}>
       <header className="pos-top">
@@ -488,9 +600,9 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
           </div>
         </div>
       ) : view === "reports" ? (
-        <PosReports ws={ws} user={user} role={role} rvcId={rvcId} staff={staff} rvcs={rvcs} ctx={ctx} journal={journal} withPrivilege={withPrivilege} print={print} printers={printers} />
+        reportsPanel
       ) : view === "functions" ? (
-        <Functions ws={ws} user={user} role={role} roles={roles} staff={staff} printers={printers} ctx={ctx} lastInvoice={lastInvoice} menuItems={menuItems} withPrivilege={withPrivilege} print={print} journal={journal} openAmount={(title, help, then) => setDialog({ t: "amount", title, ...(help ? { help } : {}), then: (c) => { setDialog(null); then(c); } })} onPreview={(doc, title) => setDialog({ t: "receipt", doc, title })} />
+        functionsPanel
       ) : (
         <div className="pos-body">
           <section className="pos-menu">
@@ -621,75 +733,7 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
         </div>
       )}
 
-      {dialog?.t === "mods" ? (
-        <ModifierDialog item={dialog.item} groups={dialog.item.modifierGroupIds.map((id) => modifierGroups.find((g) => g.id === id)).filter((g): g is ModifierGroup => Boolean(g))} onAdd={(mods, qty, note) => addItem(dialog.item, mods, qty, note)} onClose={() => setDialog(null)} />
-      ) : null}
-      {dialog?.t === "allergy" ? (
-        <Modal title="Allergy alert" onClose={() => setDialog(null)} footer={<><button className="btn" onClick={() => setDialog(null)}>Don't add</button><button className="btn danger solid" onClick={() => { const item = dialog.item; setDialog(null); const groups = item.modifierGroupIds.map((id) => modifierGroups.find((g) => g.id === id)).filter((g): g is ModifierGroup => Boolean(g)); if (groups.length) setDialog({ t: "mods", item }); else addItem(item, [], 1, `ALLERGY CHECKED: ${dialog.hits.join(", ")}`); }}>Add anyway</button></>}>
-          <div className="callout bad"><strong>{dialog.item.name}</strong> contains <strong>{dialog.hits.join(", ")}</strong>, which this guest is allergic to.</div>
-        </Modal>
-      ) : null}
-      {dialog?.t === "auth" ? <ManagerAuth privilege={dialog.privilege} requester={user} propertyId={ws.propertyId} staff={staff} roles={roles} {...(dialog.limit ? { limit: dialog.limit } : {})} onApproved={dialog.then} onClose={() => setDialog(null)} /> : null}
-      {dialog?.t === "transfer" && check ? (
-        <Modal title={`Transfer check #${check.checkNo}`} onClose={() => setDialog(null)}>
-          <div className="stack">
-            <span className="section-title">To another employee</span>
-            <div className="chips">
-              {staff.filter((s) => s.status === "active" && s.id !== check.staffId && (!s.propertyIds?.length || s.propertyIds.includes(ws.propertyId))).map((s) => <button key={s.id} className="chip" onClick={() => transferCheck({ staffId: s.id })}>{s.name}</button>)}
-            </div>
-            {tables.length ? (
-              <>
-                <span className="section-title">To another table</span>
-                <div className="chips">
-                  {tables.filter((t) => t.id !== check.tableId && !openChecks.some((c) => c.tableId === t.id)).map((t) => <button key={t.id} className="chip" onClick={() => transferCheck({ tableId: t.id })}>Table {t.name}</button>)}
-                </div>
-              </>
-            ) : null}
-          </div>
-        </Modal>
-      ) : null}
-      {dialog?.t === "amount" ? <AmountDialog title={dialog.title} {...(dialog.help ? { help: dialog.help } : {})} {...(dialog.initial ? { initial: dialog.initial } : {})} onDone={dialog.then} onClose={() => setDialog(null)} /> : null}
-      {dialog?.t === "reason" ? <ReasonDialog title={dialog.title} reasons={reasons.filter((r) => r.type === dialog.type)} onPick={dialog.then} onClose={() => setDialog(null)} /> : null}
-      {dialog?.t === "discount" ? <DiscountDialog discounts={discounts} scope={dialog.scope} onPick={(d) => applyDiscount(d, dialog.scope)} onClose={() => setDialog(null)} /> : null}
-      {dialog?.t === "customer" && check ? (
-        <CustomerDialog
-          customers={customers}
-          current={check.customerId}
-          allergies={check.allergies ?? []}
-          buyer={check.buyer}
-          onPick={(c) => setCheck((cur) => (cur ? (c ? { ...cur, customerId: c.id } : (({ customerId: _x, ...rest }) => rest)(cur)) : cur))}
-          onAllergies={(a) => setCheck((cur) => (cur ? { ...cur, allergies: a } : cur))}
-          onBuyer={(b) => setCheck((cur) => (cur ? (b ? { ...cur, buyer: b } : (({ buyer: _b, ...rest }) => rest)(cur)) : cur))}
-          onClose={() => setDialog(null)}
-        />
-      ) : null}
-      {dialog?.t === "covers" ? (
-        <Modal title="Number of guests" onClose={() => setDialog(null)}>
-          <div className="keypad">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15].map((n) => <button key={n} onClick={() => dialog.then(n)}>{n}</button>)}
-          </div>
-        </Modal>
-      ) : null}
-      {dialog?.t === "pay" && check && totals ? (
-        <PayDialog
-          check={check}
-          amountDue={totals.amountDue}
-          tenders={tenders}
-          staffId={user.id}
-          reference={`CHK${check.checkNo}-${ws.code}`}
-          onPayments={(payments) => setCheck({ ...check, payments })}
-          onClose={() => setDialog(null)}
-          onFinish={finish}
-        />
-      ) : null}
-      {dialog?.t === "receipt" ? (
-        <Modal title={dialog.title} onClose={() => setDialog(null)} footer={<><button className="btn" onClick={() => window.print()}>Print from this device</button><button className="btn primary" onClick={() => setDialog(null)}>New check</button></>}>
-          <div className="stack" style={{ alignItems: "center" }}>
-            {dialog.change ? <div className="callout good" style={{ fontSize: 20 }}>Change due: <strong className="num">{money(dialog.change)}</strong></div> : null}
-            <ReceiptView doc={dialog.doc} logo={settings.branding.logoDataUrl} />
-          </div>
-        </Modal>
-      ) : null}
+      {dialogs}
     </div>
   );
 }
