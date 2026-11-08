@@ -114,6 +114,7 @@ export function sampleSettings(): {
       requireClockIn: false,
       pinMinLength: 4,
       theme: { template: "modern", colors: {}, fontScale: 1, buttonSize: "regular", radius: 14, checkSide: "right", categoryStyle: "tabs", columns: 0, showImages: true, colorByCategory: true },
+      mobile: { style: "bright", useOn: "phones", showSalesOnHome: true },
     },
     accounting: {
       id: "accounting",

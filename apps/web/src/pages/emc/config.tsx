@@ -442,6 +442,7 @@ export function DevicesPage() {
           { key: "propertyId", label: "Outlet", type: "select", optionsFrom: { col: C.properties }, required: true },
           { key: "rvcId", label: "Revenue centre", type: "select", optionsFrom: { col: C.revenueCenters }, required: true },
           { key: "deviceProfile", label: "Hardware model", type: "select", options: [{ value: "dedicated", label: "Dedicated POS / Windows PC" }, { value: "mobile", label: "Mobile (tablet / phone)" }] },
+          { key: "uiStyle", label: "Screen style", type: "select", options: [{ value: "default", label: "Business setting (Mobile app style page)" }, { value: "terminal", label: "Terminal layout" }, { value: "bright", label: "Bright app" }, { value: "indigo", label: "Indigo app" }] },
           { key: "receiptPrinterId", label: "Bill printer", type: "select", optionsFrom: { col: C.printers, filter: (p) => p.role === "receipt" } },
           { key: "printMode", label: "Printing", type: "select", options: [{ value: "agent", label: "Print Agent (recommended, works for tablets)" }, { value: "direct", label: "Direct from POS Shell (USB on this PC)" }, { value: "preview", label: "On-screen only (demo)" }] },
           { key: "active", label: "Active", type: "bool" },

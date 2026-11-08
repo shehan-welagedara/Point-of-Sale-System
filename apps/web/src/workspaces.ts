@@ -56,7 +56,7 @@ export const WORKSPACES: Workspace[] = [
       { label: "Organisation", items: [{ to: "/emc/setup/organisation", label: "Properties & revenue centres", ico: "⌖" }, { to: "/emc/setup/devices", label: "Workstations & printers", ico: "⌨" }, { to: "/emc/pos/print-queue", label: "Print queue", ico: "⎙" }] },
       { label: "Service", items: [{ to: "/emc/pos/tables", label: "Tables", ico: "▦", module: "tables" }, { to: "/emc/pos/order-types", label: "Order types", ico: "⇄" }] },
       { label: "Payments and rules", items: [{ to: "/emc/pos/tenders", label: "Tender media", ico: "₨" }, { to: "/emc/pos/discounts", label: "Discounts", ico: "%" }, { to: "/emc/pos/reasons", label: "Reason codes", ico: "✎" }] },
-      { label: "Look and feel", items: [{ to: "/emc/pos/appearance", label: "POS themes", ico: "◐" }] },
+      { label: "Look and feel", items: [{ to: "/emc/pos/appearance", label: "Terminal themes", ico: "◐" }, { to: "/emc/pos/mobile", label: "Mobile app style", ico: "▯" }, { to: "/emc/pos/bill", label: "Bill designer", ico: "🧾" }] },
     ],
   },
   {

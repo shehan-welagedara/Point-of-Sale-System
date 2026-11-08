@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateCheck, sriLankaChargeRules } from "@pos/engine";
 import type { BrandingSettings, BusinessSettings, Check, TenderMedia } from "@pos/core";
-import { buildBill, buildKot, pairLines, toEscPos, toText, wrap } from "../src/index.js";
+import { DEFAULT_BILL_LAYOUT, buildBill, buildKot, feedbackLink, pairLines, resolveBillLayout, toEscPos, toText, wrap } from "../src/index.js";
 
 const business: BusinessSettings = {
   id: "business",
@@ -59,6 +59,47 @@ describe("bill", () => {
     const guest = toText(buildBill({ kind: "guestCheck", check, totals, business, branding, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, qr: { data: "000201", caption: "Scan to pay with LankaQR" } }));
     expect(guest).toContain("GUEST CHECK");
     expect(guest).toContain("not a tax invoice");
+  });
+
+  it("follows the administrator's bill layout", () => {
+    const layout = { titleSize: 1 as const, invoiceTitle: "BILL", guestCheckTitle: "PRE-BILL", showPhone: false, showServer: true, serverLabel: "Steward", showCovers: false, showModifiers: false, qtyStyle: "after" as const, showUnitPrice: true, showItemCount: true, guestCheckNote: "", showPoweredBy: false, totalLabel: "AMOUNT DUE", extraFeed: 3 };
+    const plainBiz = { ...business, vatRegistered: false };
+    const inv = toText(buildBill({ kind: "invoice", check: paid, totals, business: plainBiz, branding, width: 48, staffName: "Nimali", orderTypeName: "Dine-in", tenders, invoiceNo: "X1", layout }));
+    expect(inv).toContain("BILL");
+    expect(inv).not.toContain("Tel:");
+    expect(inv).toContain("Steward: Nimali");
+    expect(inv).not.toContain("Covers");
+    expect(inv).not.toContain("Extra spicy");
+    expect(inv).toContain("Chicken Kottu x2");
+    expect(inv).toContain("2 @ 1,200.00");
+    expect(inv).toMatch(/Items\s+3/);
+    expect(inv).toContain("AMOUNT DUE");
+    expect(inv).not.toContain("Powered by");
+    const doc = buildBill({ kind: "invoice", check: paid, totals, business: plainBiz, branding, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, invoiceNo: "X1", layout });
+    expect(doc.blocks).toContainEqual({ t: "feed", lines: 3 });
+    const guest = toText(buildBill({ kind: "guestCheck", check, totals, business, branding: { ...branding, bill: layout }, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders }));
+    expect(guest).toContain("PRE-BILL");
+    expect(guest).not.toContain("not a tax invoice");
+  });
+
+  it("keeps the IRD particulars on a tax invoice whatever the layout says", () => {
+    const layout = { showAddress: false, showSubtotal: false, invoiceTitle: "RECEIPT", showPhone: false };
+    const text = toText(buildBill({ kind: "invoice", check: { ...paid, buyer: { name: "ABC Ltd", tin: "123456789", address: "Kandy" } }, totals, business, branding, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, invoiceNo: "26NOV_W01_9", layout }));
+    for (const s of ["TAX INVOICE", "No. 25, Galle Road", "TIN: 100000000", "26NOV_W01_9", "Invoice Dt", "Supply Dt", "Subtotal", "Value excl. VAT", "VAT 18%", "Purchaser:", "123456789"]) expect(text).toContain(s);
+    expect(text).not.toContain("RECEIPT");
+    // A guest check is not a tax document, so the address may be dropped there.
+    expect(toText(buildBill({ kind: "guestCheck", check, totals, business, branding, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, layout }))).not.toContain("Galle Road");
+  });
+
+  it("combines identical items and builds feedback links", () => {
+    const dup: Check = { ...paid, lines: [...paid.lines, { ...paid.lines[1]!, id: "c" }] };
+    const t2 = calculateCheck({ orderType: "dine-in", pricing: "exclusive", rules: sriLankaChargeRules({ vatRegistered: true, ssclLiable: false }), lines: dup.lines.map((l) => ({ id: l.id, name: l.name, quantity: l.qty, unitPrice: l.unitPrice, taxClass: "standard" })) });
+    const text = toText(buildBill({ kind: "invoice", check: dup, totals: t2, business, branding, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, invoiceNo: "I", layout: { combineSameItems: true } }));
+    expect(text).toMatch(/2 Lime Juice\s+900\.00/);
+    expect(feedbackLink(DEFAULT_BILL_LAYOUT, "26NOV W01", "lagoon.lk")).toBe("https://lagoon.lk/feedback?inv=26NOV%20W01");
+    expect(feedbackLink(DEFAULT_BILL_LAYOUT, "I1")).toBeUndefined();
+    expect(feedbackLink(resolveBillLayout({ showFeedbackQr: false }), "I1", "x.lk")).toBeUndefined();
+    expect(resolveBillLayout({ extraFeed: 40 }).extraFeed).toBe(6);
   });
 
   it("encodes ESC/POS with init, cut and drawer kick", () => {

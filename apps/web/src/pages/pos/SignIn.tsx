@@ -22,6 +22,8 @@ import { useApp, useCollection } from "../../state/app";
 import { Keypad, PinEntry } from "./dialogs";
 import { PosMain } from "./Pos";
 import { resolveTheme, themeStyle } from "./theme";
+import { MobileDeviceSetup, MobileRvcPicker, MobileSignIn } from "./mobile/MobileSignIn";
+import { type UiStyle, useUiStyle } from "./mobile/ui";
 
 const WS_KEY = "pos-suite.workstation";
 
@@ -41,6 +43,8 @@ export function PosApp() {
   const [session, setSession] = useState<PosSession | null>(null);
   const [pendingRvc, setPendingRvc] = useState<{ user: Staff; rvcIds: string[] } | null>(null);
   const ws = workstations?.find((w) => w.id === wsId && w.active);
+  const ui = useUiStyle(settings.pos.mobile, ws);
+  const openChecks = useCollection<{ rvcId: string; propertyId: string }>(ws ? C.checks : null, { where: [["status", "==", "open"]] }) ?? [];
   const theme = resolveTheme(settings.pos.theme);
   const style = themeStyle(theme, settings.branding.primaryColor);
   const journal = useMemo(
@@ -57,7 +61,9 @@ export function PosApp() {
   if (!on("pos")) return <Empty title="The Point of Sale module is not enabled for this business" />;
   if (!store || !workstations || !staff || !roles || !rvcs) return <Loading />;
   if (!ws || !journal)
-    return (
+    return ui !== "terminal" ? (
+      <MobileDeviceSetup style={ui} workstations={workstations.filter((w) => w.active)} rvcs={rvcs} onPick={(id) => { localStorage.setItem(WS_KEY, id); setWsId(id); }} />
+    ) : (
       <div className="pos-theme" style={style}>
         <DeviceSetup workstations={workstations.filter((w) => w.active)} rvcs={rvcs} onPick={(id) => { localStorage.setItem(WS_KEY, id); setWsId(id); }} />
       </div>
@@ -88,20 +94,31 @@ export function PosApp() {
       />
     );
 
+  const signIn = (
+    <SignIn
+      ws={ws}
+      ui={ui}
+      staff={staff}
+      roles={roles}
+      rvcs={rvcs}
+      journal={journal}
+      onSignedIn={(user, rvcIds) => (rvcIds.length === 1 ? begin(user, rvcIds[0]!) : setPendingRvc({ user, rvcIds }))}
+      onChangeDevice={() => { localStorage.removeItem(WS_KEY); setWsId(null); }}
+    />
+  );
+  if (ui !== "terminal")
+    return pendingRvc ? (
+      <MobileRvcPicker style={ui} rvcs={rvcs.filter((r) => pendingRvc.rvcIds.includes(r.id))} user={pendingRvc.user} defaultRvc={ws.rvcId} openCount={(id) => openChecks.filter((c) => c.rvcId === id && c.propertyId === ws.propertyId).length} onPick={(id) => begin(pendingRvc.user, id)} onCancel={() => setPendingRvc(null)} />
+    ) : (
+      signIn
+    );
+
   return (
     <div className="pos-theme" style={style}>
       {pendingRvc ? (
         <RvcPicker ws={ws} rvcs={rvcs.filter((r) => pendingRvc.rvcIds.includes(r.id))} user={pendingRvc.user} onPick={(id) => begin(pendingRvc.user, id)} onCancel={() => setPendingRvc(null)} />
       ) : (
-        <SignIn
-          ws={ws}
-          staff={staff}
-          roles={roles}
-          rvcs={rvcs}
-          journal={journal}
-          onSignedIn={(user, rvcIds) => (rvcIds.length === 1 ? begin(user, rvcIds[0]!) : setPendingRvc({ user, rvcIds }))}
-          onChangeDevice={() => { localStorage.removeItem(WS_KEY); setWsId(null); }}
-        />
+        signIn
       )}
     </div>
   );
@@ -179,7 +196,7 @@ function DeviceSetup({ workstations, rvcs, onPick }: { workstations: Workstation
  * Employee sign-in (Simphony style): employee number + PIN, or a card swipe, or tap a name (for
  * small venues). Wrong PINs count towards a lockout; locked or ended employees can't sign in.
  */
-function SignIn({ ws, staff, roles, rvcs, journal, onSignedIn, onChangeDevice }: { ws: Workstation; staff: Staff[]; roles: Role[]; rvcs: RevenueCenter[]; journal: PosJournal; onSignedIn: (s: Staff, rvcIds: string[]) => void; onChangeDevice: () => void }) {
+function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevice }: { ws: Workstation; ui: UiStyle; staff: Staff[]; roles: Role[]; rvcs: RevenueCenter[]; journal: PosJournal; onSignedIn: (s: Staff, rvcIds: string[]) => void; onChangeDevice: () => void }) {
   const { settings, store, toast } = useApp();
   const mode = settings.pos.signInMode ?? DEFAULT_SIGN_IN.mode;
   const maxFailed = settings.pos.maxFailedSignIns ?? DEFAULT_SIGN_IN.maxFailedSignIns;
@@ -192,21 +209,28 @@ function SignIn({ ws, staff, roles, rvcs, journal, onSignedIn, onChangeDevice }:
   const here = staff.filter((s) => s.status === "active" && (!s.propertyIds?.length || s.propertyIds.includes(ws.propertyId)));
   useEffect(() => cardRef.current?.focus(), [who]);
 
-  function identify(text: string) {
+  function identify(text: string): Staff | null {
     const t = text.trim();
-    if (!t) return;
+    if (!t) return null;
     const s = staff.find((x) => x.cardId === t) ?? staff.find((x) => x.employeeNo === t);
-    if (!s) return setErr("Unknown employee number or card");
+    if (!s) {
+      setErr("Unknown employee number or card");
+      return null;
+    }
     const d = signInDecision(s, roleFor(s, ws.propertyId, roles), ws, propertyRvcIds, todayColombo());
-    if (!d.ok) return setErr(d.reason ?? "Not allowed");
+    if (!d.ok) {
+      setErr(d.reason ?? "Not allowed");
+      return null;
+    }
     setErr("");
     setWho(s);
     setIdText("");
+    return s;
   }
 
-  async function checkPin(pin: string) {
-    if (!who || !store) return;
-    const current = staff.find((s) => s.id === who.id) ?? who;
+  async function checkPin(pin: string, person: Staff | null = who) {
+    if (!person || !store) return;
+    const current = staff.find((s) => s.id === person.id) ?? person;
     const d = signInDecision(current, roleFor(current, ws.propertyId, roles), ws, propertyRvcIds, todayColombo());
     if (!d.ok) return setErr(d.reason ?? "Not allowed");
     if (!(await verifyPin(pin, current.pinHash, current.pinSalt))) {
@@ -235,6 +259,28 @@ function SignIn({ ws, staff, roles, rvcs, journal, onSignedIn, onChangeDevice }:
     toast(`Clocked in at ${timeColombo(now)}`);
     onSignedIn({ ...clockFor.s, clockedInAt: now }, clockFor.rvcIds);
   }
+
+  if (ui !== "terminal")
+    return (
+      <MobileSignIn
+        style={ui}
+        ws={ws}
+        rvcs={rvcs}
+        onChangeDevice={onChangeDevice}
+        view={{
+          mode,
+          here,
+          who,
+          err,
+          clockFor,
+          identify,
+          pick: (s) => { setErr(""); setWho(s ? identify(s.employeeNo) : null); },
+          checkPin: (pin, person) => checkPin(pin, person ?? who),
+          clockIn,
+          cancelClock: () => { setClockFor(null); setWho(null); },
+        }}
+      />
+    );
 
   return (
     <div className="auth">
