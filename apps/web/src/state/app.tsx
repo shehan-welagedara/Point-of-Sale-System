@@ -30,8 +30,8 @@ import {
   runStaffAuth,
   withStaffSecrets,
 } from "@pos/core";
-import { type Actor, type LedgerRequest, UNAUDITED, makeAuditEvent, runLedgerRequest, storeRunner } from "@pos/ledger";
-import { DEMO_PEOPLE, buildSampleStore, sampleSettings } from "@pos/sample-data";
+import { type Actor, type LedgerRequest, type LedgerSettings, UNAUDITED, makeAuditEvent, runLedgerRequest, storeRunner } from "@pos/ledger";
+import { DEMO_PEOPLE, STARTER_PROPERTY_ID, buildSampleStore, sampleSettings, starterConfig } from "@pos/sample-data";
 import { httpsCallable } from "firebase/functions";
 import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from "firebase/auth";
 import { collectionGroup, doc, getDoc, getDocs, onSnapshot, query, setDoc, where, writeBatch } from "firebase/firestore";
@@ -453,12 +453,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const requested = chosen ? Object.fromEntries(chosen.map((k) => [k, true])) : (sample?.modules ?? { pos: true, tables: true, recipes: true, revenue: true });
       const licensing = { plan, entitlements: ent, modules: clampModules(requested, ent), ...(plan === "trial" ? { trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString() } : {}) };
       const base = defaultSettings(name);
-      const configOps: WriteOp[] = sample?.ops ?? Object.values(base).map((data): WriteOp => ({ op: "set", col: C.settings, data }));
+      // A new client business gets its outlet, stores, payment methods, roles and chart of accounts
+      // at once (sample-data starter kit), so every module works from the first screen.
+      const starter: Settings = {
+        ...base,
+        pos: { ...base.pos, defaultPropertyId: STARTER_PROPERTY_ID },
+        accounting: { ...base.accounting, ledger: { ...(base.accounting as AccountingSettings & { ledger: LedgerSettings }).ledger, defaultCostCenter: STARTER_PROPERTY_ID } } as AccountingSettings,
+      };
+      const configOps: WriteOp[] = sample?.ops ?? [
+        ...Object.values(starter).map((data): WriteOp => ({ op: "set", col: C.settings, data })),
+        ...starterConfig({ name, addressLines: base.business.addressLines, modules: licensing.modules }),
+      ];
+      const openYear = !sample && licensing.modules.accounting;
       const now = new Date().toISOString();
       if (mode === "local") {
         const t: Tenant = { id: "local", name, ownerUid: "local-owner", ...licensing, status: "active", createdAt: now };
         const m = new MemoryStore();
         await withStaffSecrets(m).batch(configOps);
+        if (openYear) await runLedgerRequest({ runner: storeRunner(m), store: m, now: () => new Date(), sealDelayMs: 0 }, { uid: "local-owner", name, role: "owner" }, { action: "ensureFiscalYear", date: todayColombo() });
         if (withSample) {
           await m.merge(C.settings, "branding", { displayName: name === "Spice Lagoon (demo)" ? "Spice Lagoon" : name });
         }
@@ -483,6 +495,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await b.commit();
         const fs = withStaffSecrets(new FirestoreStore(db, id, () => firebase().auth.currentUser?.uid));
         await fs.batch(configOps);
+        // The fiscal year is created by the ledger function (clients can't write it).
+        if (openYear) await httpsCallable(firebase().functions, "ledgerApi")({ tenantId: id, action: "ensureFiscalYear", date: todayColombo() }).catch(() => undefined);
         localStorage.setItem("pos-suite.activeTenant", id);
       } finally {
         creating.current = false;

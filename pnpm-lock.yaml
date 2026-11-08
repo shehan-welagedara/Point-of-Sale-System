@@ -177,6 +177,9 @@ importers:
       '@pos/core':
         specifier: workspace:*
         version: link:../core
+      '@pos/ledger':
+        specifier: workspace:*
+        version: link:../ledger
       '@pos/sample-data':
         specifier: workspace:*
         version: link:../sample-data

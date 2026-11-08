@@ -1,3 +1,4 @@
+import { AttachmentPanel } from "../../components/Attachments";
 import { useMemo, useState } from "react";
 import {
   type GoodsReceipt,
@@ -237,6 +238,7 @@ export function GoodsReceiptsPage() {
   const vendors = new Map((useCollection<Vendor>(C.vendors) ?? []).map((v) => [v.id, v.name]));
   const grns = useCollection<GoodsReceipt>(C.goodsReceipts) ?? [];
   const defaultLoc = useDefaultLocation();
+  const toLedger = useStockToLedger();
   if (!on("purchasing")) return <ModuleOff name="Purchasing" />;
   return (
     <CrudPage
@@ -259,6 +261,7 @@ export function GoodsReceiptsPage() {
         { key: "lines", label: "Items received", type: "lines", fields: lineFields("Cost per unit (excl. VAT)"), newRow: () => ({ inventoryItemId: "", qty: 1, unitCost: 0 }) },
         { key: "inputVat", label: "Input VAT on invoice", type: "money" },
       ]}
+      extraEditor={(d) => (d.number ? <AttachmentPanel linkedTo={{ col: C.goodsReceipts, id: String(d.id ?? d.number), label: `Goods receipt ${d.number}` }} title="Delivery note / supplier bill" /> : null)}
       rowActions={(d) =>
         d.status === "posted" ? (
           <span className="badge good">Posted</span>
@@ -269,6 +272,7 @@ export function GoodsReceiptsPage() {
               try {
                 await postGoodsReceipt(store, d.id, user?.email ?? "user");
                 toast(`${d.number} posted to stock`);
+                await toLedger(d.date);
               } catch (e) {
                 toast((e as Error).message, true);
               }
@@ -290,6 +294,30 @@ export function GoodsReceiptsPage() {
   );
 }
 
+/**
+ * Stock changes reach the books through the day's stock journal (goods received, waste, usage,
+ * opening stock). With the POS that happens at End of Day; here it is posted straight away, so a
+ * business without the POS has its stock in the accounts too.
+ */
+function useStockToLedger() {
+  const { on, ledger, settings, toast } = useApp();
+  return async (businessDate: string) => {
+    if (!on("accounting")) return;
+    try {
+      const v = await ledger<{ number?: string } | null>({ action: "postPosDay", propertyId: settings.pos.defaultPropertyId, businessDate });
+      if (v) toast(`Posted to the books (${v.number ?? businessDate})`);
+    } catch (e) {
+      toast(`Saved in stock, but not yet in the books: ${(e as Error).message}. Post it later from Finance → Overview.`, true);
+    }
+  };
+}
+
+const COUNT_KIND: Record<NonNullable<StockCount["kind"]>, { label: string; help: string }> = {
+  count: { label: "Regular count", help: "Differences are losses or errors (stock count differences)." },
+  usage: { label: "Kitchen usage", help: "Without POS sales: what is missing since the last count is what the kitchen used (cost of sales)." },
+  opening: { label: "Opening stock", help: "The first count when you start: what is on the shelves becomes your opening stock." },
+};
+
 export function StockCountsPage() {
   const { on, toast } = useApp();
   const store = useStore();
@@ -300,6 +328,8 @@ export function StockCountsPage() {
   const defaultLoc = useDefaultLocation();
   const [open, setOpen] = useState<StockCount | null>(null);
   const [blind, setBlind] = useState(true);
+  const [kind, setKind] = useState<NonNullable<StockCount["kind"]>>("count");
+  const toLedger = useStockToLedger();
   if (!on("inventory")) return <ModuleOff name="Inventory" />;
   const itemMap = new Map(items.map((i) => [i.id, i]));
   const levelOf = (loc: string, id: string) => levels.find((l) => l.locationId === loc && l.itemId === id)?.qty ?? 0;
@@ -310,7 +340,8 @@ export function StockCountsPage() {
       locationId: defaultLoc,
       date: todayColombo(),
       status: "draft",
-      lines: items.filter((i) => i.trackStock && i.active).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)).map((i) => ({ itemId: i.id, counted: Math.max(0, Math.round(levelOf(defaultLoc, i.id))) })),
+      kind,
+      lines: items.filter((i) => i.trackStock && i.active).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)).map((i) => ({ itemId: i.id, counted: kind === "opening" ? 0 : Math.max(0, Math.round(levelOf(defaultLoc, i.id))) })),
     };
     await store.set(C.stockCounts, c);
     setOpen(c);
@@ -318,15 +349,28 @@ export function StockCountsPage() {
 
   return (
     <div className="page">
-      <PageHead title="Stock counts" subtitle="Count what is on the shelves. Posting a count adjusts stock: losses at FIFO cost, gains at standard cost." actions={<button className="btn primary" onClick={start}>Start a count</button>} />
+      <PageHead
+        title="Stock counts"
+        subtitle="Count what is on the shelves. Posting a count adjusts stock: losses at FIFO cost, gains at standard cost."
+        actions={
+          <>
+            <select className="select" style={{ width: "auto" }} value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Type of count">
+              {Object.entries(COUNT_KIND).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <button className="btn primary" onClick={start}>Start a count</button>
+          </>
+        }
+      />
+      <p className="small muted">{COUNT_KIND[kind].help}</p>
       <div className="card table-wrap">
         {!counts ? <Loading /> : counts.length === 0 ? <Empty title="No counts yet" /> : (
           <table className="table">
-            <thead><tr><th>Count</th><th>Location</th><th>Date</th><th className="num">Items</th><th>Status</th></tr></thead>
+            <thead><tr><th>Count</th><th>Type</th><th>Location</th><th>Date</th><th className="num">Items</th><th>Status</th></tr></thead>
             <tbody>
               {counts.sort((a, b) => b.date.localeCompare(a.date)).map((c) => (
                 <tr key={c.id} className="clickable" onClick={() => setOpen(c)}>
                   <td className="mono">{c.id}</td>
+                  <td>{COUNT_KIND[c.kind ?? "count"].label}</td>
                   <td>{locations.find((l) => l.id === c.locationId)?.name ?? c.locationId}</td>
                   <td>{c.date}</td>
                   <td className="num">{c.lines.length}</td>
@@ -340,7 +384,7 @@ export function StockCountsPage() {
       {open ? (
         <Modal
           wide
-          title={`Count ${open.date} · ${locations.find((l) => l.id === open.locationId)?.name ?? ""}`}
+          title={`${COUNT_KIND[open.kind ?? "count"].label} ${open.date} · ${locations.find((l) => l.id === open.locationId)?.name ?? ""}`}
           onClose={() => setOpen(null)}
           footer={
             open.status === "draft" ? (
@@ -348,7 +392,8 @@ export function StockCountsPage() {
                 <label className="check small"><input type="checkbox" checked={blind} onChange={(e) => setBlind(e.target.checked)} /> Blind count (hide system quantities)</label>
                 <span className="grow" />
                 <button className="btn" onClick={async () => { await store.set(C.stockCounts, open); toast("Count saved"); }}>Save</button>
-                <button className="btn primary" onClick={async () => { await store.set(C.stockCounts, open); const m = await postStockCount(store, open.id); toast(m ? `Posted with ${m.lines.length} adjustment(s)` : "Posted: no differences"); setOpen(null); }}>Post count</button>
+                <label className="row small">Date <input className="input" type="date" style={{ width: "auto" }} value={open.date} onChange={(e) => setOpen({ ...open, date: e.target.value })} /></label>
+                <button className="btn primary" onClick={async () => { await store.set(C.stockCounts, open); const m = await postStockCount(store, open.id); toast(m ? `Posted with ${m.lines.length} line(s)` : "Posted: no differences"); setOpen(null); await toLedger(open.date); }}>Post count</button>
               </>
             ) : undefined
           }
@@ -384,6 +429,7 @@ export function AdjustPage() {
   const store = useStore();
   const items = useCollection<InventoryItem>(C.inventoryItems) ?? [];
   const locations = useCollection<Location>(C.locations) ?? [];
+  const toLedger = useStockToLedger();
   const reasons = (useCollection<{ id: string; type: string; name: string }>(C.reasonCodes) ?? []).filter((r) => r.type === "waste");
   const defaultLoc = useDefaultLocation();
   const [mode, setMode] = useState<"waste" | "transfer" | "production">("waste");
@@ -407,6 +453,7 @@ export function AdjustPage() {
       } else await produceBatch(store, { locationId: from || defaultLoc, prepItemId: itemId, qty: qtyN, businessDate: todayColombo() });
       toast(mode === "waste" ? "Waste recorded" : mode === "transfer" ? "Transfer posted" : "Batch produced");
       setQty("");
+      if (mode !== "transfer") await toLedger(todayColombo());
     } catch (e) {
       toast((e as Error).message, true);
     }

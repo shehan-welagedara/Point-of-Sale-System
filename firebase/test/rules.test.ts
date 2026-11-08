@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { type RulesTestEnvironment, assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { collectionGroup, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
+import { collectionGroup, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 
 let env: RulesTestEnvironment;
 const T = "spice-demo";
@@ -269,5 +269,67 @@ describe("licensing and POS controls", () => {
     await assertSucceeds(setDoc(doc(till, "tenants", "lic", "timeCards", "tc1"), { id: "tc1", staffId: "1002", clockIn: "x" }));
     await assertSucceeds(updateDoc(doc(till, "tenants", "lic", "timeCards", "tc1"), { clockOut: "y", minutes: 480 }));
     await assertFails(updateDoc(doc(till, "tenants", "lic", "timeCards", "tc-closed"), { minutes: 1 }));
+  });
+});
+
+describe("accounting and stock first (no POS)", () => {
+  const B = "books";
+  async function seedBooks() {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "tenants", B), { id: B, name: "Books first", ownerUid: "owner", modules: { pos: false, inventory: true, purchasing: false, crm: false, accounting: true }, plan: "demo", status: "active" });
+      for (const [uid, role] of [["owner", "owner"], ["acct", "accountant"], ["store", "storekeeper"], ["till", "terminal"], ["view", "viewer"], ["aud", "auditor"]] as const) {
+        await setDoc(doc(db, "tenants", B, "members", uid), { id: uid, uid, role, tenantId: B });
+      }
+      await setDoc(doc(db, "tenants", B, "attachments", "linked"), { id: "linked", fileName: "veg.jpg", contentType: "image/jpeg", size: 1000, sha256: "a".repeat(64), chunks: 1, status: "linked", linkedTo: { col: "vouchers", id: "PI-1" }, uploadedBy: "acct", uploadedAt: "x" });
+    });
+  }
+  const att = (id: string, uid: string, extra: Record<string, unknown> = {}) => ({ id, fileName: "bill.jpg", contentType: "image/jpeg", size: 120_000, sha256: "b".repeat(64), chunks: 1, status: "inbox", uploadedBy: uid, uploadedAt: "2026-11-08T10:00:00Z", ...extra });
+
+  it("lets the accountant keep suppliers and customers without the purchasing or CRM modules", async () => {
+    await seedBooks();
+    await assertSucceeds(setDoc(doc(as("acct"), "tenants", B, "vendors", "VEG01"), { id: "VEG01", code: "VEG01", name: "Perera Vegetable Stores", phone: "", paymentTermsDays: 7, active: true }));
+    await assertSucceeds(setDoc(doc(as("acct"), "tenants", B, "customers", "ABC01"), { id: "ABC01", name: "ABC Holdings", phone: "" }));
+    await assertFails(setDoc(doc(as("view"), "tenants", B, "vendors", "X"), { id: "X", code: "X", name: "X" }));
+    await assertFails(setDoc(doc(as("till"), "tenants", B, "customers", "Y"), { id: "Y", name: "Y" }));
+  });
+
+  it("files bill photos as evidence that cannot be swapped afterwards", async () => {
+    await seedBooks();
+    const store = as("store");
+    // Storekeepers and accountants file bills; tills and viewers can't, nor read them.
+    await assertSucceeds(setDoc(doc(store, "tenants", B, "attachmentChunks", "a1_0"), { id: "a1_0", attachmentId: "a1", index: 0, data: "QUJD" }));
+    await assertSucceeds(setDoc(doc(store, "tenants", B, "attachments", "a1"), att("a1", "store")));
+    await assertFails(setDoc(doc(as("till"), "tenants", B, "attachments", "a2"), att("a2", "till")));
+    await assertFails(getDoc(doc(as("view"), "tenants", B, "attachments", "a1")));
+    await assertSucceeds(getDoc(doc(as("aud"), "tenants", B, "attachmentChunks", "a1_0")));
+    // Filed in someone else's name, too large, or a chunk over the limit: refused.
+    await assertFails(setDoc(doc(store, "tenants", B, "attachments", "a3"), att("a3", "acct")));
+    await assertFails(setDoc(doc(store, "tenants", B, "attachments", "a4"), att("a4", "store", { size: 11 * 1024 * 1024 })));
+    await assertFails(setDoc(doc(store, "tenants", B, "attachmentChunks", "big"), { id: "big", attachmentId: "a1", index: 1, data: "x".repeat(700_001) }));
+    // Linking and describing are allowed; the file, its fingerprint and its chunks are fixed.
+    await assertSucceeds(updateDoc(doc(as("acct"), "tenants", B, "attachments", "a1"), { status: "linked", linkedTo: { col: "vouchers", id: "PI-9" }, supplierName: "Perera", amount: 1425000 }));
+    await assertFails(updateDoc(doc(as("acct"), "tenants", B, "attachments", "a1"), { sha256: "c".repeat(64) }));
+    await assertFails(updateDoc(doc(as("owner"), "tenants", B, "attachmentChunks", "a1_0"), { data: "WFla" }));
+    // Only an administrator removes, and only what is still unfiled in the inbox.
+    await assertSucceeds(setDoc(doc(store, "tenants", B, "attachments", "a5"), att("a5", "store")));
+    await assertFails(deleteDoc(doc(as("acct"), "tenants", B, "attachments", "a5")));
+    await assertSucceeds(deleteDoc(doc(as("owner"), "tenants", B, "attachments", "a5")));
+    await assertFails(deleteDoc(doc(as("owner"), "tenants", B, "attachments", "linked")));
+  });
+
+  it("lets the accountant prepare opening balances and the asset register, but never post", async () => {
+    await seedBooks();
+    const acct = as("acct");
+    const draft = { id: "OPEN-2026-04-01", type: "journal", status: "draft", opening: true, createdBy: "acct", postingDate: "2026-04-01", lines: [] };
+    await assertSucceeds(setDoc(doc(acct, "tenants", B, "vouchers", draft.id), draft));
+    await assertFails(setDoc(doc(acct, "tenants", B, "vouchers", "J2"), { ...draft, id: "J2", status: "posted" }));
+    await assertFails(setDoc(doc(acct, "tenants", B, "vouchers", "J3"), { ...draft, id: "J3", createdBy: "owner" }));
+    // Assets owned before the books start come in with their depreciation to date…
+    await assertSucceeds(setDoc(doc(acct, "tenants", B, "assets", "FA-001"), { id: "FA-001", name: "Combi oven", status: "active", cost: 60000000, accumulatedDep: 6250000, lastDepPeriod: "2026-03" }));
+    // …which only the server changes from then on.
+    await assertFails(updateDoc(doc(acct, "tenants", B, "assets", "FA-001"), { accumulatedDep: 0 }));
+    await assertSucceeds(updateDoc(doc(acct, "tenants", B, "assets", "FA-001"), { name: "Combi oven (Rational)" }));
+    await assertFails(setDoc(doc(as("store"), "tenants", B, "assets", "FA-002"), { id: "FA-002", name: "Fridge", status: "active", accumulatedDep: 0 }));
   });
 });

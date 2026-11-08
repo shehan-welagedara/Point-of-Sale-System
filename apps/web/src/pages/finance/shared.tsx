@@ -1,3 +1,4 @@
+import { AttachmentPanel } from "../../components/Attachments";
 import { type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { type Account, type Customer, type MemberRole, type Vendor, COLLECTIONS as C } from "@pos/core";
@@ -43,6 +44,9 @@ export function voucherAmount(v: Voucher): number {
       return (v.lines ?? []).reduce((a, l) => a + l.debit, 0);
   }
 }
+
+/** What the ledger's submit returns: posted at once, or waiting for approval. */
+export type SubmitOutcome = { status: "posted" | "submitted"; voucher?: { number?: string } };
 
 export function useLedgerSettings(): LedgerSettings | undefined {
   const { settings } = useApp();
@@ -261,6 +265,7 @@ export function VoucherDetail({ voucher, onClose, onEdit }: { voucher: Voucher; 
           )}
         </div>
         {voucher.hash ? <Field label="Integrity hash (chained to the previous posted voucher)"><span className="mono tiny" style={{ wordBreak: "break-all" }}>{voucher.hash}</span></Field> : null}
+        <AttachmentPanel linkedTo={{ col: L.vouchers, id: voucher.id, label: `${TYPE_LABEL[voucher.type]} ${voucher.number ?? ""}`.trim() }} />
         <Link className="small" to={`/emc/audit/trail?doc=${encodeURIComponent(voucher.id)}`}>View change history →</Link>
       </div>
     </Drawer>
