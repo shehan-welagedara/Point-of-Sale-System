@@ -52,3 +52,6 @@ export function downloadBuffer(buffer: ArrayBuffer | Uint8Array, filename: strin
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+/** Whole rupees for dashboards and tiles: "Rs 125,400". */
+export const moneyShort = (cents: number | undefined) => `Rs ${Math.round((cents ?? 0) / 100).toLocaleString("en-US")}`;

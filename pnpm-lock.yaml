@@ -20,6 +20,9 @@ importers:
       firebase-tools:
         specifier: 14.27.0
         version: 14.27.0(@types/node@22.15.3)(typescript@5.9.3)
+      marked:
+        specifier: 13.0.3
+        version: 13.0.3
       vitest:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.15.3)(tsx@4.19.4)(yaml@2.9.1)

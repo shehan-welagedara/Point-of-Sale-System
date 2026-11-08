@@ -43,7 +43,7 @@ export function LoginsPage() {
 
   return (
     <div className="page">
-      <PageHead title="Back-office logins" subtitle="Who can open this back office, and with what access. POS staff use PINs instead (People → POS staff)." />
+      <PageHead title="Back-office logins" subtitle="Who can open this back office, and with what access. POS staff sign in with PINs instead (People &amp; Security → Employees)." />
       <div className="grid cols-3">
         {(Object.keys(MEMBER_ROLE_INFO) as MemberRole[]).map((r) => (
           <div key={r} className="card card-body stack tight">

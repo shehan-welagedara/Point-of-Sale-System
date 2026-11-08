@@ -291,10 +291,14 @@ Keep the issued licence (saved under `licence-keys/issued/`) with the client's c
 
    **Check the settings with the client's accountant** ([06](06-sri-lanka-compliance.md)).
 2. **Administration → Branding:** logo, colours, bill header and footer lines.
-3. **POS Configuration → POS themes:** choose Classic, Modern or Midnight and adjust colours and sizes.
+3. **POS Configuration → Terminal themes:** for counter terminals and PCs, choose Classic, Modern or Midnight and adjust colours and sizes.
+4. **POS Configuration → Mobile app style:** show the client both styles (**Bright** and **Indigo**) on a phone and let them choose. Set where it applies (phones; phones and tablets; every screen), the accent colour and the sign-in picture (a landscape photo of the restaurant). A workstation can override it under Workstations & printers → *Screen style*.
+5. **POS Configuration → Bill designer:** with the owner, choose what the bills print (titles, employee label, header, items, totals, QR codes, footer), check the preview on the client's paper width, and print a test bill. For VAT-registered clients the IRD particulars stay locked on.
+6. **POS Configuration → POS options:** business day start (for late-night venues), automatic bill printing, loyalty points per Rs 100.
 
 - [ ] Business and tax details confirmed by the accountant
-- [ ] Logo and bill text set; POS theme chosen
+- [ ] Logo and bill text set; terminal theme and mobile app style chosen by the client
+- [ ] Bill layout approved by the owner on a printed test bill
 
 ---
 
@@ -426,10 +430,11 @@ pnpm agent
 
 ## P. Training and the dry run
 
-1. **Train staff in the demo business** (H.3):
-   - **Cashiers and stewards:** sign in, tables, orders, modifiers, allergies, send, split, transfer, payment, bill.
+1. **Train staff in the demo business** (H.3) with the [training manuals](manual/training/README.md): one per role, with exercises and sign-off checklists. Print them, with the [user manual](manual/user-manual.md), as PDFs carrying the client's name: `pnpm manual:pdf -- --client "Client name"` (files in `manual-pdf/`).
+   - **Cashiers and stewards:** sign in, tables, orders, modifiers, allergies, send, split, transfer, payment, bill (on the phones in the chosen app style).
    - **Supervisors:** voids, discounts and approvals.
    - **Manager:** reports on the POS, End of Day, 86, unlock employee.
+   - **Storekeeper, accountant, administrator:** their back-office workspaces.
 2. **Dry run in the real business**, on the day before go-live, after closing:
    - Ring a few real-looking checks with each tender, then a void with approval, a discount and a split.
    - Run **End of Day**: Z report, stock deduction, ledger posting if Finance is on, WhatsApp report (simulated).
@@ -539,6 +544,7 @@ pnpm firebase:deploy
 - [ ] Menu, stock and recipes imported; data quality clean
 - [ ] Every employee has their own PIN; roles and limits signed off by the owner
 - [ ] Devices installed; Print Agent auto-starts; printers and drawer tested
-- [ ] Staff trained; manager can run End of Day; dry run clean
+- [ ] Staff trained and signed off (training manuals); manager can run End of Day; dry run clean
+- [ ] User manual and training manuals handed over (PDF with the client's name)
 - [ ] Monthly routine (section R) explained; first export of the audit package done
 - [ ] Support contacts given to the client

@@ -18,14 +18,17 @@
     "firebase:deploy": "pnpm build && firebase deploy --only hosting,firestore,functions",
     "test:functions": "pnpm --filter @pos/functions build && node -e \"require('fs').writeFileSync('apps/functions/dist/.env.local','SEAL_DELAY_MS=0\\n')\" && firebase emulators:exec --only auth,firestore,functions --project demo-pos-suite \"vitest run --root apps/functions test/emulator.test.ts\"",
     "licence": "node tools/licence/run.mjs",
-    "test:e2e": "node apps/web/e2e/run.mjs"
+    "test:e2e": "node apps/web/e2e/run.mjs",
+    "manual:screenshots": "node apps/web/e2e/manual-shots.mjs",
+    "manual:pdf": "node tools/manual/build-pdf.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "4.0.1",
+    "esbuild": "0.25.12",
     "firebase": "11.10.0",
     "firebase-tools": "14.27.0",
-    "vitest": "3.2.4",
-    "esbuild": "0.25.12"
+    "marked": "13.0.3",
+    "vitest": "3.2.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
