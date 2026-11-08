@@ -75,9 +75,12 @@ try {
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Void" }).click();
   check("a cashier's void needs approval", (await page.locator(".modal-head h2").textContent()) === "Manager approval");
-  await pin("2222", ".modal");
+  const approvers = await page.locator(".modal [aria-label=Approvers] .chip").allTextContents();
+  check("a cashier can't approve for themselves", approvers.length > 0 && !approvers.some((t) => t.includes("Nimali")), approvers.join(", "));
+  await page.locator(".modal .chip", { hasText: "Dilan" }).click();
+  await pin("1234", ".modal");
   await page.waitForTimeout(500);
-  check("a cashier can't approve for themselves", (await page.locator(".modal").innerText()).includes("Not authorised") || (await page.locator(".modal").innerText()).includes("Nobody"));
+  check("a wrong approval PIN is refused and counted", (await page.locator(".modal").innerText()).includes("tries left"));
   await pin("6666", ".modal");
   await page.waitForTimeout(500);
   await page.locator(".modal .btn.lg").first().click();
@@ -294,6 +297,25 @@ try {
     const hx = await tp.evaluate(() => document.scrollingElement.scrollWidth - innerWidth);
     check("tablet uses the app style with more columns", (await tp.locator(".mpos.indigo").count()) === 1 && cols >= 3 && hx <= 1, `${cols} columns`);
     await tablet.close();
+  }
+
+  // ── Releases: devices report their version; a newer release shows a banner; an unsupported one blocks.
+  await page.goto(`${B}/emc/setup/status?mode=local`);
+  await page.waitForTimeout(800);
+  check("system status lists POS devices and their version", (await page.locator("tbody tr", { hasText: "W01" }).count()) > 0 && (await page.getByText("Secure", { exact: true }).count()) > 0);
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, storageState: await page.context().storageState() });
+    const p = await ctx.newPage();
+    let live = { version: "99.0.0", minSupportedVersion: "0.0.1" };
+    await p.route("**/version.json*", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(live) }));
+    await p.goto(`${B}/emc/home?mode=local`);
+    await p.waitForTimeout(1200);
+    check("a newer release shows the update banner", ((await p.locator(".sys-banner.info").textContent()) ?? "").includes("99.0.0"));
+    live = { version: "99.0.0", minSupportedVersion: "98.0.0" };
+    await p.reload();
+    await p.waitForTimeout(1200);
+    check("an unsupported version must update before use", (await p.getByRole("alertdialog", { name: "Update required" }).count()) === 1);
+    await ctx.close();
   }
 
   check("no browser errors", errors.length === 0, errors.slice(0, 5).join(" | "));

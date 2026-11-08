@@ -11,7 +11,7 @@ import {
   taxSummary,
   trialBalance,
 } from "@pos/ledger";
-import { type TableSheet, tablesToWorkbook } from "@pos/excel";
+import { type TableSheet, tablesToWorkbook } from "../../lib/excel";
 import { Field, Loading, ModuleOff, PageHead, Seg } from "../../components/ui";
 import { amount, downloadBuffer, money } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";

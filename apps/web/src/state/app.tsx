@@ -25,14 +25,20 @@ import {
   newId,
   verifyLicence,
   withValidation,
+  type StaffAuthRequest,
+  type StaffAuthResult,
+  runStaffAuth,
+  withStaffSecrets,
 } from "@pos/core";
 import { type Actor, type LedgerRequest, UNAUDITED, makeAuditEvent, runLedgerRequest, storeRunner } from "@pos/ledger";
 import { DEMO_PEOPLE, buildSampleStore, sampleSettings } from "@pos/sample-data";
 import { httpsCallable } from "firebase/functions";
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from "firebase/auth";
 import { collectionGroup, doc, getDoc, getDocs, onSnapshot, query, setDoc, where, writeBatch } from "firebase/firestore";
 import { firebase, firebaseConfigured } from "../lib/firebase";
 import { FirestoreStore } from "../lib/firestore-store";
+import { setErrorSink } from "../lib/errors";
+import { offlineCard, offlinePin, rememberCard, rememberPin } from "../lib/offline-pin";
 import { todayColombo } from "../lib/format";
 
 export interface Settings {
@@ -97,6 +103,8 @@ interface AppState {
   actor: Actor | null;
   /** Server-side ledger operation: Cloud Functions in Firebase mode, the same code locally. */
   ledger: <T = unknown>(req: LedgerRequest) => Promise<T>;
+  /** Employee PIN / card check: the posAuth Cloud Function in Firebase mode, the same code locally. */
+  staffAuth: (req: StaffAuthRequest) => Promise<StaffAuthResult>;
   /** Display name for a user id (members, demo people). */
   personName: (uid: string | undefined) => string;
   /** Licence in force: edition, entitlement, validity. */
@@ -255,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStore.current = m;
     setTenant(save.tenant);
     setTenants([save.tenant]);
-    setStore(withValidation(m));
+    setStore(withValidation(withStaffSecrets(m)));
     setReady(true);
   }, []);
 
@@ -295,7 +303,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const preferred = localStorage.getItem("pos-suite.activeTenant");
     const active = ts.find((t) => t.id === preferred) ?? ts[0] ?? null;
     setTenant(active);
-    setStore(active ? withValidation(new FirestoreStore(db, active.id, () => firebase().auth.currentUser?.uid)) : null);
+    setStore(active ? withValidation(withStaffSecrets(new FirestoreStore(db, active.id, () => firebase().auth.currentUser?.uid))) : null);
   }, []);
 
   useEffect(() => {
@@ -364,6 +372,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return store.watch<{ id: string; name?: string; email?: string }>(C.members, undefined, (ms) => setMemberNames(Object.fromEntries(ms.map((m) => [m.id, m.name || m.email || m.id]))));
   }, [store, mode]);
 
+  const staffAuth = useCallback(
+    async (req: StaffAuthRequest): Promise<StaffAuthResult> => {
+      if (!tenant) throw new Error("no business selected");
+      if (mode === "local") {
+        const m = localStore.current;
+        if (!m) throw new Error("no local data");
+        return runStaffAuth(withStaffSecrets(m), req);
+      }
+      const offline = async (): Promise<StaffAuthResult> => {
+        if (req.action === "verify") {
+          const r = await offlinePin(tenant.id, req.staffId, req.pin);
+          return r.ok ? { ok: true, staffId: req.staffId } : { ok: false, reason: r.reason ?? "Wrong PIN" };
+        }
+        if (req.action === "identifyCard") {
+          const id = await offlineCard(tenant.id, req.card);
+          return id ? { ok: true, staffId: id } : { ok: false, reason: "No connection to the server: sign in with your employee number" };
+        }
+        return { ok: false, reason: "No connection to the server" };
+      };
+      if (!navigator.onLine) return offline();
+      try {
+        const res = await httpsCallable(firebase().functions, "posAuth", { timeout: 8000 })({ tenantId: tenant.id, ...req });
+        const r = res.data as StaffAuthResult;
+        // Remember on this device for sign-in during an internet outage (lib/offline-pin).
+        if (r.ok && req.action === "verify") void rememberPin(tenant.id, req.staffId, req.pin);
+        if (r.ok && req.action === "identifyCard") void rememberCard(tenant.id, req.card, r.staffId);
+        return r;
+      } catch (e) {
+        const code = (e as { code?: string }).code ?? "";
+        const msg = (e as { message?: string }).message?.replace(/^.*?:\s*/, "") ?? "";
+        if (/unavailable|deadline-exceeded|internal/.test(code) || /network|fetch/i.test(msg)) return offline();
+        return { ok: false, reason: msg || "The PIN could not be checked" };
+      }
+    },
+    [tenant, mode],
+  );
+
+  // A write the server refused after the screen moved on (offline-tolerant writes): tell the user.
+  useEffect(() => {
+    const on = (e: Event) => toast(`Not saved on the server: ${String((e as CustomEvent).detail).replace(/^.*?:\s*/, "")}`, true);
+    window.addEventListener("pos-suite:write-failed", on);
+    return () => window.removeEventListener("pos-suite:write-failed", on);
+  }, [toast]);
+
+  // Unexpected errors are kept in the business's clientErrors (Administration → System status).
+  useEffect(() => {
+    if (!store) return setErrorSink(null);
+    const uid = mode === "firebase" ? firebase().auth.currentUser?.uid : (DEMO_PEOPLE[personaRef.current]?.uid ?? "local");
+    if (!uid) return setErrorSink(null);
+    setErrorSink(async (r) => store.set(C.clientErrors, { ...r, uid }));
+    return () => setErrorSink(null);
+  }, [store, mode, user?.uid]);
+
   const ledger = useCallback(
     async <T,>(req: LedgerRequest): Promise<T> => {
       if (!tenant || !actor) throw new Error("no business selected");
@@ -397,7 +458,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (mode === "local") {
         const t: Tenant = { id: "local", name, ownerUid: "local-owner", ...licensing, status: "active", createdAt: now };
         const m = new MemoryStore();
-        await m.batch(configOps);
+        await withStaffSecrets(m).batch(configOps);
         if (withSample) {
           await m.merge(C.settings, "branding", { displayName: name === "Spice Lagoon (demo)" ? "Spice Lagoon" : name });
         }
@@ -410,12 +471,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const { db } = firebase();
         const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "tenant"}-${Math.random().toString(36).slice(2, 7)}`;
-        const t: Tenant = { id, name, ownerUid: user.uid, ...licensing, status: "active", createdAt: now };
+        // An owner/administrator adding a business (e.g. a training copy) proves it with their current one;
+        // the very first business in a new project claims the deployment (see firestore.rules).
+        const from = tenant && memberships.some((m) => m.tenantId === tenant.id && (m.role === "owner" || m.role === "admin")) ? tenant.id : undefined;
+        const t = { id, name, ownerUid: user.uid, ...licensing, status: "active", createdAt: now, ...(from ? { createdFromTenant: from } : {}) } as Tenant;
         const b = writeBatch(db);
+        const deployment = await getDoc(doc(db, "deployment", "config")).catch(() => null);
+        if (deployment && !deployment.exists()) b.set(doc(db, "deployment", "config"), { ownerUid: user.uid, openSignup: false, createdAt: now });
         b.set(doc(db, "tenants", id), t);
         b.set(doc(db, "tenants", id, "members", user.uid), { id: user.uid, uid: user.uid, email: user.email, name: user.name, role: "owner", tenantId: id, createdAt: now });
         await b.commit();
-        const fs = new FirestoreStore(db, id, () => firebase().auth.currentUser?.uid);
+        const fs = withStaffSecrets(new FirestoreStore(db, id, () => firebase().auth.currentUser?.uid));
         await fs.batch(configOps);
         localStorage.setItem("pos-suite.activeTenant", id);
       } finally {
@@ -423,7 +489,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       await loadMemberships(user);
     },
-    [mode, user, openLocal, loadMemberships],
+    [mode, user, openLocal, loadMemberships, tenant, memberships],
   );
 
   const switchTenant = useCallback(
@@ -431,7 +497,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("pos-suite.activeTenant", id);
       const t = tenants.find((x) => x.id === id) ?? null;
       setTenant(t);
-      setStore(t && mode === "firebase" ? withValidation(new FirestoreStore(firebase().db, t.id, () => firebase().auth.currentUser?.uid)) : store);
+      setStore(t && mode === "firebase" ? withValidation(withStaffSecrets(new FirestoreStore(firebase().db, t.id, () => firebase().auth.currentUser?.uid))) : store);
     },
     [tenants, mode, store],
   );
@@ -492,6 +558,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     signUp: async (email, password, name) => {
       const cred = await createUserWithEmailAndPassword(firebase().auth, email, password);
       await updateProfile(cred.user, { displayName: name });
+      // Invitations are only accepted from a verified address, so nobody can claim someone else's invite.
+      await sendEmailVerification(cred.user).catch(() => undefined);
     },
     signOut: async () => {
       if (mode === "local") return;
@@ -518,6 +586,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     actor,
     ledger,
+    staffAuth,
     personName: (uid) => {
       if (!uid) return "—";
       const demo = Object.values(DEMO_PEOPLE).find((p) => p.uid === uid);
@@ -525,7 +594,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     acceptInvite: async () => {
       if (mode !== "firebase" || !user?.email) return false;
-      const { db } = firebase();
+      const { db, auth } = firebase();
+      const me = auth.currentUser;
+      if (me && !me.emailVerified) {
+        await me.reload();
+        if (!auth.currentUser?.emailVerified) {
+          await sendEmailVerification(me).catch(() => undefined);
+          throw new Error(`verify your email address first: open the link we sent to ${user.email} (check spam), then press this button again`);
+        }
+        await me.getIdToken(true);
+      }
       const inviteRef = doc(db, "invites", user.email.toLowerCase());
       const inv = await getDoc(inviteRef);
       if (!inv.exists()) return false;

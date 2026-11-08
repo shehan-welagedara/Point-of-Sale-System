@@ -9,12 +9,10 @@ import {
   COLLECTIONS as C,
   DEFAULT_SIGN_IN,
   PosJournal,
-  afterFailedSignIn,
   businessDateNow,
   newId,
   roleFor,
   signInDecision,
-  verifyPin,
 } from "@pos/core";
 import { Empty, Loading } from "../../components/ui";
 import { timeColombo, todayColombo } from "../../lib/format";
@@ -24,6 +22,52 @@ import { PosMain } from "./Pos";
 import { resolveTheme, themeStyle } from "./theme";
 import { MobileDeviceSetup, MobileRvcPicker, MobileSignIn } from "./mobile/MobileSignIn";
 import { type UiStyle, useUiStyle } from "./mobile/ui";
+import { APP_VERSION, setBusy } from "../../lib/version";
+
+interface DeviceStatus {
+  id: string;
+  uid: string;
+  deviceId: string;
+  appVersion: string;
+  lastSeenAt: string;
+  employeeId?: string;
+  online?: boolean;
+}
+
+/** A random id for this browser, so two devices using one workstation can be told apart. */
+function thisDeviceId(): string {
+  try {
+    let id = localStorage.getItem("pos-suite.device");
+    if (!id) {
+      id = newId();
+      localStorage.setItem("pos-suite.device", id);
+    }
+    return id;
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Reports this device's app version and last contact every few minutes (System status page;
+ * which devices still run an old release), and warns when the same workstation is open on a
+ * second device: each workstation numbers its own bills, so it must be used on one device only.
+ */
+function useDeviceHeartbeat(wsId: string | undefined, employeeId: string | undefined): boolean {
+  const { store, user, mode } = useApp();
+  const deviceId = useMemo(thisDeviceId, []);
+  const status = (useCollection<DeviceStatus>(wsId ? C.deviceStatus : null, wsId ? { where: [["id", "==", wsId]] } : undefined) ?? [])[0];
+  useEffect(() => {
+    if (!wsId || !store) return;
+    const uid = mode === "firebase" ? user?.uid : "local";
+    if (!uid) return;
+    const beat = () => void store.set(C.deviceStatus, { id: wsId, uid, deviceId, appVersion: APP_VERSION, lastSeenAt: new Date().toISOString(), online: navigator.onLine, ...(employeeId ? { employeeId } : {}) }).catch(() => undefined);
+    beat();
+    const t = setInterval(beat, 4 * 60_000);
+    return () => clearInterval(t);
+  }, [wsId, store, user?.uid, mode, deviceId, employeeId]);
+  return Boolean(status && status.deviceId !== deviceId && Date.now() - Date.parse(status.lastSeenAt) < 6 * 60_000);
+}
 
 const WS_KEY = "pos-suite.workstation";
 
@@ -52,6 +96,12 @@ export function PosApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [ws?.id, store],
   );
+  const sharedDevice = useDeviceHeartbeat(ws?.id, session?.user.id);
+  useEffect(() => {
+    // A signed-in employee's screen never reloads by itself for an update.
+    setBusy("pos-session", Boolean(session));
+    return () => setBusy("pos-session", false);
+  }, [session]);
   const idleSeconds = ws?.autoSignOutSeconds ?? settings.pos.autoSignOutSeconds ?? DEFAULT_SIGN_IN.autoSignOutSeconds;
   useIdle(session && idleSeconds > 0 ? idleSeconds : 0, () => {
     if (session) void journal?.log({ type: "autoSignOut", employeeId: session.user.id });
@@ -75,8 +125,16 @@ export function PosApp() {
     setPendingRvc(null);
   };
 
+  const shared = sharedDevice ? (
+    <div className="sys-banner warn" role="alert" style={{ top: 10, bottom: "auto" }}>
+      <span>Workstation {ws.code} is also open on another device. Use each workstation on one device only: bills are numbered per workstation and may fail to close.</span>
+    </div>
+  ) : null;
+
   if (session)
     return (
+      <>
+      {shared}
       <PosMain
         ws={ws}
         user={session.user}
@@ -92,6 +150,7 @@ export function PosApp() {
           begin(session.user, rvcId);
         }}
       />
+      </>
     );
 
   const signIn = (
@@ -108,13 +167,14 @@ export function PosApp() {
   );
   if (ui !== "terminal")
     return pendingRvc ? (
-      <MobileRvcPicker style={ui} rvcs={rvcs.filter((r) => pendingRvc.rvcIds.includes(r.id))} user={pendingRvc.user} defaultRvc={ws.rvcId} openCount={(id) => openChecks.filter((c) => c.rvcId === id && c.propertyId === ws.propertyId).length} onPick={(id) => begin(pendingRvc.user, id)} onCancel={() => setPendingRvc(null)} />
+      <>{shared}<MobileRvcPicker style={ui} rvcs={rvcs.filter((r) => pendingRvc.rvcIds.includes(r.id))} user={pendingRvc.user} defaultRvc={ws.rvcId} openCount={(id) => openChecks.filter((c) => c.rvcId === id && c.propertyId === ws.propertyId).length} onPick={(id) => begin(pendingRvc.user, id)} onCancel={() => setPendingRvc(null)} /></>
     ) : (
-      signIn
+      <>{shared}{signIn}</>
     );
 
   return (
     <div className="pos-theme" style={style}>
+      {shared}
       {pendingRvc ? (
         <RvcPicker ws={ws} rvcs={rvcs.filter((r) => pendingRvc.rvcIds.includes(r.id))} user={pendingRvc.user} onPick={(id) => begin(pendingRvc.user, id)} onCancel={() => setPendingRvc(null)} />
       ) : (
@@ -197,7 +257,7 @@ function DeviceSetup({ workstations, rvcs, onPick }: { workstations: Workstation
  * small venues). Wrong PINs count towards a lockout; locked or ended employees can't sign in.
  */
 function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevice }: { ws: Workstation; ui: UiStyle; staff: Staff[]; roles: Role[]; rvcs: RevenueCenter[]; journal: PosJournal; onSignedIn: (s: Staff, rvcIds: string[]) => void; onChangeDevice: () => void }) {
-  const { settings, store, toast } = useApp();
+  const { settings, store, toast, staffAuth } = useApp();
   const mode = settings.pos.signInMode ?? DEFAULT_SIGN_IN.mode;
   const maxFailed = settings.pos.maxFailedSignIns ?? DEFAULT_SIGN_IN.maxFailedSignIns;
   const [who, setWho] = useState<Staff | null>(null);
@@ -209,13 +269,18 @@ function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevic
   const here = staff.filter((s) => s.status === "active" && (!s.propertyIds?.length || s.propertyIds.includes(ws.propertyId)));
   useEffect(() => cardRef.current?.focus(), [who]);
 
-  function identify(text: string): Staff | null {
+  /** Employee number (looked up here) or card (checked on the server: card numbers aren't readable). */
+  async function identify(text: string): Promise<Staff | null> {
     const t = text.trim();
     if (!t) return null;
-    const s = staff.find((x) => x.cardId === t) ?? staff.find((x) => x.employeeNo === t);
+    let s = staff.find((x) => x.employeeNo === t) ?? null;
     if (!s) {
-      setErr("Unknown employee number or card");
-      return null;
+      const r = await staffAuth({ action: "identifyCard", card: t });
+      s = r.ok ? (staff.find((x) => x.id === r.staffId) ?? null) : null;
+      if (!s) {
+        setErr(r.ok ? "Unknown employee number or card" : r.reason === "Unknown card" ? "Unknown employee number or card" : r.reason);
+        return null;
+      }
     }
     const d = signInDecision(s, roleFor(s, ws.propertyId, roles), ws, propertyRvcIds, todayColombo());
     if (!d.ok) {
@@ -233,17 +298,14 @@ function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevic
     const current = staff.find((s) => s.id === person.id) ?? person;
     const d = signInDecision(current, roleFor(current, ws.propertyId, roles), ws, propertyRvcIds, todayColombo());
     if (!d.ok) return setErr(d.reason ?? "Not allowed");
-    if (!(await verifyPin(pin, current.pinHash, current.pinSalt))) {
-      const next = afterFailedSignIn(current, maxFailed, new Date().toISOString());
-      await store.merge(C.staff, current.id, next);
-      await journal.log({ type: "signInFailed", employeeId: current.id, detail: `attempt ${next.failedSignIns} of ${maxFailed}` });
-      if (next.lockedAt) {
-        await journal.log({ type: "lockout", employeeId: current.id });
-        setErr(`Locked after ${maxFailed} wrong PINs. A manager must unlock you.`);
-      } else setErr(`Wrong PIN (${maxFailed - (next.failedSignIns ?? 0)} tries left)`);
+    // Checked on the server, which also counts wrong PINs and locks the employee out.
+    const r = await staffAuth({ action: "verify", staffId: current.id, pin, purpose: "signIn" });
+    if (!r.ok) {
+      if (r.triesLeft !== undefined) await journal.log({ type: "signInFailed", employeeId: current.id, detail: `attempt ${maxFailed - r.triesLeft} of ${maxFailed}` });
+      if (r.locked && r.triesLeft === 0) await journal.log({ type: "lockout", employeeId: current.id });
+      setErr(r.reason);
       return;
     }
-    await store.merge(C.staff, current.id, { failedSignIns: 0, lastSignInAt: new Date().toISOString() });
     await journal.log({ type: "signIn", employeeId: current.id });
     if (settings.pos.requireClockIn && !current.clockedInAt) return setClockFor({ s: current, rvcIds: d.rvcIds });
     onSignedIn(current, d.rvcIds);
@@ -274,7 +336,7 @@ function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevic
           err,
           clockFor,
           identify,
-          pick: (s) => { setErr(""); setWho(s ? identify(s.employeeNo) : null); },
+          pick: (s) => { setErr(""); if (s) void identify(s.employeeNo); else setWho(null); },
           checkPin: (pin, person) => checkPin(pin, person ?? who),
           clockIn,
           cancelClock: () => { setClockFor(null); setWho(null); },
@@ -304,7 +366,7 @@ function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevic
             <p className="muted">Tap your name</p>
             <div className="grid cols-3" style={{ width: "100%" }}>
               {here.map((s) => (
-                <button key={s.id} className="btn lg" style={{ flexDirection: "column", height: 78, borderRadius: 16 }} onClick={() => identify(s.employeeNo)}>
+                <button key={s.id} className="btn lg" style={{ flexDirection: "column", height: 78, borderRadius: 16 }} onClick={() => void identify(s.employeeNo)}>
                   <span>{s.name}</span>
                   <span className="tiny muted">#{s.employeeNo}{s.lockedAt ? " · locked" : ""}</span>
                 </button>
@@ -326,13 +388,13 @@ function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevic
                 placeholder={mode === "card" ? "Swipe or type your number" : "e.g. 1002"}
                 value={idText}
                 onChange={(e) => setIdText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && identify(idText)}
+                onKeyDown={(e) => { if (e.key === "Enter") void identify(idText); }}
               />
               {err ? <div className="callout bad small">{err}</div> : <p className="small muted">A card reader types the card number and Enter, so a swipe signs you in straight away.</p>}
             </div>
             <div className="stack">
               <Keypad onKey={(k) => (k === "C" ? setIdText("") : k === "⌫" ? setIdText((v) => v.slice(0, -1)) : setIdText((v) => (v + k).slice(0, 12)))} />
-              <button className="btn primary lg" disabled={!idText} onClick={() => identify(idText)}>Next</button>
+              <button className="btn primary lg" disabled={!idText} onClick={() => void identify(idText)}>Next</button>
             </div>
           </div>
         )}

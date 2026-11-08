@@ -484,3 +484,9 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 /* Phone preview on the Mobile app style page: smaller on short 16:9 screens so it fits. */
 @media (min-width: 901px) and (max-height: 820px) { .phone-frame { zoom: 0.82; } }
 @media (min-width: 901px) and (max-height: 730px) { .phone-frame { zoom: 0.74; } }
+
+/* Release and connection notices (SystemBanners) */
+.sys-banner { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 250; display: flex; align-items: center; gap: 12px; max-width: min(720px, calc(100% - 24px)); padding: 10px 14px; border-radius: 14px; box-shadow: var(--shadow-lg); font-size: 14px; }
+.sys-banner.info { background: #1e293b; color: #fff; }
+.sys-banner.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); bottom: calc(68px + env(safe-area-inset-bottom)); }
+.sys-banner .btn { flex: none; }

@@ -1,0 +1,22 @@
+{
+  "$comment": "Every deployment of the Cloud Restaurant Edition. 'wave' decides the order of a release: staging first, then wave 1 (pilot), then wave 2 (everyone else). Project ids are not secrets; keep logins and keys out of this file.",
+  "staging": {
+    "id": "staging",
+    "name": "Vendor staging (demo restaurant)",
+    "projectId": "REPLACE-with-your-staging-project",
+    "region": "asia-south1",
+    "backupBucket": ""
+  },
+  "clients": [
+    {
+      "id": "kandy-myst",
+      "name": "Kandy Myst Restaurant",
+      "projectId": "REPLACE-with-kandy-myst-project",
+      "region": "asia-south1",
+      "wave": 1,
+      "maintenanceWindow": "23:30-05:00 Asia/Colombo",
+      "backupBucket": "gs://REPLACE-with-kandy-myst-project-backups",
+      "enabled": false
+    }
+  ]
+}
