@@ -11,6 +11,9 @@
  *    Center at any time, and in the test suite against the demo data.
  */
 import { z } from "zod";
+
+// No runtime code generation: the app runs under a strict Content-Security-Policy (no eval).
+z.config({ jitless: true });
 import { PRIVILEGES } from "./privileges.js";
 import { COLLECTIONS as C, type DocStore } from "./store.js";
 
@@ -102,11 +105,12 @@ export const SCHEMAS = {
       employeeNo: z.string().regex(/^\d{1,10}$/, "employee number must be digits (it is the POS sign-in ID)"),
       name,
       roleId: id,
-      propertyRoles: z.record(z.string()).optional(),
+      propertyRoles: z.record(z.string(), z.string()).optional(),
       propertyIds: z.array(id),
       rvcIds: z.array(id).optional(),
-      pinHash: z.string().min(16, "PIN is not set"),
-      pinSalt: z.string().min(8),
+      pinSet: z.boolean().optional(),
+      pinHash: z.string().min(16).optional(),
+      pinSalt: z.string().min(8).optional(),
       cardId: z.string().optional(),
       phone: z.string().optional(),
       email: z.string().email().optional().or(z.literal("")),
@@ -117,7 +121,8 @@ export const SCHEMAS = {
       lockedAt: iso.optional(),
     })
     .passthrough()
-    .refine((s) => !s.hireDate || !s.terminationDate || s.hireDate <= s.terminationDate, { message: "termination date is before the hire date", path: ["terminationDate"] }),
+    .refine((s) => !s.hireDate || !s.terminationDate || s.hireDate <= s.terminationDate, { message: "termination date is before the hire date", path: ["terminationDate"] })
+    .refine((s) => Boolean(s.pinSet || s.pinHash), { message: "PIN is not set", path: ["pinSet"] }),
   [C.inventoryItems]: z.object({ ...entity, code, name, category: z.string(), majorGroup, stockUnit: z.enum(["g", "ml", "pcs"]), purchaseUnit: z.string().min(1), purchaseFactor: z.number().positive(), purchaseCost: money, vendorId: z.string().optional(), parLevel: z.number().nonnegative(), reorderQty: z.number().nonnegative(), isPrep: z.boolean(), trackStock: z.boolean(), active: z.boolean() }).passthrough(),
   [C.locations]: z.object({ ...entity, name, isDefault: z.boolean() }).passthrough(),
   [C.recipes]: z.object({ ...entity, kind: z.enum(["menu", "prep"]), yieldQty: z.number().positive(), lines: z.array(z.object({ inventoryItemId: id, qty: z.number().positive("ingredient quantity must be more than 0") }).passthrough()).min(1, "a recipe needs at least one ingredient"), method: z.string().optional() }).passthrough(),

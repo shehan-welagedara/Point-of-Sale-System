@@ -15,7 +15,6 @@ import {
   canAuthorize,
   newId,
   roleFor,
-  verifyPin,
 } from "@pos/core";
 import { Field, Modal } from "../../components/ui";
 import { money, pct } from "../../lib/format";
@@ -134,12 +133,48 @@ export function ModifierDialog({ item, groups, onAdd, onClose }: { item: MenuIte
  * role holds the privilege and "manager override", is the same level or more senior than the
  * requester's, and whose limit covers the amount can approve.
  */
+/**
+ * Approval by a more senior employee: they swipe their card, or tap their name and enter their PIN.
+ * The PIN is checked on the server and wrong PINs count towards that employee's lockout, so
+ * approval PINs can't be guessed at the till.
+ */
 export function ManagerAuth({ privilege, requester, propertyId, staff, roles, limit, onApproved, onClose }: { privilege: PrivilegeKey; requester: Staff; propertyId: string; staff: Staff[]; roles: Role[]; limit?: { kind: LimitKind; value: number; label: string }; onApproved: (by: Staff) => void; onClose: () => void }) {
+  const { staffAuth } = useApp();
   const [err, setErr] = useState("");
   const [card, setCard] = useState("");
+  const [who, setWho] = useState<Staff | null>(null);
+  const [busy, setBusy] = useState(false);
   const requesterRole = roleFor(requester, propertyId, roles);
   const check = (s: Staff) => canAuthorize({ authorizer: s, authorizerRole: roleFor(s, propertyId, roles), requester, requesterRole, privilege, ...(limit ? { limit } : {}) });
-  const eligible = staff.filter((s) => s.status === "active" && (!s.propertyIds?.length || s.propertyIds.includes(propertyId)) && check(s).ok);
+  const eligible = staff.filter((s) => s.status === "active" && !s.lockedAt && (!s.propertyIds?.length || s.propertyIds.includes(propertyId)) && check(s).ok);
+
+  async function swipe(text: string) {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    try {
+      const r = await staffAuth({ action: "identifyCard", card: text.trim() });
+      const s = r.ok ? staff.find((x) => x.id === r.staffId) : undefined;
+      if (!s) return setErr(r.ok ? "Unknown card" : r.reason);
+      const ok = check(s);
+      return ok.ok ? onApproved(s) : setErr(ok.reason ?? "Not authorised");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pin(p: string) {
+    if (!who || busy) return;
+    setBusy(true);
+    try {
+      const r = await staffAuth({ action: "verify", staffId: who.id, pin: p, purpose: "approve" });
+      if (r.ok) return onApproved(who);
+      setErr(r.reason);
+      if (r.locked) setWho(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <Modal title="Manager approval" onClose={onClose}>
       <div className="stack" style={{ alignItems: "center" }}>
@@ -151,26 +186,36 @@ export function ManagerAuth({ privilege, requester, propertyId, staff, roles, li
           style={{ maxWidth: 280, textAlign: "center" }}
           placeholder="Swipe manager card"
           autoComplete="off"
+          aria-label="Manager card"
           value={card}
           onChange={(e) => setCard(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
-            const s = staff.find((x) => x.cardId && x.cardId === card.trim());
+            const t = card;
             setCard("");
-            if (!s) return setErr("Unknown card");
-            const r = check(s);
-            return r.ok ? onApproved(s) : setErr(r.reason ?? "Not authorised");
+            void swipe(t);
           }}
         />
-        <PinEntry
-          error={err}
-          onSubmit={async (pin) => {
-            for (const s of eligible) {
-              if (await verifyPin(pin, s.pinHash, s.pinSalt)) return onApproved(s);
-            }
-            setErr(eligible.length ? "Not authorised" : "Nobody on duty can approve this");
-          }}
-        />
+        {who ? (
+          <>
+            <p className="small"><strong>{who.name}</strong>, enter your PIN</p>
+            <PinEntry error={err} onSubmit={(p) => void pin(p)} />
+            <button className="btn ghost sm" onClick={() => { setWho(null); setErr(""); }}>Someone else</button>
+          </>
+        ) : (
+          <>
+            <span className="small muted">or tap your name</span>
+            <div className="chips" style={{ justifyContent: "center" }} aria-label="Approvers">
+              {eligible.map((s) => (
+                <button key={s.id} className="chip" onClick={() => { setWho(s); setErr(""); }}>
+                  {s.name}{s.jobTitle ? <span className="tiny muted"> · {s.jobTitle}</span> : null}
+                </button>
+              ))}
+            </div>
+            {!eligible.length ? <span className="badge warn">Nobody on duty can approve this</span> : null}
+            {err ? <span className="badge bad">{err}</span> : null}
+          </>
+        )}
         <p className="tiny muted">The approval is recorded in the POS journal with both names.</p>
       </div>
     </Modal>

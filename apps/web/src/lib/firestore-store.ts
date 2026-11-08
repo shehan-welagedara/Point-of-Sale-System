@@ -17,6 +17,28 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import type { DocData, DocStore, Increments, Query, WriteOp } from "@pos/core";
+import { reportError } from "./errors";
+
+/**
+ * Firestore applies a write on the device at once and confirms it when the server has it. Waiting
+ * for that confirmation would freeze the POS whenever the internet drops, so writes wait at most a
+ * few seconds (none when offline); the device keeps them and sends them on reconnect. A write the
+ * server later refuses is reported and announced (event "pos-suite:write-failed").
+ */
+function settle(p: Promise<void>): Promise<void> {
+  const late = p.catch((e: unknown) => {
+    reportError(e);
+    window.dispatchEvent(new CustomEvent("pos-suite:write-failed", { detail: (e as Error)?.message ?? String(e) }));
+    throw e;
+  });
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    late.catch(() => undefined);
+    return Promise.resolve();
+  }
+  return Promise.race([late, new Promise<void>((resolve) => setTimeout(resolve, 4000))]).catch((e) => {
+    throw e;
+  });
+}
 
 function toIncrements(inc: Increments): DocumentData {
   const out: DocumentData = {};
@@ -70,19 +92,19 @@ export class FirestoreStore implements DocStore {
   }
 
   async set<T extends DocData>(col: string, data: T): Promise<void> {
-    await setDoc(this.ref(col, data.id), this.stamp(data) as DocumentData);
+    await settle(setDoc(this.ref(col, data.id), this.stamp(data) as DocumentData));
   }
 
   async merge(col: string, id: string, data: Record<string, unknown>): Promise<void> {
-    await setDoc(this.ref(col, id), this.stamp(data), { merge: true });
+    await settle(setDoc(this.ref(col, id), this.stamp(data), { merge: true }));
   }
 
   async increment(col: string, id: string, inc: Increments, base?: Record<string, unknown>): Promise<void> {
-    await setDoc(this.ref(col, id), { ...(base ?? {}), id, ...toIncrements(inc) }, { merge: true });
+    await settle(setDoc(this.ref(col, id), { ...(base ?? {}), id, ...toIncrements(inc) }, { merge: true }));
   }
 
   async remove(col: string, id: string): Promise<void> {
-    await deleteDoc(this.ref(col, id));
+    await settle(deleteDoc(this.ref(col, id)));
   }
 
   /**
@@ -102,7 +124,7 @@ export class FirestoreStore implements DocStore {
         else if (op.op === "increment") b.set(this.ref(op.col, op.id), { ...(op.base ?? {}), id: op.id, ...toIncrements(op.inc) }, { merge: true });
         else b.delete(this.ref(op.col, op.id));
       }
-      await b.commit();
+      await settle(b.commit());
     };
     for (let i = 0; i < chunks.length; i += 6) await Promise.all(chunks.slice(i, i + 6).map(commit));
   }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { addDays } from "@pos/core";
 import { type Asset, LEDGER as L, depreciationSchedule, netBookValue } from "@pos/ledger";
-import { tablesToWorkbook } from "@pos/excel";
+import { tablesToWorkbook } from "../../lib/excel";
 import { Drawer, Field, Modal, ModuleOff, PageHead, Stat } from "../../components/ui";
 import { amount, downloadBuffer, money, toCents, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";

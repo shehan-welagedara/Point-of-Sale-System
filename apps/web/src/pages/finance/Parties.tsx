@@ -11,7 +11,7 @@ import {
   LEDGER as L,
   aging,
 } from "@pos/ledger";
-import { tablesToWorkbook } from "@pos/excel";
+import { tablesToWorkbook } from "../../lib/excel";
 import { Field, Modal, ModuleOff, Seg, Stat } from "../../components/ui";
 import { amount, downloadBuffer, money, toCents, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";

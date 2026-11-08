@@ -6,6 +6,7 @@
  *  - auditTenant  Firestore trigger: records changes to the tenant record (licensed modules)
  *  - auditSealer  hourly: seals new audit events into the hash chain
  *  - licenceApi   callable: verifies a vendor licence key and applies the entitlement
+ *  - posAuth      callable: checks employee PINs and cards (hashes are unreadable to clients)
  */
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
@@ -13,7 +14,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWrittenWithAuthContext } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { type Member, type Tenant, DEMO_LICENCE_PUBLIC_KEY, LicenceError, TRIAL_DAYS, builtInEntitlements, clampModules, isOn, licenceStatus, newId, verifyLicence } from "@pos/core";
+import { type Member, type StaffAuthRequest, type Tenant, DEMO_LICENCE_PUBLIC_KEY, LicenceError, TRIAL_DAYS, builtInEntitlements, clampModules, isOn, licenceStatus, newId, runStaffAuth, verifyLicence } from "@pos/core";
 import { type Actor, type LedgerRequest, LedgerError, PermissionError, UNAUDITED, makeAuditEvent, runLedgerRequest, sealPending } from "@pos/ledger";
 import { AdminStore, adminRunner, collectionRef } from "./admin-store.js";
 
@@ -89,6 +90,25 @@ export const licenceApi = onCall<{ tenantId: string; action: "activate"; token: 
     if (e instanceof LicenceError) throw new HttpsError("failed-precondition", e.message);
     throw e;
   }
+});
+
+/**
+ * Employee PIN and card checks for sign-in and manager approvals. Only POS devices and managers
+ * may ask; wrong PINs count towards the employee's lockout, so PINs can't be guessed.
+ */
+export const posAuth = onCall<{ tenantId: string } & StaffAuthRequest>({ maxInstances: 10 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "sign in first");
+  const { tenantId, ...req } = request.data;
+  if (!tenantId || !req.action) throw new HttpsError("invalid-argument", "tenantId and action are required");
+  const { actor } = await actorFor(tenantId, request.auth.uid, String(request.auth.token.email ?? ""));
+  const allowed = req.action === "migrate" ? ["owner", "admin"] : ["owner", "admin", "manager", "terminal"];
+  if (!allowed.includes(actor.role)) throw new HttpsError("permission-denied", "this login can't check employee PINs");
+  if (req.action === "verify" && (typeof req.staffId !== "string" || typeof req.pin !== "string" || !/^\d{4,8}$/.test(req.pin) || !["signIn", "approve"].includes(req.purpose))) {
+    throw new HttpsError("invalid-argument", "staffId, a 4–8 digit PIN and the purpose are required");
+  }
+  if (req.action === "identifyCard" && (typeof req.card !== "string" || req.card.length > 64)) throw new HttpsError("invalid-argument", "card is required");
+  if (!["verify", "identifyCard", "migrate"].includes(req.action)) throw new HttpsError("invalid-argument", "unknown action");
+  return runStaffAuth(new AdminStore(db, tenantId), req as StaffAuthRequest, new Date());
 });
 
 function actorType(authType: string): "user" | "service" | "system" | "unknown" {

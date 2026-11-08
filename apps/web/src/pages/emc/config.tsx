@@ -6,7 +6,6 @@ import {
   type Printer,
   type TenderMedia,
   COLLECTIONS as C,
-  hashPin,
   newId,
 } from "@pos/core";
 import { buildTestPage, widthForPaper } from "@pos/printing";

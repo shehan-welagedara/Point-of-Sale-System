@@ -9,7 +9,7 @@ import { collection, connectFirestoreEmulator, doc, getDoc, getDocs, initializeF
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { buildEntitlements, signLicence } from "@pos/core";
+import { buildEntitlements, hashPin, signLicence } from "@pos/core";
 import { buildFiscalYear, defaultChartOfAccounts, defaultCostCenters, defaultLedgerSettings } from "@pos/ledger";
 
 const PROJECT = "demo-pos-suite";
@@ -57,6 +57,8 @@ beforeAll(async () => {
   accountant = (await createUserWithEmailAndPassword(auth, `acc-${T}@demo.lk`, "secret123")).user.uid;
   owner = (await createUserWithEmailAndPassword(auth, `own-${T}@demo.lk`, "secret123")).user.uid;
   const b = writeBatch(db);
+  // The first business in the project claims the deployment (firestore.rules).
+  if (!(await getDoc(doc(db, "deployment", "config"))).exists()) b.set(doc(db, "deployment", "config"), { ownerUid: owner, openSignup: false });
   b.set(doc(db, "tenants", T), { id: T, name: "E2E", ownerUid: owner, modules: { pos: true, accounting: true }, plan: "demo", status: "active" });
   b.set(doc(db, "tenants", T, "members", owner), { id: owner, uid: owner, role: "owner", tenantId: T, name: "Owner", email: "o" });
   await b.commit();
@@ -168,5 +170,44 @@ describe("licence activation on Cloud Functions", () => {
     expect(t.modules.accounting).toBe(true);
     // The owner still can't raise the entitlement directly.
     await expect(setDoc(doc(db, "tenants", T), { plan: "enterprise" }, { merge: true })).rejects.toThrow(/PERMISSION_DENIED/);
+  });
+});
+
+describe("employee PIN checks on the server (posAuth)", () => {
+  const posAuth = httpsCallable(fns, "posAuth");
+  const auth2 = (data: Record<string, unknown>) => posAuth({ tenantId: T, ...data }).then((r) => r.data as { ok: boolean; reason?: string; triesLeft?: number; locked?: boolean; staffId?: string; migrated?: number });
+  /** Writes a document as the emulator's admin (bypassing the rules), e.g. an old-style staff record. */
+  const adminSet = (path: string, data: Record<string, string | number | boolean | string[]>) =>
+    admin(path, { method: "PATCH", body: JSON.stringify({ fields: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, Array.isArray(v) ? { arrayValue: { values: v.map((x) => ({ stringValue: x })) } } : typeof v === "number" ? { integerValue: String(v) } : typeof v === "boolean" ? { booleanValue: v } : { stringValue: v }])) }) });
+
+  it("checks PINs with lockout, hides the hashes and moves old ones", async () => {
+    await as(`own-${T}@demo.lk`);
+    const { hash, salt } = await hashPin("4826");
+    await setDoc(doc(db, "tenants", T, "staff", "2001"), { id: "2001", employeeNo: "2001", name: "Supun", roleId: "cashier", propertyIds: [], status: "active", pinSet: true, hasCard: true, ...stamp(owner) });
+    await setDoc(doc(db, "tenants", T, "staffSecrets", "2001"), { id: "2001", pinHash: hash, pinSalt: salt, cardId: "CARD-2001-XYZ" });
+    // Nobody can read the secret back, not even the owner.
+    await expect(getDoc(doc(db, "tenants", T, "staffSecrets", "2001"))).rejects.toMatchObject({ code: "permission-denied" });
+
+    expect(await auth2({ action: "verify", staffId: "2001", pin: "1111", purpose: "signIn" })).toMatchObject({ ok: false, triesLeft: 4 });
+    expect(await auth2({ action: "verify", staffId: "2001", pin: "4826", purpose: "signIn" })).toMatchObject({ ok: true, staffId: "2001" });
+    expect((await getDoc(doc(db, "tenants", T, "staff", "2001"))).data()?.failedSignIns).toBe(0);
+    expect(await auth2({ action: "identifyCard", card: "CARD-2001-XYZ" })).toMatchObject({ ok: true, staffId: "2001" });
+    expect(await auth2({ action: "identifyCard", card: "CARD-NOPE" })).toMatchObject({ ok: false });
+
+    // Five wrong PINs lock the employee; the right PIN then no longer works.
+    for (let i = 0; i < 5; i++) await auth2({ action: "verify", staffId: "2001", pin: "9999", purpose: "approve" });
+    expect(await auth2({ action: "verify", staffId: "2001", pin: "4826", purpose: "signIn" })).toMatchObject({ ok: false, locked: true });
+
+    // An old-style record with the hash on the staff document is moved on first use.
+    const old = await hashPin("7319");
+    await adminSet(`tenants/${T}/staff/2002`, { id: "2002", employeeNo: "2002", name: "Old", roleId: "server", status: "active", pinHash: old.hash, pinSalt: old.salt });
+    expect(await auth2({ action: "verify", staffId: "2002", pin: "7319", purpose: "signIn" })).toMatchObject({ ok: true });
+    const moved = (await getDoc(doc(db, "tenants", T, "staff", "2002"))).data()!;
+    expect(moved.pinHash).toBeUndefined();
+    expect(moved.pinSet).toBe(true);
+
+    // Logins without POS rights can't check PINs.
+    await as(`acc-${T}@demo.lk`);
+    await expect(auth2({ action: "verify", staffId: "2002", pin: "7319", purpose: "signIn" })).rejects.toMatchObject({ code: "functions/permission-denied" });
   });
 });

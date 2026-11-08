@@ -285,7 +285,9 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
   DEFAULT_ROLES.forEach((r) => put(C.roles, r));
   for (const [employeeNo, name, roleId, pin, jobTitle, rvcIds, cardId] of STAFF) {
     const { hash, salt } = await hashPin(pin);
-    put(C.staff, { id: employeeNo, employeeNo, name, roleId, jobTitle, propertyIds: [SAMPLE_PROPERTY_ID], ...(rvcIds.length ? { rvcIds } : {}), ...(cardId ? { cardId } : {}), pinHash: hash, pinSalt: salt, status: "active", hireDate: "2026-09-01", pinChangedAt: now });
+    put(C.staff, { id: employeeNo, employeeNo, name, roleId, jobTitle, propertyIds: [SAMPLE_PROPERTY_ID], ...(rvcIds.length ? { rvcIds } : {}), ...(cardId ? { hasCard: true } : {}), pinSet: true, status: "active", hireDate: "2026-09-01", pinChangedAt: now });
+    // PIN hashes and card numbers live where clients can't read them (see @pos/core staff-auth).
+    put(C.staffSecrets, { id: employeeNo, pinHash: hash, pinSalt: salt, pinChangedAt: now, ...(cardId ? { cardId } : {}) });
   }
 
   // CRM & finance masters

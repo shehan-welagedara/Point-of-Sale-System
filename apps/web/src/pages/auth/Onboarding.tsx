@@ -21,7 +21,8 @@ export function Onboarding() {
       await f();
       if (tenant) navigate("/emc/home");
     } catch (e) {
-      toast(`Could not finish: ${(e as Error).message}`, true);
+      const msg = (e as Error).message;
+      toast(/permission|insufficient/i.test(msg) ? "Only this system's owner can add businesses here. Ask them to invite you (Back-office logins), then use “Accept invitation”." : `Could not finish: ${msg}`, true);
     } finally {
       setBusy(null);
     }

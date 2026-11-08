@@ -15,7 +15,7 @@ import {
   COLLECTIONS as C,
   MEMBER_ROLE_INFO,
 } from "@pos/core";
-import { type ImportResult, buildFeederWorkbook, importOps, parseFeederWorkbook } from "@pos/excel";
+import { type ImportResult, buildFeederWorkbook, importOps, parseFeederWorkbook } from "../../lib/excel";
 import type { ReceiptDoc } from "@pos/printing";
 import { doc, setDoc } from "firebase/firestore";
 import { firebase } from "../../lib/firebase";
@@ -142,7 +142,7 @@ export function DataPage() {
     if (!result) return;
     setBusy(true);
     try {
-      await store.batch(importOps(result.data));
+      await store.batch(await importOps(result.data));
       toast("Import complete");
       setResult(null);
     } catch (e) {

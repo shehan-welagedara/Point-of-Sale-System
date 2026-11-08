@@ -465,9 +465,14 @@ export interface Staff extends Entity {
   rvcIds?: string[];
   jobTitle?: string;
   department?: string;
-  pinHash: string;
-  pinSalt: string;
-  /** Magnetic/RFID card number for swipe sign-in and authorisations. */
+  /** A PIN is set (the hash itself is in staffSecrets, which clients can't read). */
+  pinSet?: boolean;
+  /** A card is registered (the number is in staffSecrets). */
+  hasCard?: boolean;
+  /** Old-style records only: moved to staffSecrets on first use. */
+  pinHash?: string;
+  pinSalt?: string;
+  /** Old-style records only (magnetic/RFID card number); moved to staffSecrets. */
   cardId?: string;
   phone?: string;
   email?: string;

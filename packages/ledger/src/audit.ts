@@ -47,7 +47,10 @@ export interface AuditSeal {
 }
 
 /** Collections whose changes are not audited one by one (append-only ledgers and counters). */
-export const UNAUDITED = new Set(["ledger", "accountBalances", "ledgerHead", "numberSeries", "sequences", "dailyStats", "printJobs", "auditEvents", "auditSeals", "posJournal", "menuImages"]);
+export const UNAUDITED = new Set(["ledger", "accountBalances", "ledgerHead", "numberSeries", "sequences", "dailyStats", "printJobs", "auditEvents", "auditSeals", "posJournal", "menuImages", "staffSecrets", "deviceStatus", "clientErrors"]);
+
+/** Never copied into the audit trail (PIN hashes, card numbers): recorded as changed, value hidden. */
+const SECRET = new Set(["pinHash", "pinSalt", "cardId"]);
 
 /** Fields that only describe bookkeeping noise and are left out of diffs. */
 const NOISE = new Set(["updatedAt", "updatedBy"]);
@@ -76,7 +79,7 @@ export async function makeAuditEvent(args: { id: string; at: string; actorType: 
   if (d.action === "update" && d.changedFields.length === 0) return null;
   // Large blobs (logos) are recorded by size, not content.
   const trim = (o: Record<string, unknown>): Record<string, unknown> =>
-    Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === "string" && v.length > 2000 ? `[${v.length} characters]` : v]));
+    Object.fromEntries(Object.entries(o).map(([k, v]) => [k, SECRET.has(k) && v ? "[hidden]" : typeof v === "string" && v.length > 2000 ? `[${v.length} characters]` : v]));
   const base = {
     id: args.id,
     at: args.at,

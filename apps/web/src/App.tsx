@@ -7,6 +7,7 @@ import { Launchpad, Shell } from "./pages/emc/Shell";
 import { LicencePage } from "./pages/emc/Licence";
 import { MobileStylePage, PosOptionsPage, PosThemesPage, SignInPolicyPage } from "./pages/emc/Appearance";
 import { BillDesignerPage } from "./pages/emc/BillDesigner";
+import { SystemStatusPage } from "./pages/emc/SystemStatus";
 import { EmployeesPage, RolesPage, TimeCardsPage } from "./pages/emc/People";
 import { Dashboard, MenuEngineering, Reports } from "./pages/emc/Reports";
 import {
@@ -95,6 +96,7 @@ export function App() {
         <Route path="pos/bill" element={<BillDesignerPage />} />
         <Route path="pos/options" element={<PosOptionsPage />} />
         <Route path="setup/licence" element={<LicencePage />} />
+        <Route path="setup/status" element={<SystemStatusPage />} />
         <Route path="people/roles" element={<RolesPage />} />
         <Route path="people/logins" element={<LoginsPage />} />
         <Route path="setup/business" element={<BusinessTaxPage />} />

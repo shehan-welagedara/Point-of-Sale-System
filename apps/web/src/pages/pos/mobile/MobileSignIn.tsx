@@ -40,7 +40,7 @@ export interface SignInView {
   who: Staff | null;
   err: string;
   clockFor: { s: Staff } | null;
-  identify: (text: string) => Staff | null;
+  identify: (text: string) => Promise<Staff | null>;
   pick: (s: Staff | null) => void;
   checkPin: (pin: string, person?: Staff) => Promise<void>;
   clockIn: () => Promise<void>;
@@ -62,7 +62,7 @@ export function MobileSignIn({ style, ws, rvcs, view, onChangeDevice }: { style:
     if (busy) return;
     setBusy(true);
     try {
-      const person = view.who ?? view.identify(idText);
+      const person = view.who ?? (await view.identify(idText));
       if (person && pin) await view.checkPin(pin, person);
       setPin("");
     } finally {
