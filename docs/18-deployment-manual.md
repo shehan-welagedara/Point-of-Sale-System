@@ -182,17 +182,10 @@ pnpm exec firebase use --add
 
 Choose the project ID from B.2 and type an alias such as `lagoon`. Later, switch between clients with `pnpm exec firebase use lagoon`.
 
-2. **Web app settings.** Copy `apps/web/.env.example` to `apps/web/.env.local` and fill it in:
+2. **Web app settings: nothing per client.** The same build serves every client: on Firebase Hosting the app reads the client's project settings at start-up (`/__/firebase/init.json`). Do **not** put a client's `VITE_FIREBASE_…` values in `apps/web/.env.local` when you build a release; the release tool refuses a build that contains one. `.env.local` is only for development and the emulators. Set your licence public key once, for every build:
 
 ```ini
-VITE_FIREBASE_API_KEY=…            # from D.3
-VITE_FIREBASE_AUTH_DOMAIN=…
-VITE_FIREBASE_PROJECT_ID=…
-VITE_FIREBASE_STORAGE_BUCKET=…
-VITE_FIREBASE_MESSAGING_SENDER_ID=…
-VITE_FIREBASE_APP_ID=…
-VITE_USE_EMULATORS=false
-VITE_FUNCTIONS_REGION=asia-south1  # same as the Firestore location
+# apps/web/.env.production   (no Firebase values here)
 VITE_LICENCE_PUBLIC_KEY=MFkw…      # your public key from E.3
 ```
 
@@ -203,21 +196,34 @@ LOCATION=asia-south1               # must equal the Firestore location
 LICENCE_PUBLIC_KEY=MFkw…           # same public key
 ```
 
-Keep one copy of these two files per client, for example `apps/web/.env.lagoon`. Copy the right one into place before each deploy.
+The release tool writes a per-client file (`.env.<project id>`) with the client's region, so one `.env` serves all clients.
+
+4. **Register the client for updates.** Add the client to `release/clients.json` (id, name, project id, region, wave, maintenance window). Then, with the client's owner, run the access script once. It lets your release robot deploy updates, creates the backup bucket (90-day retention) and switches on Firestore delete protection ([20](20-release-and-updates.md)):
+
+```bash
+bash tools/release/grant-access.sh PROJECT-ID pos-release@YOUR-VENDOR-PROJECT.iam.gserviceaccount.com asia-south1
+```
 
 - [ ] `firebase use` points at the client's project
-- [ ] `apps/web/.env.local` filled in
+- [ ] `apps/web/.env.local` has **no** client Firebase values
 - [ ] `apps/functions/.env` filled in
+- [ ] Client in `release/clients.json`; access script run; backup bucket set
 
 ---
 
 ## G. Deploy
 
-1. **Build and deploy** the web app, security rules, database indexes and the Cloud Functions:
+1. **Build and deploy** the web app, security rules, database indexes and the Cloud Functions. The release tool backs up, runs any data migrations, deploys in the safe order and checks the live version:
 
 ```bash
-pnpm firebase:deploy
+pnpm build
 ```
+
+```bash
+pnpm release:deploy --target CLIENT-ID
+```
+
+(`pnpm firebase:deploy` still works for a quick deploy to the project selected with `firebase use`, without backup or migrations.)
 
 - The **first** deploy switches on several Google services (Cloud Functions, Cloud Build, Artifact Registry, Eventarc, Pub/Sub, Cloud Scheduler) and can take 5–10 minutes.
 - If it stops with a permissions or "service agent" error, wait 5 minutes and run it again. The new services need a few minutes to be ready.
@@ -233,12 +239,12 @@ pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1
    - **Hosting** shows a release.
    - **Firestore → Rules** shows our rules.
    - **Firestore → Indexes** lists the indexes (they may show "Building" for a few minutes).
-   - **Functions** lists `ledgerApi`, `licenceApi`, `auditTrail`, `auditTenant` and `auditSealer`.
+   - **Functions** lists `ledgerApi`, `licenceApi`, `posAuth`, `auditTrail`, `auditTenant` and `auditSealer`.
    - **Firestore → Time-to-live** has a policy on `printJobs`.
 
 The system is now live at **https://PROJECT-ID.web.app** (also `.firebaseapp.com`).
 
-- [ ] Deploy succeeded; five functions listed
+- [ ] Deploy succeeded; six functions listed; `https://PROJECT-ID.web.app/version.json` shows the release
 - [ ] Clean-up policy set
 - [ ] The site opens on https://PROJECT-ID.web.app
 
@@ -246,7 +252,7 @@ The system is now live at **https://PROJECT-ID.web.app** (also `.firebaseapp.com
 
 ## H. First sign-in and the client's business
 
-1. Open the site → **Create account** with the client's email and a strong password. This person becomes the **owner**.
+1. Open the site → **Create account** with the client's email and a strong password. This person becomes the **owner**, and creating the first business **claims the deployment**: from then on only they, owners and administrators of a business, and the people listed in `deployment/config.creators` can create businesses here. Strangers who sign up can't. (On your own demo project, set `openSignup: true` in that document in the Firestore console.)
 2. **Set up a business:**
    1. Under **New client business**, type the business name.
    2. Choose the **modules** the client bought.
@@ -365,7 +371,7 @@ In **People & Security**:
    - Revenue centres; card number if they use swipe cards.
    - A **PIN**. Let each person choose their own PIN at the counter; easy PINs are refused.
 4. **Back-office logins.** People who use the back office (manager, accountant, storekeeper) and **one login per POS device**:
-   1. Open **Back-office logins → Invite**. Enter the email and role. Devices use the **POS terminal** role, for example `pos-counter@lagooncafe.lk`.
+   1. Open **Back-office logins → Invite**. Enter the email and role. Devices use the **POS terminal** role, for example `pos-counter@lagooncafe.lk`. The invited person signs up with that address and must **verify it** (link in the email) before **Accept invitation** works: this stops anyone else claiming the invitation.
    2. The invited person opens the site → **Create account** with that email → **I was invited to a business**.
 
    Devices sign in once and stay signed in. Staff then sign in on top with their number and PIN.
@@ -483,27 +489,12 @@ pnpm agent
 
 ## S. Updating the system
 
-When a new version is released:
-1. Read the release notes.
-2. Choose a quiet time, after closing.
+Updates go through the release process in [20 — Releases and updates](20-release-and-updates.md): one tested build, deployed to your staging project first, then to pilot clients, then to everyone, after closing time, with a backup before each client.
 
-```bash
-git pull
-```
+- **Automatic (recommended):** tag the release (`pnpm release:version 1.1.0`, commit, `git tag v1.1.0`, push). GitHub builds and tests it, deploys to staging, and waits for your approval before each wave of clients.
+- **By hand, one client:** `pnpm build`, then `pnpm release:deploy --target CLIENT-ID` (add `--dry-run` to see the steps first).
 
-```bash
-pnpm install
-```
-
-```bash
-pnpm exec firebase use lagoon
-```
-
-```bash
-pnpm firebase:deploy
-```
-
-3. Reload each device (pull down, or Ctrl+F5) and check one sale prints. On the Print Agent PC, run `git pull` and `pnpm install`, then restart the agent if the release notes say so.
+Devices pick up the new version by themselves: screens show **Version x is available**, and devices where nobody is signed in reload within a minute. **Administration → System status** shows which devices still run the old version. On the Print Agent PC, run `git pull` and `pnpm install`, then restart the agent if the release notes say so.
 
 ---
 
@@ -547,4 +538,5 @@ pnpm firebase:deploy
 - [ ] Staff trained and signed off (training manuals); manager can run End of Day; dry run clean
 - [ ] User manual and training manuals handed over (PDF with the client's name)
 - [ ] Monthly routine (section R) explained; first export of the audit package done
+- [ ] Security checklist done ([21](21-security-review.md#go-live-security-checklist)): 2-Step Verification for owners, backups and delete protection, deployment claimed by the owner
 - [ ] Support contacts given to the client

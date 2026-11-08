@@ -1,0 +1,117 @@
+/**
+ * Deploys the built release to staging or to client projects, one client at a time, safely:
+ *
+ *   node tools/release/deploy.mjs --target staging
+ *   node tools/release/deploy.mjs --target wave:1            (pilot clients)
+ *   node tools/release/deploy.mjs --target kandy-myst         (one client; comma-separate several)
+ *   options: --dry-run  --skip-backup  --only hosting|functions|rules|indexes (comma list)
+ *
+ * For each project: backup (Firestore export) → indexes → data migrations → rules and functions →
+ * hosting → check that /version.json reports the new version. Stops at the first failure.
+ * Needs Google credentials with deploy rights on each project (CI: workload identity; laptop:
+ * `gcloud auth application-default login` and `firebase login`).
+ */
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const argv = process.argv.slice(2);
+const flag = (n) => argv.includes(`--${n}`);
+const opt = (n) => {
+  const i = argv.indexOf(`--${n}`);
+  return i >= 0 ? argv[i + 1] : undefined;
+};
+const dryRun = flag("dry-run");
+const parts = new Set((opt("only") ?? "indexes,rules,functions,hosting").split(","));
+const target = opt("target");
+if (!target) fail("--target is required (staging, wave:N or client ids)");
+
+const registry = JSON.parse(readFileSync(resolve(root, opt("registry") ?? "release/clients.json"), "utf8"));
+const version = JSON.parse(readFileSync(join(root, "apps/web/package.json"), "utf8")).version;
+
+function fail(msg) {
+  console.error(`\n✗ ${msg}`);
+  process.exit(1);
+}
+
+function targets() {
+  if (target === "staging") return [registry.staging];
+  const enabled = registry.clients.filter((c) => c.enabled !== false);
+  if (target.startsWith("wave:")) {
+    const w = Number(target.slice(5));
+    return enabled.filter((c) => c.wave === w);
+  }
+  return target.split(",").map((id) => registry.clients.find((c) => c.id === id) ?? fail(`unknown client "${id}" (release/clients.json)`));
+}
+
+function run(cmd, args, opts = {}) {
+  console.log(`  $ ${cmd} ${args.join(" ")}`);
+  if (dryRun) return;
+  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", env: process.env, ...opts });
+  if (r.status !== 0) fail(`${cmd} ${args[0]} failed (exit ${r.status})`);
+}
+
+const firebase = (project, only) => run("pnpm", ["exec", "firebase", "deploy", "--only", only, "--project", project, "--non-interactive"]);
+
+function preflight() {
+  const live = join(root, "apps/web/dist/version.json");
+  if (!existsSync(live)) fail("no web build: run `pnpm build` first (CI builds once and deploys that build everywhere)");
+  const built = JSON.parse(readFileSync(live, "utf8"));
+  if (built.version !== version) fail(`the build is version ${built.version} but apps/web/package.json says ${version}: rebuild`);
+  // A build made with apps/web/.env.local would point every client at that one project.
+  const assets = join(root, "apps/web/dist/assets");
+  for (const f of readdirSync(assets).filter((n) => n.endsWith(".js"))) {
+    if (/AIza[0-9A-Za-z_-]{35}/.test(readFileSync(join(assets, f), "utf8"))) fail(`the build contains a Firebase API key (${f}): build without apps/web/.env.local so each client uses its own project`);
+  }
+  if (!process.env.LICENCE_PUBLIC_KEY) console.warn("! LICENCE_PUBLIC_KEY is not set: functions keep the value in apps/functions/.env (the public demo key if empty).");
+  return built;
+}
+
+async function verify(projectId) {
+  const url = `https://${projectId}.web.app/version.json`;
+  for (let i = 0; i < 6; i++) {
+    try {
+      const v = await (await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" })).json();
+      if (v.version === version) return console.log(`  ✓ ${url} reports ${v.version}`);
+    } catch {
+      /* not live yet */
+    }
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+  fail(`${url} does not report ${version}`);
+}
+
+const list = targets();
+if (!list.length) fail(`no enabled projects for ${target}`);
+const built = preflight();
+console.log(`Release ${version} (${built.commit}) → ${list.map((c) => c.id).join(", ")}${dryRun ? " [dry run]" : ""}`);
+const summary = [`### Release ${version} → ${target}`, "", "| Client | Project | Result |", "|---|---|---|"];
+
+for (const c of list) {
+  if (!c.projectId || c.projectId.startsWith("REPLACE")) fail(`${c.id}: set its projectId in release/clients.json`);
+  console.log(`\n▶ ${c.name} (${c.projectId})`);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  if (!flag("skip-backup")) {
+    if (c.backupBucket && !c.backupBucket.includes("REPLACE")) run("gcloud", ["firestore", "export", `${c.backupBucket}/pre-release/${version}-${stamp}`, "--project", c.projectId, "--quiet"]);
+    else console.warn("  ! no backupBucket: skipping the pre-release backup (set one before go-live)");
+  }
+  if (parts.has("indexes")) firebase(c.projectId, "firestore:indexes");
+  run("node", ["tools/release/migrate.mjs", "--project", c.projectId, ...(dryRun ? ["--dry-run"] : [])]);
+  if (parts.has("functions")) {
+    // Per-project function settings (Firebase reads .env.<projectId> next to the functions code).
+    const env = [`LOCATION=${c.region ?? "asia-south1"}`, ...(process.env.LICENCE_PUBLIC_KEY ? [`LICENCE_PUBLIC_KEY=${process.env.LICENCE_PUBLIC_KEY}`] : [])].join("\n");
+    if (!dryRun) writeFileSync(join(root, `apps/functions/dist/.env.${c.projectId}`), `${env}\n`);
+  }
+  const rulesAndFunctions = ["rules", "functions"].filter((p) => parts.has(p)).map((p) => (p === "rules" ? "firestore:rules" : "functions"));
+  if (rulesAndFunctions.length) firebase(c.projectId, rulesAndFunctions.join(","));
+  if (parts.has("hosting")) {
+    firebase(c.projectId, "hosting");
+    if (!dryRun) await verify(c.projectId);
+  }
+  summary.push(`| ${c.name} | ${c.projectId} | ${dryRun ? "dry run" : "deployed"} |`);
+}
+
+if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join("\n")}\n`);
+console.log(`\n✓ ${version} ${dryRun ? "would be" : "is"} live on ${list.length} project(s).`);

@@ -23,4 +23,5 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:rules
+      - run: pnpm test:migrations
       - run: pnpm build
