@@ -389,9 +389,10 @@ In **People & Security**:
    - approval limits (owner only);
    - cost centres;
    - exchange rates.
-2. **Opening balances:** one journal on the go-live date, using bank, cash, assets, loans and capital from the accountant.
-3. **Fixed assets:** register equipment, furniture and IT with cost, date and life.
-4. Invite the **accountant** (role Accountant) and, if wanted, the **external auditor** (role Auditor, read-only).
+2. **Opening balances, and records since the start date:** with the **accounting workbook** (Finance → Excel import): opening balances, opening stock, suppliers and customers with what they owe, supplier bills and expenses since the start date, daily sales from manual bills, and fixed assets with depreciation to date. Show the client the example first (**Download the example (filled in)**, or `templates/accounting-workbook-sample.xlsx`). Everything is checked before it is saved, and importing again skips what is already in.
+3. **Paper bills:** photograph them into **Finance → Bills & receipts** and attach them to the imported bills (**From inbox**), or record each from there.
+4. **Administration → Setup checklist** shows what is still missing. The [configuration guide](manual/configuration-guide.md) explains each setting for the client's own staff.
+5. Invite the **accountant** (role Accountant) and, if wanted, the **external auditor** (role Auditor, read-only).
 
 - [ ] Finance settings and opening balances entered by the accountant
 

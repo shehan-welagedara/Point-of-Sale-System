@@ -548,8 +548,8 @@ Each recipe lists ingredients (stock items or prep recipes) with quantities and 
 | **Stock on hand** | Quantities and FIFO value per item and location; items below their reorder level are highlighted. |
 | **Stock items** | Ingredients and goods: code, name, category, major group, stock unit (g, ml, pcs), purchase unit and stock units per purchase unit, cost per purchase unit, main vendor, par level and reorder quantity, whether it is a prep item, and whether stock is tracked. |
 | **Purchase orders** | Order from vendors: items and quantities in purchase units, the delivery store and date. **Suggest from par levels** drafts orders for everything below par. Set the status to approved, then **Receive** when the delivery arrives (this drafts a goods receipt). |
-| **Goods receipts (GRN)** | Record deliveries: vendor, supplier invoice number, items and costs, input VAT. **Post to stock** adds FIFO stock lots at the received cost and updates the latest purchase price. The supplier's bill is then entered in Finance → Payables and matched against the order and the receipt. |
-| **Stock counts** | **Start a count**, enter what is on the shelves, **Post count**. Losses are costed at FIFO, gains at standard cost. |
+| **Goods receipts (GRN)** | Record deliveries: vendor, supplier invoice number, items and costs, input VAT, and a photo of the delivery note or bill (**Add photo or scan**). **Post to stock** adds FIFO stock lots at the received cost and updates the latest purchase price. The supplier's bill is then entered in Finance → Payables and matched against the order and the receipt. |
+| **Stock counts** | Choose the **type of count**, **Start a count**, enter what is on the shelves, **Post count**. *Regular count:* differences are losses or errors (stock count differences). *Kitchen usage:* for businesses without POS sales, what is missing since the last count is what the kitchen used (cost of sales). *Opening stock:* the first count when you start. Losses are costed at FIFO, gains at standard cost. With accounting on, counts, waste and receipts post to the books at once. |
 | **Waste & transfers** | Record spoilage with a reason, move stock between stores, or cook a batch of a prep item (production). |
 | **Movements** | Every change to stock with its FIFO cost: the audit trail behind stock value and cost of sales. |
 | **Vendors** | Supplier details, TIN, payment terms. |
@@ -612,8 +612,11 @@ The Finance module is a full double-entry general ledger. POS sales, stock and p
 
 | Page | Use |
 |---|---|
-| **Overview** | Key figures, recent postings, and a **Post** button for any POS day not yet posted to the ledger. |
+| **Overview** | Key figures, work waiting, and **Days to post**: any POS day, or day of stock receipts, counts and waste, not yet in the ledger, with a **Post** button; **Post day** posts any date you choose. |
 | **Approvals** | Journals above the approval threshold wait here for a second person (four-eyes control). |
+| **Record an expense** | One form for a supplier bill or a cash purchase (vegetables, gas, rent, repairs…) with a photo of the bill: supplier, what it was for, total, VAT, and how it was paid (cash, petty cash, bank, or not yet). Posted at once; paid bills get their payment too. |
+| **Daily sales (manual bills)** | A day of handwritten bills as one entry: food, beverage and other sales, service charge, taxes and discounts against the cash, card and bank money received. They must match. |
+| **Bills & receipts** | Photograph or scan paper bills first (many at once from a phone), add date, supplier and amount, then **Record as expense** for each. Every file keeps a fingerprint so it can't be changed afterwards. |
 | **Journals** | Manual journal entries. Posted entries cannot be edited or deleted: **reverse** them with a reason. Filter by status: draft, awaiting approval, posted, cancelled. |
 | **Payables** | Supplier bills (from GRNs or entered), payments, ageing. |
 | **Receivables** | Credit customers' invoices, receipts, ageing. |
@@ -623,8 +626,18 @@ The Finance module is a full double-entry general ledger. POS sales, stock and p
 | **Financial statements** | Trial balance, financial position (balance sheet), profit or loss, cash flows, general ledger, VAT & taxes. |
 | **Budgets** | Budgets per account and period, compared with actuals. |
 | **Period close** | Close a month so nothing more can post to it; reopen if a correction is unavoidable (recorded); open the next fiscal year. |
+| **Suppliers, Customers** | Suppliers with payment terms, and credit customers, kept by the accountant (also without the Purchasing or Customers modules). |
 | **Chart of accounts** | Accounts, types and codes (Sri Lankan restaurant chart included). |
 | **Finance settings** | Which accounts POS sales, VAT, service charge, discounts, stock and payables post to; approval thresholds (owner or administrator only). |
+| **Excel import** | Bring the books in from the accounting workbook: opening balances, opening stock, suppliers and customers with what they owe, supplier bills (paid or not), expenses, daily sales and fixed assets. **Download the example (filled in)** shows what goes where. Every row is checked and the totals shown before anything is saved; importing the same file again skips what is already in. |
+
+![Bills & receipts](img/fin-bills.jpg)
+
+**Photos and scans of bills.** Every expense, supplier bill, payment, journal and goods receipt has **Add photo or scan**, and **From inbox** to attach one already in Bills & receipts. Open a file to see it full size, check its fingerprint and download it. Accountants, storekeepers, managers and administrators can file bills; only an owner or administrator can remove a file, and only while it is still unfiled.
+
+![Excel import check](img/fin-import-check.jpg)
+
+The configuration guide explains the accounts, approval limits, opening balances and the accounting workbook step by step.
 
 ![Journals](img/fin-journals.jpg)
 
@@ -693,6 +706,10 @@ Invite people by email and give them a back-office role (see [section 2](#2-sign
 ---
 
 ## 14. Administration
+
+**Setup checklist** shows what the business still needs, in order, for the modules it uses (business details, standard set-up, fiscal year, suppliers, opening balances, stock items, opening stock, menu, employees, logins, licence), each with a button to do it.
+
+![Setup checklist](img/setup-checklist.jpg)
 
 ### 14.1 Business & tax
 

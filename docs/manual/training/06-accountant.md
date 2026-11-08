@@ -5,6 +5,8 @@
 ## What you will be able to do
 
 - Understand what posts automatically from the POS and stores
+- Record everyday expenses and manual sales, with photos of the paper bills
+- Bring existing books in with the accounting workbook
 - Enter journals, supplier invoices and payments, customer invoices and receipts
 - Reconcile the bank, run depreciation, and close a month
 - Prepare the VAT return figures and the financial statements
@@ -19,9 +21,31 @@
 | POS sales | Sales by major group, service charge, VAT, SSCL, discounts, rounding, and each tender to its account | End of Day (or **Post** next to the day on Finance → Overview) |
 | Stock usage | Cost of sales by major group against inventory (FIFO) | End of Day |
 | Goods receipts | Inventory against *stock received not billed* | When the storekeeper posts the receipt |
-| Waste, counts | Wastage and stock adjustment | When posted |
+| Waste, counts | Wastage and stock adjustment; *kitchen usage* counts to cost of sales; *opening stock* counts to opening balances | When posted |
 
-The accounts used are set in **Finance → Finance settings**. End of Day can run again: it posts only the difference.
+The accounts used are set in **Finance → Finance settings**. End of Day can run again: it posts only the difference. Days with stock activity but no POS sales appear under **Days to post** on the Overview; **Post day** posts any date.
+
+## 1a. Everyday entries and bill photos (40 min)
+
+![Bills & receipts](../img/fin-bills.jpg)
+
+1. **Bills & receipts:** photograph the day's paper bills (**Add photos or scans**), type the date, supplier and amount under each.
+2. **Record as expense** on each: choose what it was for (the configuration guide has a table of common restaurant costs and their accounts) and how it was paid. The photo is attached; the bill and its payment post with their numbers.
+3. **Daily sales (manual bills):** add up a day's handwritten bills; sales minus discounts must equal the money received.
+4. On any supplier bill, payment, journal or goods receipt: **Add photo or scan**, or **From inbox**. Open a file to check its fingerprint.
+
+**Exercise 1a.** Photograph a vegetable bill of Rs 14,250 from *Perera Vegetable Stores* paid in cash and record it to *5000 Cost of sales – food*. Then enter yesterday's manual sales: food 98,500, beverages 21,300, service charge 9,800, discount 2,500; cash 74,100, card 41,000, bank 12,000.
+
+## 1b. Bringing existing books in (30 min)
+
+![Excel import check](../img/fin-import-check.jpg)
+
+1. **Finance → Excel import:** set **Books start on**; **Download the example (filled in)** and go through each sheet with the trainer.
+2. Fill the blank workbook (or a copy of the example) with the business's figures: opening balances, opening stock, suppliers and customers with what they owe, bills and expenses since the start date, daily sales, fixed assets.
+3. Choose the file; read the totals, the retained-earnings figure and any problems (sheet and row). Fix and choose again until it is clean, then **Import**.
+4. Approve what waits under **Approvals** (a different person), then check the trial balance against the business's own figures.
+
+**Exercise 1b.** In the demo business, import the example workbook and find the opening journal, a supplier's opening bill and the asset register entries it created.
 
 ## 2. Journals and approvals (40 min)
 
@@ -93,6 +117,8 @@ The accounts used are set in **Finance → Finance settings**. End of Day can ru
 ## Sign-off checklist
 
 - [ ] Explains what posts automatically and from where
+- [ ] Records an expense from a bill photo and a day of manual sales
+- [ ] Imports an accounting workbook and explains the retained-earnings figure
 - [ ] Enters, submits, approves and reverses a journal
 - [ ] Enters a supplier invoice with three-way match and pays it
 - [ ] Reconciles the bank from an imported statement

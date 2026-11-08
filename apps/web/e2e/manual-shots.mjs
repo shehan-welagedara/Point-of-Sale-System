@@ -57,6 +57,14 @@ try {
     ["fin-journals", "/emc/finance/journals"],
     ["fin-statements", "/emc/finance/statements"],
     ["fin-periods", "/emc/finance/periods"],
+    ["fin-expense", "/emc/finance/expense"],
+    ["fin-sales", "/emc/finance/sales"],
+    ["fin-settings", "/emc/finance/settings"],
+    ["fin-accounts", "/emc/finance/accounts"],
+    ["setup-checklist", "/emc/setup/checklist"],
+    ["inv-items", "/emc/inventory/items"],
+    ["inv-grn", "/emc/inventory/grn"],
+    ["menu-categories", "/emc/menu/categories"],
     ["audit-integrity", "/emc/audit?tab=integrity"],
     ["audit-journal", "/emc/audit?tab=journal"],
     ["audit-quality", "/emc/audit?tab=quality"],
@@ -224,6 +232,56 @@ try {
   await page.goto(`${B}/emc/setup/status?mode=local`);
   await wait(page, 900);
   await shot(page, "admin-status");
+
+  // Bills & receipts with a photographed bill, the expense recorded from it, and the Excel import check.
+  {
+    const png = await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 600;
+      c.height = 900;
+      const g = c.getContext("2d");
+      g.fillStyle = "#fdfcf7";
+      g.fillRect(0, 0, 600, 900);
+      g.fillStyle = "#222";
+      g.font = "bold 34px serif";
+      g.fillText("PERERA VEGETABLE STORES", 40, 80);
+      g.font = "26px serif";
+      ["Manning Market, Colombo 11", "Bill No. V-2201      03/04", "", "Carrots 5 kg        1,750.00", "Leeks 4 kg          1,600.00", "Tomatoes 6 kg       2,700.00", "Onions 10 kg        3,200.00", "Green chillies 2 kg 1,500.00", "Cabbage 8 kg        3,500.00", "", "TOTAL           Rs 14,250.00"].forEach((t, i) => g.fillText(t, 40, 150 + i * 46));
+      return c.toDataURL("image/png").split(",")[1];
+    });
+    const bill = { name: "perera-veg-V2201.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") };
+    await page.goto(`${B}/emc/finance/bills?mode=local`);
+    await wait(page, 900);
+    await page.locator(".page input[type=file]").first().setInputFiles(bill);
+    await wait(page, 1800);
+    await page.getByLabel("Supplier").first().fill("Perera Vegetable Stores");
+    await page.getByLabel("Amount").first().fill("14250");
+    await page.getByLabel("Amount").first().blur();
+    await wait(page, 600);
+    await shot(page, "fin-bills");
+    await page.getByRole("button", { name: "Record as expense" }).first().click();
+    await wait(page, 1200);
+    await page.getByLabel("Expense category").selectOption("5000");
+    await page.getByPlaceholder("e.g. Vegetables for the week").fill("Vegetables");
+    await shot(page, "fin-expense-from-bill");
+
+    await page.goto(`${B}/emc/finance/import?mode=local`);
+    await wait(page, 900);
+    await shot(page, "fin-import");
+    const dl = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download the example (filled in)" }).click();
+    const file = await (await dl).path();
+    await page.getByLabel("Accounting workbook").setInputFiles({ name: "accounting-workbook-EXAMPLE.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: (await import("node:fs")).readFileSync(file) });
+    await wait(page, 2500);
+    await shot(page, "fin-import-check");
+    await page.locator(".modal .btn", { hasText: "Cancel" }).click();
+
+    await page.goto(`${B}/emc/inventory/counts?mode=local`);
+    await wait(page, 900);
+    await page.getByRole("button", { name: /Start a count/ }).click();
+    await wait(page, 900);
+    await shot(page, "inv-count-kind");
+  }
 } finally {
   await browser.close();
   await server.close();
