@@ -149,6 +149,24 @@ service cloud.firestore {
                               && request.resource.data.keys().hasOnly(['id', 'pinHash', 'pinSalt', 'cardId', 'pinChangedAt', 'updatedBy', 'updatedAt']);
         allow delete: if isManager(t);
       }
+      // Photos and scans of paper bills (evidence). The file is stored in parts and fingerprinted;
+      // it can't be changed, only its description and link. Terminals don't see them.
+      function canFile() { return hasRole(t, ['owner', 'admin', 'manager', 'accountant', 'storekeeper']); }
+      match /attachments/{id} {
+        allow read: if canFile() || canAudit(t);
+        allow create: if canFile() && request.resource.data.id == id && request.resource.data.uploadedBy == request.auth.uid
+                      && request.resource.data.size is int && request.resource.data.size <= 10485760
+                      && request.resource.data.sha256 is string && request.resource.data.chunks is int;
+        allow update: if canFile() && onlyChanges(['linkedTo', 'status', 'documentDate', 'supplierName', 'amount', 'note']);
+        allow delete: if isAdmin(t) && resource.data.status == 'inbox';
+      }
+      match /attachmentChunks/{id} {
+        allow read: if canFile() || canAudit(t);
+        allow create: if canFile() && request.resource.data.attachmentId is string
+                      && request.resource.data.data is string && request.resource.data.data.size() <= 700000;
+        allow update: if false;
+        allow delete: if isAdmin(t);
+      }
       // Each device reports its app version and last contact (System status page; release management).
       match /deviceStatus/{id} {
         allow read: if isMember(t);
@@ -213,14 +231,16 @@ service cloud.firestore {
       // ── Customers (CRM module) ──
       match /customers/{id} {
         allow read: if isMember(t);
-        allow write: if moduleOn(t, 'crm') && (isManager(t) || canPos(t));
+        // Guest profiles (CRM), and credit customers for receivables (accounting).
+        allow write: if (moduleOn(t, 'crm') && (isManager(t) || canPos(t))) || (moduleOn(t, 'accounting') && canBooks(t));
       }
 
       // ── Inventory & purchasing (ERP modules) ──
       match /inventoryItems/{id} { allow read: if isMember(t); allow write: if (moduleOn(t, 'inventory') || moduleOn(t, 'recipes')) && canStock(t) && idMatches(id); }
       match /recipes/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'recipes') && canStock(t) && idMatches(id); }
       match /locations/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'inventory') && isManager(t); }
-      match /vendors/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'purchasing') && canStock(t); }
+      // Suppliers are kept by purchasing staff, and by accountants for payables (accounting-only businesses).
+      match /vendors/{id} { allow read: if isMember(t); allow write: if (moduleOn(t, 'purchasing') && canStock(t)) || (moduleOn(t, 'accounting') && canBooks(t)); }
       match /purchaseOrders/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'purchasing') && canStock(t); }
       match /goodsReceipts/{id} {
         allow read: if isMember(t);

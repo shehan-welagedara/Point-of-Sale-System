@@ -8,6 +8,9 @@ import { LicencePage } from "./pages/emc/Licence";
 import { MobileStylePage, PosOptionsPage, PosThemesPage, SignInPolicyPage } from "./pages/emc/Appearance";
 import { BillDesignerPage } from "./pages/emc/BillDesigner";
 import { SystemStatusPage } from "./pages/emc/SystemStatus";
+import { SetupChecklistPage } from "./pages/emc/SetupChecklist";
+import { BillsInboxPage, DailySalesPage, RecordExpensePage } from "./pages/finance/Everyday";
+import { AccountingImportPage } from "./pages/finance/AccountingImport";
 import { EmployeesPage, RolesPage, TimeCardsPage } from "./pages/emc/People";
 import { Dashboard, MenuEngineering, Reports } from "./pages/emc/Reports";
 import {
@@ -97,6 +100,13 @@ export function App() {
         <Route path="pos/options" element={<PosOptionsPage />} />
         <Route path="setup/licence" element={<LicencePage />} />
         <Route path="setup/status" element={<SystemStatusPage />} />
+        <Route path="setup/checklist" element={<SetupChecklistPage />} />
+        <Route path="finance/expense" element={<RecordExpensePage />} />
+        <Route path="finance/sales" element={<DailySalesPage />} />
+        <Route path="finance/bills" element={<BillsInboxPage />} />
+        <Route path="finance/import" element={<AccountingImportPage />} />
+        <Route path="finance/suppliers" element={<VendorsPage />} />
+        <Route path="finance/customers" element={<CustomersPage />} />
         <Route path="people/roles" element={<RolesPage />} />
         <Route path="people/logins" element={<LoginsPage />} />
         <Route path="setup/business" element={<BusinessTaxPage />} />

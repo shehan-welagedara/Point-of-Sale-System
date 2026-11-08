@@ -40,6 +40,7 @@ import { seedFinance } from "./finance.js";
 
 export * from "./catalog.js";
 export * from "./finance.js";
+export * from "./starter.js";
 
 export const SAMPLE_PROPERTY_ID = "CMB";
 export const SAMPLE_LOCATION_ID = "MAIN";

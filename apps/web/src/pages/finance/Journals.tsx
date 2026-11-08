@@ -1,10 +1,11 @@
+import { AttachmentPanel } from "../../components/Attachments";
 import { useState } from "react";
 import { newId } from "@pos/core";
 import { type ExchangeRate, type JournalVoucher, type LineInput, type Voucher, LEDGER as L } from "@pos/ledger";
 import { Field, Modal, ModuleOff } from "../../components/ui";
 import { amount, money, toCents, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
-import { AccountSelect, CostCenterSelect, VoucherList, canBooks, newDraftBase, useLedgerAction, useLedgerSettings, useParties } from "./shared";
+import { type SubmitOutcome, AccountSelect, CostCenterSelect, VoucherList, canBooks, newDraftBase, useLedgerAction, useLedgerSettings, useParties } from "./shared";
 
 interface DraftLine {
   account: string;
@@ -30,6 +31,7 @@ function toDraft(l: LineInput): DraftLine {
 
 /** Manual journal: balanced lines with cost centre and party, optional foreign currency. */
 export function JournalEditor({ voucher, onClose }: { voucher?: JournalVoucher; onClose: () => void }) {
+  const [vid] = useState(() => voucher?.id ?? `JV-${newId()}`);
   const { actor, store, toast } = useApp();
   const ls = useLedgerSettings();
   const parties = useParties();
@@ -78,7 +80,7 @@ export function JournalEditor({ voucher, onClose }: { voucher?: JournalVoucher; 
     const v: JournalVoucher = {
       ...base,
       ...(voucher ? { createdAt: voucher.createdAt } : {}),
-      id: voucher?.id ?? `JV-${newId()}`,
+      id: vid,
       type: "journal",
       postingDate: date,
       remarks: remarks.trim(),
@@ -88,7 +90,7 @@ export function JournalEditor({ voucher, onClose }: { voucher?: JournalVoucher; 
     };
     await store.set(L.vouchers, v);
     if (submit) {
-      const r = await run<{ status: string; number?: string }>({ action: "submit", voucherId: v.id }, (x) => (x.status === "posted" ? `Posted ${x.number ?? ""}` : "Submitted for approval"));
+      const r = await run<SubmitOutcome>({ action: "submit", voucherId: v.id }, (x) => (x.status === "posted" ? `Posted ${x.voucher?.number ?? ""}` : "Submitted for approval"));
       if (!r) return;
     } else toast("Draft saved");
     onClose();
@@ -152,6 +154,7 @@ export function JournalEditor({ voucher, onClose }: { voucher?: JournalVoucher; 
             <button className="btn sm ghost" onClick={() => setLines([...lines, { ...blank(), ...(dr > cr ? { credit: String((dr - cr) / 100) } : { debit: String((cr - dr) / 100) }) }])}>Add balancing line</button>
           ) : null}
         </div>
+        <AttachmentPanel linkedTo={{ col: L.vouchers, id: vid, label: "Journal" }} title="Supporting documents" />
         <p className="small muted">
           {ls && ls.journalApprovalThreshold > 0 ? `Journals of ${money(ls.journalApprovalThreshold)} or more need approval by a second person.` : "Every manual journal is approved by a second person before it posts."} Numbers are given only when a journal posts, so the series has no gaps.
         </p>

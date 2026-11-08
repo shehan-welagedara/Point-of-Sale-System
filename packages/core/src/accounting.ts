@@ -76,10 +76,14 @@ export function buildDailyJournal(args: {
     }
   }
   for (const m of args.movements) {
-    if (m.type === "sale") {
+    if (m.type === "opening") {
+      const value = m.lines.reduce((x, l) => x + l.cost, 0);
+      lines.push(line(a.inventory, value, "Opening stock"));
+      lines.push(line(a.openingBalances ?? "3900", -value, "Opening stock"));
+    } else if (m.type === "sale" || m.type === "usage") {
       for (const [group, cost] of Object.entries(m.costByMajorGroup ?? {})) {
         lines.push(line(a.cogsByMajorGroup[group] ?? a.cogsByMajorGroup.Other ?? a.wastage, cost, `Cost of sales – ${group}`));
-        lines.push(line(a.inventory, -cost, "Inventory consumed"));
+        lines.push(line(a.inventory, -cost, m.type === "usage" ? "Kitchen usage (stock count)" : "Inventory consumed"));
       }
     } else if (m.type === "waste" || m.type === "adjust") {
       const value = m.lines.reduce((x, l) => x + l.cost, 0);

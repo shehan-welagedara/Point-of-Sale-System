@@ -36,6 +36,8 @@ try {
   await page.goto(`${B}/?mode=local`);
   await page.getByText("Load the demo restaurant").click();
   await page.waitForURL(/emc\/home/, { timeout: 90_000 });
+  // The launchpad renders its tiles once the business has loaded.
+  await page.waitForFunction(() => document.querySelectorAll(".tile-name").length >= 10, null, { timeout: 15_000 }).catch(() => {});
   const tiles = await page.locator(".tile-name").allTextContents();
   check("launchpad shows module workspaces", tiles.length >= 10, tiles.join(", "));
 
@@ -316,6 +318,81 @@ try {
     await p.waitForTimeout(1200);
     check("an unsupported version must update before use", (await p.getByRole("alertdialog", { name: "Update required" }).count()) === 1);
     await ctx.close();
+  }
+
+  // ── Accounting without the POS: photos of paper bills, expenses, manual sales, the Excel import.
+  {
+    // A small photo of a "bill" (drawn on a canvas), as a phone would send it.
+    const png = await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 400;
+      c.height = 600;
+      const g = c.getContext("2d");
+      g.fillStyle = "#fff";
+      g.fillRect(0, 0, 400, 600);
+      g.fillStyle = "#000";
+      g.font = "28px sans-serif";
+      g.fillText("Perera Vegetable Stores", 20, 60);
+      g.fillText("Vegetables  Rs 4,250.00", 20, 140);
+      return c.toDataURL("image/png").split(",")[1];
+    });
+    const bill = { name: "veg-bill.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") };
+
+    await page.goto(`${B}/emc/finance/bills?mode=local`);
+    await page.waitForTimeout(800);
+    await page.locator(".page input[type=file]").first().setInputFiles(bill);
+    await page.waitForTimeout(1500);
+    check("bill photos go into Bills & receipts", (await page.locator(".att-thumb").count()) >= 1);
+    await page.getByRole("button", { name: "Record as expense" }).first().click();
+    await page.waitForURL(/finance\/expense\?attachment=/);
+    await page.waitForTimeout(800);
+    await page.getByLabel("Supplier").selectOption("__new");
+    await page.getByPlaceholder("e.g. Perera Vegetable Stores").fill("Perera Vegetable Stores");
+    await page.getByLabel("Expense category").selectOption({ index: 1 });
+    await page.getByLabel("Total").fill("4250");
+    await page.getByRole("button", { name: "Record expense" }).click();
+    await page.waitForTimeout(1500);
+    const toast = (await page.locator(".toast").allTextContents()).join(" ");
+    check("an expense from a bill photo is posted and paid", /Expense recorded: PINV-/.test(toast) && toast.includes("paid"), toast.slice(0, 120));
+    await page.goto(`${B}/emc/finance/bills?mode=local`);
+    await page.waitForTimeout(800);
+    check("the photo leaves the inbox once filed", (await page.locator(".att-thumb").count()) === 0);
+
+    await page.goto(`${B}/emc/finance/expense?mode=local`);
+    await page.waitForTimeout(800);
+    await page.locator(".att-panel input[type=file]").setInputFiles(bill);
+    await page.waitForTimeout(1500);
+    await page.locator(".att-panel .att-thumb").first().click();
+    await page.waitForTimeout(1200);
+    check("an attached bill opens with its fingerprint verified", (await page.locator(".modal .badge.good", { hasText: "Fingerprint verified" }).count()) === 1);
+    await page.locator(".modal .btn.primary", { hasText: "Close" }).click();
+
+    await page.goto(`${B}/emc/finance/sales?mode=local`);
+    await page.waitForTimeout(800);
+    await page.getByLabel("Food").fill("10000");
+    await page.getByLabel("Cash").fill("10000");
+    await page.getByRole("button", { name: "Post the day" }).click();
+    await page.waitForTimeout(1200);
+    check("a day of manual bills goes to the books", (await page.locator(".toast").allTextContents()).some((t) => t.startsWith("Sales for")));
+
+    await page.goto(`${B}/emc/finance/import?mode=local`);
+    await page.waitForTimeout(1000);
+    const dl = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download the example (filled in)" }).click();
+    const file = await (await dl).path();
+    await page.getByLabel("Accounting workbook").setInputFiles({ name: "accounting-workbook-EXAMPLE.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: (await import("node:fs")).readFileSync(file) });
+    await page.waitForTimeout(2500);
+    const modal = await page.locator(".modal").innerText();
+    check("the accounting workbook is checked before import", modal.includes("Check results") && modal.includes("We owe suppliers") && modal.includes("example data"), modal.slice(0, 80));
+    await page.locator(".modal .btn.primary", { hasText: "Import" }).click();
+    await page.waitForSelector("text=Import results", { timeout: 60_000 });
+    const res = await page.locator(".card", { hasText: "Import results" }).innerText();
+    const problems = res.match(/Problems\s*(\d+)/)?.[1];
+    check("the example imports into the demo books", problems === "0" && /Posted\s*\d+/.test(res), res.replace(/\s+/g, " ").slice(0, 160));
+
+    await page.goto(`${B}/emc/setup/checklist?mode=local`);
+    await page.waitForTimeout(800);
+    check("setup checklist lists the steps for the chosen modules", (await page.locator("tbody tr").count()) >= 8);
   }
 
   check("no browser errors", errors.length === 0, errors.slice(0, 5).join(" | "));

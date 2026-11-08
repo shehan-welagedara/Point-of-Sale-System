@@ -236,6 +236,8 @@ export interface AccountingSettings extends Entity {
     stockAdjustment: string;
     accountsPayable: string;
     complimentary: string;
+    /** Opening stock is posted against this account (default 3900 Opening balances). */
+    openingBalances?: string;
     /** Goods received, not yet invoiced (ERPNext "Stock Received But Not Billed"). When set, goods
      * receipts credit this account and the supplier invoice moves it to trade creditors with VAT. */
     stockReceivedNotBilled?: string;
@@ -630,7 +632,9 @@ export interface StockLevel extends Entity {
   updatedAt: string;
 }
 
-export type MovementType = "receive" | "sale" | "waste" | "adjust" | "transferIn" | "transferOut" | "production" | "consumption";
+/** `usage`: stock used in the kitchen, found by counting (periodic inventory, no POS sales); posted to cost of sales.
+ * `opening`: stock on hand when the business starts using the system; posted against opening balances. */
+export type MovementType = "receive" | "sale" | "waste" | "adjust" | "transferIn" | "transferOut" | "production" | "consumption" | "usage" | "opening";
 
 export interface StockMovementLine {
   itemId: string;
@@ -658,6 +662,12 @@ export interface StockCount extends Entity {
   locationId: string;
   date: string;
   status: "draft" | "posted";
+  /**
+   * What the differences mean: `count` (default) — errors and losses, posted to stock count
+   * differences; `usage` — what the kitchen used since the last count (businesses without POS
+   * sales), posted to cost of sales; `opening` — the first count, posted against opening balances.
+   */
+  kind?: "count" | "usage" | "opening";
   lines: { itemId: string; counted: number; expected?: number }[];
 }
 
@@ -907,4 +917,39 @@ export interface AuditEntry extends Entity {
   entity: string;
   entityId: string;
   detail?: string;
+}
+
+/**
+ * A photo or scan of a paper document (supplier bill, receipt, handwritten sales bills), kept as
+ * evidence. The file itself is stored in `attachmentChunks` (base64 parts of at most 700,000
+ * characters) and fingerprinted with SHA-256, so any change to it is detected. Files are never
+ * edited; only the description and the link to a document can change.
+ */
+export interface Attachment {
+  id: string;
+  fileName: string;
+  contentType: string;
+  /** Stored size in bytes (after the photo is resized). */
+  size: number;
+  sha256: string;
+  chunks: number;
+  /** Small preview (data URL, images only). */
+  thumbnail?: string;
+  /** The document it belongs to, e.g. { col: "vouchers", id: "PI-…" }. Empty = still in the inbox. */
+  linkedTo?: { col: string; id: string; label?: string };
+  status: "inbox" | "linked";
+  /** What the paper says, typed in by the person who filed it (optional). */
+  documentDate?: string;
+  supplierName?: string;
+  amount?: Cents;
+  note?: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export interface AttachmentChunk {
+  id: string;
+  attachmentId: string;
+  index: number;
+  data: string;
 }

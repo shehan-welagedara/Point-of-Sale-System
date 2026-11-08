@@ -1,3 +1,4 @@
+import { AttachmentPanel } from "../../components/Attachments";
 import { type ReactNode, useMemo, useState } from "react";
 import { type GoodsReceipt, type InventoryItem, COLLECTIONS as C, addDays, newId } from "@pos/core";
 import {
@@ -15,7 +16,7 @@ import { tablesToWorkbook } from "../../lib/excel";
 import { Field, Modal, ModuleOff, Seg, Stat } from "../../components/ui";
 import { amount, downloadBuffer, money, toCents, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
-import { AccountSelect, VoucherList, canBooks, newDraftBase, useLedgerAction, useLedgerSettings, useParties } from "./shared";
+import { type SubmitOutcome, AccountSelect, VoucherList, canBooks, newDraftBase, useLedgerAction, useLedgerSettings, useParties } from "./shared";
 
 type Side = "supplier" | "customer";
 
@@ -31,6 +32,7 @@ interface ItemDraft {
 
 /** Supplier invoice, normally created from goods receipts so it can be three-way matched. */
 export function PurchaseInvoiceEditor({ voucher, onClose }: { voucher?: PurchaseInvoice; onClose: () => void }) {
+  const [vid] = useState(() => voucher?.id ?? `PI-${newId()}`);
   const { actor, store, toast, settings } = useApp();
   const ls = useLedgerSettings();
   const parties = useParties();
@@ -82,7 +84,7 @@ export function PurchaseInvoiceEditor({ voucher, onClose }: { voucher?: Purchase
     const v: PurchaseInvoice = {
       ...newDraftBase(actor.uid, ls?.defaultCostCenter ?? "MAIN"),
       ...(voucher ? { createdAt: voucher.createdAt } : {}),
-      id: voucher?.id ?? `PI-${newId()}`,
+      id: vid,
       type: "purchaseInvoice",
       postingDate: date,
       remarks: `${parties.name("supplier", supplierId)} invoice ${invNo.trim()}`,
@@ -98,8 +100,8 @@ export function PurchaseInvoiceEditor({ voucher, onClose }: { voucher?: Purchase
     };
     await store.set(L.vouchers, v);
     if (submit) {
-      const r = await run<{ status: string; number?: string; match?: { status: string } }>({ action: "submit", voucherId: v.id }, (x) =>
-        x.status === "posted" ? `Posted ${x.number ?? ""} – three-way match ${x.match?.status ?? ""}` : "Price or quantity differs from the goods receipt: sent for approval",
+      const r = await run<SubmitOutcome & { voucher?: { match?: { status: string } } }>({ action: "submit", voucherId: v.id }, (x) =>
+        x.status === "posted" ? `Posted ${x.voucher?.number ?? ""} – three-way match ${x.voucher?.match?.status ?? ""}` : "Price or quantity differs from the goods receipt: sent for approval",
       );
       if (!r) return;
     } else toast("Draft saved");
@@ -172,6 +174,7 @@ export function PurchaseInvoiceEditor({ voucher, onClose }: { voucher?: Purchase
           <Field label="Input VAT on the invoice" help={settings.business.vatRegistered ? "Claimable input tax" : "Not VAT-registered: VAT is part of the cost"}><input className="input" inputMode="decimal" value={vat} onChange={(e) => setVat(e.target.value)} disabled={!settings.business.vatRegistered} /></Field>
           <Field label="Withholding tax deducted" help="Withheld from the supplier and payable to the IRD"><input className="input" inputMode="decimal" value={wht} onChange={(e) => setWht(e.target.value)} /></Field>
         </div>
+        <AttachmentPanel linkedTo={{ col: L.vouchers, id: vid, label: "Supplier invoice" }} title="The supplier's bill (photo or scan)" />
       </div>
     </Modal>
   );
@@ -213,7 +216,7 @@ export function SalesInvoiceEditor({ voucher, onClose }: { voucher?: SalesInvoic
     };
     await store.set(L.vouchers, v);
     if (submit) {
-      const r = await run<{ status: string; number?: string }>({ action: "submit", voucherId: v.id }, (x) => (x.status === "posted" ? `Posted ${x.number ?? ""}` : "Submitted for approval"));
+      const r = await run<SubmitOutcome>({ action: "submit", voucherId: v.id }, (x) => (x.status === "posted" ? `Posted ${x.voucher?.number ?? ""}` : "Submitted for approval"));
       if (!r) return;
     } else toast("Draft saved");
     onClose();
@@ -326,7 +329,7 @@ export function PaymentEditor({ side, voucher, onClose }: { side: Side; voucher?
     };
     await store.set(L.vouchers, v);
     if (submit) {
-      const r = await run<{ status: string; number?: string }>({ action: "submit", voucherId: v.id }, (x) => (x.status === "posted" ? `Posted ${x.number ?? ""}` : "Submitted for approval"));
+      const r = await run<SubmitOutcome>({ action: "submit", voucherId: v.id }, (x) => (x.status === "posted" ? `Posted ${x.voucher?.number ?? ""}` : "Submitted for approval"));
       if (!r) return;
     } else toast("Draft saved");
     onClose();

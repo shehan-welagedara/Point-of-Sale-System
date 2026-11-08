@@ -24,6 +24,8 @@ export const COLLECTIONS = {
   staffSecrets: "staffSecrets",
   deviceStatus: "deviceStatus",
   clientErrors: "clientErrors",
+  attachments: "attachments",
+  attachmentChunks: "attachmentChunks",
   posJournal: "posJournal",
   menuImages: "menuImages",
   inventoryItems: "inventoryItems",

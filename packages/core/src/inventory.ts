@@ -305,9 +305,14 @@ export async function postStockCount(store: DocStore, countId: string): Promise<
   const diffs = count.lines
     .map((l) => ({ itemId: l.itemId, qty: l.counted - (levels.get(l.itemId)?.qty ?? 0) }))
     .filter((d) => Math.abs(d.qty) > EPS);
-  const movement = diffs.length
-    ? await simpleMovement(store, "adjust", { locationId: count.locationId, lines: diffs, businessDate: count.date, ref: `Count ${count.date}` })
-    : null;
+  // Usage counts post what is missing as kitchen usage (cost of sales); opening counts post what is
+  // there as opening stock. The other direction is an ordinary count difference.
+  const kind = count.kind ?? "count";
+  const main = kind === "usage" ? diffs.filter((d) => d.qty < 0) : kind === "opening" ? diffs.filter((d) => d.qty > 0) : diffs;
+  const rest = kind === "count" ? [] : diffs.filter((d) => !main.includes(d));
+  const ref = kind === "usage" ? `Kitchen usage to ${count.date}` : kind === "opening" ? `Opening stock ${count.date}` : `Count ${count.date}`;
+  const movement = main.length ? await simpleMovement(store, kind === "count" ? "adjust" : kind, { locationId: count.locationId, lines: main, businessDate: count.date, ref }) : null;
+  if (rest.length) await simpleMovement(store, "adjust", { locationId: count.locationId, lines: rest, businessDate: count.date, ref: `Count ${count.date}` });
   await store.merge(C.stockCounts, countId, {
     status: "posted",
     lines: count.lines.map((l) => ({ ...l, expected: levels.get(l.itemId)?.qty ?? 0 })),
