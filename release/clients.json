@@ -9,14 +9,15 @@
   },
   "clients": [
     {
-      "id": "kandy-myst",
-      "name": "Kandy Myst Restaurant",
-      "projectId": "REPLACE-with-kandy-myst-project",
+      "id": "noura-kitchen",
+      "name": "Noura Kitchen",
+      "projectId": "REPLACE-with-noura-kitchen-firebase-project-id",
       "region": "asia-south1",
       "wave": 1,
       "maintenanceWindow": "23:30-05:00 Asia/Colombo",
-      "backupBucket": "gs://REPLACE-with-kandy-myst-project-backups",
-      "enabled": false
+      "backupBucket": "gs://REPLACE-with-noura-kitchen-firebase-project-id-backups",
+      "enabled": false,
+      "notes": "First client. Starts with Accounting, Inventory and Purchasing (books and stores); POS later. Onboarding: docs/clients/noura-kitchen.md. Set projectId and backupBucket, run tools/release/grant-access.sh, then set enabled to true."
     }
   ]
 }
