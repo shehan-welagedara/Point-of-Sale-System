@@ -5,7 +5,7 @@ import { Login } from "./pages/auth/Login";
 import { Onboarding } from "./pages/auth/Onboarding";
 import { Launchpad, Shell } from "./pages/emc/Shell";
 import { LicencePage } from "./pages/emc/Licence";
-import { MobileStylePage, PosThemesPage, SignInPolicyPage } from "./pages/emc/Appearance";
+import { MobileStylePage, PosOptionsPage, PosThemesPage, SignInPolicyPage } from "./pages/emc/Appearance";
 import { BillDesignerPage } from "./pages/emc/BillDesigner";
 import { EmployeesPage, RolesPage, TimeCardsPage } from "./pages/emc/People";
 import { Dashboard, MenuEngineering, Reports } from "./pages/emc/Reports";
@@ -93,6 +93,7 @@ export function App() {
         <Route path="pos/appearance" element={<PosThemesPage />} />
         <Route path="pos/mobile" element={<MobileStylePage />} />
         <Route path="pos/bill" element={<BillDesignerPage />} />
+        <Route path="pos/options" element={<PosOptionsPage />} />
         <Route path="setup/licence" element={<LicencePage />} />
         <Route path="people/roles" element={<RolesPage />} />
         <Route path="people/logins" element={<LoginsPage />} />

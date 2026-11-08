@@ -18,3 +18,4 @@ apps/functions/.env
 # Vendor licence signing keys and issued licences (never commit)
 licence-keys/
 e2e-failure*.png
+manual-pdf/

@@ -347,3 +347,37 @@ export function MobileStylePage() {
     </div>
   );
 }
+
+/** POS Configuration → POS options: business day, automatic bill printing, loyalty earn rate. */
+export function PosOptionsPage() {
+  const { settings, saveSetting, toast, on } = useApp();
+  const properties = useCollection<{ id: string; name: string }>(C.properties) ?? [];
+  const [p, setP, savedOptions] = useDraft<PosSettings>({ ...settings.pos });
+  return (
+    <div className="page">
+      <PageHead title="POS options" subtitle="How the POS runs the business day, prints bills and rewards guests." actions={<button className="btn primary" onClick={async () => { await saveSetting("pos", p); savedOptions(); toast("POS options saved"); }}>Save</button>} />
+      <div className="grid cols-2">
+        <div className="card card-body stack">
+          <Field label="Business day starts at" help="Sales before this hour count for the previous day (for late-night service). The date shows on the POS top bar and on every report.">
+            <select className="select" value={p.businessDayRolloverHour} onChange={(e) => setP({ ...p, businessDayRolloverHour: Number(e.target.value) })}>
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00{h === 0 ? " (midnight)" : ""}</option>)}
+            </select>
+          </Field>
+          <div className="row between"><span>Print the bill automatically when a check is paid</span><Toggle on={p.autoPrintBillOnClose} onChange={(v) => setP({ ...p, autoPrintBillOnClose: v })} label="Print bill on close" /></div>
+          <p className="tiny muted">When off, staff print it from the payment-successful screen or the receipt window.</p>
+          <Field label="Default outlet for back-office reports">
+            <select className="select" value={p.defaultPropertyId} onChange={(e) => setP({ ...p, defaultPropertyId: e.target.value })}>
+              {properties.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="card card-body stack">
+          <h3>Loyalty</h3>
+          <Field label="Points per Rs 100 spent" help={on("loyalty") ? "Earned on the amount paid when a guest is attached to the check." : "The loyalty module is off; switch it on under Administration → Licence & modules."}>
+            <input className="input num" type="number" min={0} max={100} value={p.loyaltyPointsPer100} onChange={(e) => setP({ ...p, loyaltyPointsPer100: Math.max(0, Number(e.target.value)) })} />
+          </Field>
+        </div>
+      </div>
+    </div>
+  );
+}
