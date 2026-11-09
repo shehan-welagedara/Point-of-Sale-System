@@ -69,7 +69,9 @@ The back office is divided into **workspaces**. You only see the ones your licen
 ## 2. Signing in to the back office
 
 1. Open the address your installer gave you (for example `https://pos.yourrestaurant.lk`).
-2. Enter the email and password of your back-office login and choose **Sign in**. (New logins are invited by the owner or an administrator; see [13.4](#134-back-office-logins).)
+2. Enter the email and password of your back-office login and choose **Sign in**. (New logins are invited by the owner or an administrator; see [13.4](#134-back-office-logins).) It works from any computer, tablet or phone with internet, in any modern browser.
+   - **Forgot your password?** Choose **Forgot password?**, enter your email and **Send reset link**. Open the email (check the spam folder too), choose a new password, and sign in with it.
+   - New passwords need at least 10 characters, with letters and numbers. Don't reuse a password from another site, and never share your login: everything you do is recorded under your name.
 3. The **launchpad** opens with a tile for each workspace you may use.
 
 ![Launchpad](img/bo-launchpad.jpg)

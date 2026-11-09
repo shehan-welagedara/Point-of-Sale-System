@@ -1,6 +1,6 @@
 {
   "name": "@pos/web",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "Back office (EMC), POS and manager reports. Runs against Firebase or, with no Firebase config, in local demo mode.",
   "type": "module",

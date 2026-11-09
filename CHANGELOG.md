@@ -2,6 +2,20 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.1.1 — 2026-11-09
+
+**Type:** Patch
+
+### For clients
+
+- **Forgot password?** on the sign-in screen: enter your email to receive a link to choose a new password.
+- New back-office passwords need at least 10 characters.
+
+### Changes
+
+- Password reset by email (Firebase), without revealing which addresses have accounts; clearer sign-in messages (too many attempts, invalid email).
+- Deployment manual: the web config no longer needs copying (read from Hosting); Firebase password policy, public-facing name and email templates; custom domain recommended.
+
 ## 1.1.0 — 2026-11-08
 
 **Type:** Minor (new features) · **Data migration:** 0003 adds account 3900 *Opening balances (temporary)* to existing businesses

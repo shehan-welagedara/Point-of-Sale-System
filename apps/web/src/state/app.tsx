@@ -33,7 +33,7 @@ import {
 import { type Actor, type LedgerRequest, type LedgerSettings, UNAUDITED, makeAuditEvent, runLedgerRequest, storeRunner } from "@pos/ledger";
 import { DEMO_PEOPLE, STARTER_PROPERTY_ID, buildSampleStore, sampleSettings, starterConfig } from "@pos/sample-data";
 import { httpsCallable } from "firebase/functions";
-import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from "firebase/auth";
 import { collectionGroup, doc, getDoc, getDocs, onSnapshot, query, setDoc, where, writeBatch } from "firebase/firestore";
 import { firebase, firebaseConfigured } from "../lib/firebase";
 import { FirestoreStore } from "../lib/firestore-store";
@@ -90,6 +90,8 @@ interface AppState {
   toast: (text: string, bad?: boolean) => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
+  /** Emails a password-reset link (silently does nothing for unknown addresses). */
+  resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   createTenant: (name: string, withSample: boolean, modules?: MK[]) => Promise<void>;
   switchTenant: (id: string) => void;
@@ -574,6 +576,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await updateProfile(cred.user, { displayName: name });
       // Invitations are only accepted from a verified address, so nobody can claim someone else's invite.
       await sendEmailVerification(cred.user).catch(() => undefined);
+    },
+    resetPassword: async (email) => {
+      await sendPasswordResetEmail(firebase().auth, email).catch((e: { code?: string }) => {
+        // Don't reveal whether an address has an account; only report real problems.
+        if (e.code === "auth/user-not-found") return;
+        throw e;
+      });
     },
     signOut: async () => {
       if (mode === "local") return;
