@@ -104,6 +104,7 @@ pnpm test         # unit tests for every package
 pnpm test:rules   # security rules on the Firestore emulator (needs Java)
 pnpm test:functions  # Cloud Functions end to end on the emulators (needs Java)
 pnpm test:e2e        # browser end-to-end (needs Playwright + Chromium)
+pnpm test:pairing    # connecting phones with codes, against the Firebase emulators
 pnpm typecheck
 pnpm build
 ```

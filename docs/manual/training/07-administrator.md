@@ -52,7 +52,9 @@
 6. **Discounts** and **Reason codes.**
 7. **POS options:** business day start time, automatic bill printing, loyalty points.
 
-**Exercise 3.** Add a workstation *P01 Floor phone 1* with screen style *Business setting*, and set up the phone with it.
+8. **Connected phones and tablets:** **Connect a phone** gives each staff phone, tablet or counter PC its own login with a one-time QR code, and can create its workstation in the same step (section O of the deployment manual). **Remove** cuts one device off at once.
+
+**Exercise 3.** Connect a phone as *Floor phone 1* on a new workstation *P01* with screen style *Business setting*: scan the code, add it to the home screen, sign in with a PIN and send an order that prints in the kitchen. Then remove it.
 
 ## 4. Look and the bill (40 min)
 

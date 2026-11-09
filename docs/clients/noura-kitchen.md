@@ -35,7 +35,7 @@ pnpm release:deploy --target noura-kitchen
 1. The owner creates their account on `https://<project-id>.web.app` and verifies the email.
 2. **Create business** "Noura Kitchen" with the modules **Accounting**, **Inventory**, **Purchasing** (and **Recipes** if the menu will be costed). The starter set-up is added automatically: outlet MAIN, main store, roles, payment methods, reason codes, chart of accounts and cost centre.
 3. **+ Business → Load the demo restaurant** as a training copy.
-4. Licence (deployment manual I): for books and stores now and the POS later, **Professional + Accounting** covers it; or Starter with the Inventory, Purchasing, Recipes and Accounting add-ons. Issue against the project and business IDs shown on Licence & modules.
+4. Licence (deployment manual I): **Professional + Accounting**. It covers books and stores now and the POS later, and allows **12 workstations**: staff will use their phones as POS devices, and each phone needs its own workstation. (Starter allows only 3.) Issue against the project and business IDs shown on Licence & modules.
 
 ## 3. Configuration with the client (2–3 hours)
 
@@ -69,7 +69,18 @@ Work down **Administration → Setup checklist** together, using the [configurat
 
 > Stock deliveries from now on are received as **goods receipts** (Inventory → Goods receipts) with the delivery note photographed, not as expenses. Without the POS, a **Kitchen usage** count each week or month turns what the kitchen used into cost of sales.
 
-## 5. Training
+## 5. When the POS starts: staff phones
+
+Staff use the POS on their own phones over the internet (deployment manual, sections A, K and O):
+
+1. **At the restaurant:** bill and kitchen printers on the network, the **Print Agent** on an always-on PC with a POS terminal login (`printer@…`), Wi-Fi over the dining area and kitchen, and a 4G backup router.
+2. **Turn on the POS module**; menu, tables, tenders and employees with their own PINs (sections K–M).
+3. **Connect each phone** with a code: POS Configuration → Workstations & printers → Connect a phone → *new workstation* (`P01`, `P02`…). The steward scans the QR code, taps **Connect** and adds it to the home screen.
+4. Sign-in policy: automatic sign-out **120 seconds** (personal phones).
+5. Test: an order from each phone prints in the kitchen; one with the phone on mobile data; a bill and the cash drawer.
+6. When someone leaves, or a phone is lost: **Remove** the phone and end the employee.
+
+## 6. Training
 
 | Who | Manual | Time |
 |---|---|---|
@@ -79,7 +90,7 @@ Work down **Administration → Setup checklist** together, using the [configurat
 
 Hand over the PDFs (`pnpm manual:pdf -- --client "Noura Kitchen"`): user manual, configuration guide, training manuals 05–07.
 
-## 6. Go-live checklist
+## 7. Go-live checklist
 
 - [ ] Deployed; version page shows the release; budget alert set
 - [ ] Owner account, business with Accounting, Inventory, Purchasing; licence activated
@@ -90,4 +101,4 @@ Hand over the PDFs (`pnpm manual:pdf -- --client "Noura Kitchen"`): user manual,
 - [ ] Bill photos attached
 - [ ] Trial balance agreed with the owner
 - [ ] Accountant and storekeeper trained and signed off
-- [ ] Later: POS module, menu, employees and devices (deployment manual K–O)
+- [ ] Later: POS module, menu, employees; every staff phone connected with a code and tested with the printers (section 5 above)
