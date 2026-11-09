@@ -83,6 +83,7 @@ pnpm test              # unit tests (engine, core, ledger, printing, sample data
 pnpm test:rules        # Firestore security rules on the emulator (needs Java)
 pnpm test:functions    # Cloud Functions end to end on the emulators (needs Java)
 pnpm test:e2e          # browser end-to-end in local demo mode (needs Playwright + Chromium)
+pnpm test:pairing      # connecting phones with codes, in a browser against the Firebase emulators
 pnpm test:migrations   # data migrations on the Firestore emulator (needs Java)
 pnpm release:version 1.1.0       # start a release: version + CHANGELOG entry (then tag vX.Y.Z and push)
 pnpm release:deploy --target …   # deploy the build: staging, wave:N or client ids (backup → indexes → migrations → rules/functions → hosting)

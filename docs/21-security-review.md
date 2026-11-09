@@ -26,6 +26,8 @@ It lists what was found, what was changed, the risk that remains, and the checkl
 | 10 | Medium | The same workstation open on two devices produces duplicate invoice numbers. The rules refuse the duplicate, but the bill then fails to close. | **Mitigated.** Devices report to `deviceStatus`; a warning shows when a workstation is open on a second device. |
 | 11 | Low | The Excel library (270 KB compressed) loaded on every screen, including phones. | **Fixed.** It loads only for export and import; first load is 724 → 453 KB compressed. |
 | 12 | Low | Each client needed a separate build with its Firebase settings, a source of mix-ups (a build pointing at the wrong project). | **Fixed.** One build for all; settings are read from the client's hosting at start-up. The release tool refuses a build that contains a Firebase key. |
+| 13 | **High** | Staff phones over the internet needed one POS terminal login per device, each with its own verified mailbox; in practice one password would be shared and typed into every phone, and a leaver's or lost phone couldn't be cut off without signing out every phone. | **Fixed.** Devices are connected with a one-time code (8 characters, single use, 15 minutes, stored only as a hash and unreadable to clients). Each device gets its own login with the POS terminal role, created by the `deviceApi` function; nobody sees its password. **Remove** deletes that one login at once. The rules keep a connected device a POS terminal (it can't be promoted). |
+| 14 | Medium | No way to reset a forgotten back-office password except in the Firebase console. | **Fixed** (1.1.1). Forgot password? sends a reset link; the answer doesn't reveal whether an address has an account. New passwords need 10+ characters; the deployment manual sets the Firebase password policy. |
 
 ## 2. Remaining risks (accepted, with controls)
 
@@ -62,7 +64,8 @@ For every client, before the first real bill:
   - email enumeration protection on;
   - authorised domains limited to the client's domains.
 - [ ] **Google Cloud → Credentials:** the browser API key is restricted to the client's site addresses (HTTP referrers).
-- [ ] Each POS device and the Print Agent use their **own POS terminal login** with a strong password. Nobody uses an owner login on a till.
+- [ ] Every POS phone, tablet and PC is **connected with a one-time code** (its own login, removable on its own); the Print Agent has its own POS terminal login with a strong password. Nobody uses an owner login on a till.
+- [ ] Phones of leavers, lost phones and phones not seen for weeks are **removed** (monthly access review).
 - [ ] Every employee has their own PIN; no demo employees in the real business. **System status → Employee PINs** shows **Secure**.
 - [ ] The licence is activated with **your** licence key (not the demo key).
 - [ ] **Audit Center → Integrity** and **Data quality** are clean after the dry run.

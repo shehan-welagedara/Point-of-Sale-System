@@ -61,6 +61,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // One-time codes that connect phones and tablets: only the deviceApi function reads or writes them.
+    match /devicePairings/{codeHash} {
+      allow read, write: if false;
+    }
+
     // Invitations are keyed by lower-case email; the invited person can read and accept theirs.
     match /invites/{email} {
       allow read: if signedIn() && request.auth.token.email != null && request.auth.token.email.lower() == email;
@@ -107,7 +112,9 @@ service cloud.firestore {
                            && get(/databases/$(database)/documents/invites/$(request.auth.token.email.lower())).data.role == request.resource.data.role)
                        )
                        || (isAdmin(t) && request.resource.data.role != 'owner');
-        allow update: if isAdmin(t) && resource.data.role != 'owner' && request.resource.data.role != 'owner' && onlyChanges(['role', 'name', 'staffId']);
+        // A connected phone or tablet stays a POS terminal: it can be renamed, never promoted.
+        allow update: if isAdmin(t) && resource.data.role != 'owner' && request.resource.data.role != 'owner' && onlyChanges(['role', 'name', 'staffId'])
+                      && (!('device' in resource.data) || request.resource.data.role == 'terminal');
         allow delete: if isAdmin(t) && resource.data.role != 'owner';
       }
 

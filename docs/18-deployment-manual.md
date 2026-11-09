@@ -6,6 +6,16 @@ This manual takes one client from nothing to live trading on the **Cloud Restaur
 >
 > Google changes its console screens from time to time. If a menu name differs slightly, look for the nearest match. The steps stay the same.
 
+**How the system is reached.** Everything runs in the client's Firebase project in the cloud and is used over the internet at `https://PROJECT-ID.web.app` (or the client's own domain, section T):
+
+| Who | Device | How they get in |
+|---|---|---|
+| Owner, manager, accountant, storekeeper | Any computer, tablet or phone, anywhere | Their own email and password (back-office login) |
+| Stewards, cashiers, bar and kitchen staff | **Phones** (their own or the restaurant's), tablets, a counter PC | The device is **connected once with a one-time code** (section O); each person then signs in with their employee number and PIN |
+| The Print Agent | One always-on PC in the restaurant, on the same network as the printers | A POS terminal login (section O) |
+
+Phones work on the restaurant's Wi-Fi or on mobile data. They don't print directly: bills and kitchen tickets go through the cloud to the Print Agent, which drives the printers and the cash drawer. So the restaurant itself needs only the printers, the Print Agent PC and a reliable internet line (with 4G backup).
+
 ## Contents
 - A. Before you start
 - B. Client's Google account and Firebase project
@@ -21,7 +31,7 @@ This manual takes one client from nothing to live trading on the **Cloud Restaur
 - L. Menu, recipes and stock (Excel)
 - M. People, roles and sign-in
 - N. Finance (if licensed)
-- O. Devices in the restaurant and the Print Agent
+- O. POS devices (phones, tablets, PCs) and the Print Agent
 - P. Training and the dry run
 - Q. Go-live day
 - R. After go-live: daily, weekly, monthly
@@ -42,7 +52,8 @@ Collect from the client:
 | TIN (9 digits); VAT registration status; SSCL liability | 123456789; VAT registered; SSCL not liable |
 | Service charge %, prices inclusive or exclusive of taxes | 10%; exclusive |
 | Logo (PNG or SVG), brand colours | |
-| Outlets / revenue centres, counters and tablets, printers | 1 outlet; restaurant + takeaway; 1 counter PC + 2 tablets; bill printer + kitchen printer |
+| Outlets / revenue centres, POS devices, printers | 1 outlet; restaurant + takeaway; 6 staff phones + 1 counter PC; bill printer + kitchen printer |
+| **How many POS devices at the busiest time** (phones, tablets, PCs) | Each needs its own workstation, and the licence limits workstations: Starter 3, Professional 12 |
 | Menu with prices, modifiers, recipes; stock items; suppliers | Use the Excel data feeder (section L) |
 | Staff list: names, jobs, who may void, discount, refund | |
 | Bank for cards, LankaQR merchant ID (when approved) | |
@@ -50,11 +61,12 @@ Collect from the client:
 | An email address the client will own for the system | it@lagooncafe.lk (or a new Gmail) |
 
 Hardware ready at the site:
-- **Counter PC:** Windows 10/11 with a touch screen, Chrome or Edge, internet.
-- **Bill printer and kitchen printer:** ESC/POS, for example Epson TM-T82III.
+- **Staff phones** (and any tablets): Android 10 or newer with Chrome, or iPhone/iPad with iOS 16 or newer with Safari. Charged, with Wi-Fi or mobile data. Staff's own phones are fine (see O.1).
+- **Print Agent PC:** any small always-on Windows PC or mini-PC on the restaurant network, with the printers. It can also be the counter PC.
+- **Counter PC (optional):** Windows 10/11 with a touch screen, Chrome or Edge, if the cash desk uses a big screen.
+- **Bill printer and kitchen printer:** ESC/POS network printers (LAN or Wi-Fi), for example Epson TM-T82III. Network printers let the Print Agent PC sit anywhere on the network.
 - **Cash drawer** connected to the bill printer.
-- **Optional tablets** (Android or iPad).
-- **A UPS**, and a 4G router as backup internet.
+- **Restaurant Wi-Fi** covering the dining area and kitchen, a **4G router as backup internet** for the Print Agent PC and printers, and a **UPS** for the router, PC and printers.
 
 See [11](11-hardware-and-printing.md).
 
@@ -243,12 +255,12 @@ pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1
    - **Hosting** shows a release.
    - **Firestore → Rules** shows our rules.
    - **Firestore → Indexes** lists the indexes (they may show "Building" for a few minutes).
-   - **Functions** lists `ledgerApi`, `licenceApi`, `posAuth`, `auditTrail`, `auditTenant` and `auditSealer`.
+   - **Functions** lists `ledgerApi`, `licenceApi`, `posAuth`, `deviceApi`, `auditTrail`, `auditTenant` and `auditSealer`.
    - **Firestore → Time-to-live** has a policy on `printJobs`.
 
 The system is now live at **https://PROJECT-ID.web.app** (also `.firebaseapp.com`).
 
-- [ ] Deploy succeeded; six functions listed; `https://PROJECT-ID.web.app/version.json` shows the release
+- [ ] Deploy succeeded; seven functions listed; `https://PROJECT-ID.web.app/version.json` shows the release
 - [ ] Clean-up policy set
 - [ ] The site opens on https://PROJECT-ID.web.app
 
@@ -322,17 +334,19 @@ In **POS Configuration**:
      - Network printers: IP address and port 9100.
      - USB on Windows: the printer's *share name*.
      - Set a backup printer and the **Print Agent id** (for example `AGENT-1`).
-   - **Workstations:** one per counter PC or tablet.
-     - **Code** `W01`, `W02`, `T01`…; the code appears in IRD invoice numbers, so never reuse one.
+   - **Workstations:** one per POS device: **every phone**, tablet and counter PC has its own.
+     - **Code** `W01` (counter PC), `P01`, `P02`… (phones), `T01` (tablets); the code appears in IRD invoice numbers, so never reuse one.
      - Default revenue centre, plus which revenue centres it may switch to.
-     - Receipt printer, and **printing via Print Agent**.
+     - Receipt printer, and **printing via Print Agent** (the only way phones and tablets print).
+     - Phones' workstations can also be created while connecting the phone (section O), which is quicker.
+     - The licence limits active workstations (Starter 3, Professional 12): count every phone, plus one or two spares.
 3. **Tables** (if table service) and **Order types**.
 4. **Tender media:** cash, card, LankaQR, PayHere, vouchers, house account, complimentary.
    - Check that each one's ledger account is right (if Finance is licensed).
    - Keep PayHere and LankaQR in **mock** under Administration → Integrations until the client's merchant accounts are approved.
 5. **Discounts** and **Reason codes** (void, refund, discount, comp, paid-out).
 
-- [ ] Revenue centres, workstations (unique codes) and printers entered
+- [ ] Revenue centres, workstations (unique codes, one per device, within the licence) and printers entered
 - [ ] Tenders, discounts and reason codes reviewed
 
 ---
@@ -365,7 +379,7 @@ In **People & Security**:
 1. **Sign-in policy:**
    - method (employee number + PIN is recommended);
    - lockout after 5 wrong PINs;
-   - automatic sign-out after 300 seconds;
+   - automatic sign-out after 300 seconds (120 seconds when staff use their own phones);
    - whether staff must clock in.
 2. **Roles & privileges:** review the levels, privileges, limits and "needs approval" with the owner. For example:
    - cashiers can't void sent items;
@@ -374,15 +388,16 @@ In **People & Security**:
    - Employee number (their sign-in ID), name, job and role.
    - Revenue centres; card number if they use swipe cards.
    - A **PIN**. Let each person choose their own PIN at the counter; easy PINs are refused.
-4. **Back-office logins.** People who use the back office (manager, accountant, storekeeper) and **one login per POS device**:
-   1. Open **Back-office logins → Invite**. Enter the email and role. Devices use the **POS terminal** role, for example `pos-counter@lagooncafe.lk`. The invited person signs up with that address and must **verify it** (link in the email) before **Accept invitation** works: this stops anyone else claiming the invitation.
+4. **Back-office logins** for the **people** who use the back office (manager, accountant, storekeeper), and one for the **Print Agent**:
+   1. Open **Back-office logins → Invite**. Enter the email and role. The invited person signs up with that address and must **verify it** (link in the email) before **Accept invitation** works: this stops anyone else claiming the invitation.
    2. The invited person opens the site → **Create account** with that email → **I was invited to a business**.
+   3. The Print Agent's login uses the **POS terminal** role and an address the client owns, for example `printer@lagooncafe.lk` or a Gmail address made for it.
 
-   Devices sign in once and stay signed in. Staff then sign in on top with their number and PIN.
+   **Phones, tablets and counter PCs don't need logins here.** They are connected with a one-time code (section O): no email, no shared password.
 
 - [ ] Sign-in policy set; roles reviewed with the owner
 - [ ] Every employee has a number, role, outlets and their own PIN
-- [ ] Manager, accountant and each POS device have logins
+- [ ] Manager, accountant and the Print Agent have logins
 
 ---
 
@@ -402,22 +417,46 @@ In **People & Security**:
 
 ---
 
-## O. Devices in the restaurant and the Print Agent
+## O. POS devices (phones, tablets, PCs) and the Print Agent
 
-**Each POS PC or tablet:**
-1. Open **https://PROJECT-ID.web.app** in Chrome or Edge (Safari on iPad) and sign in with that device's login.
-2. Open **Point of Sale** and choose the workstation (W01, T01…). Each workstation is used on **one device only**.
-3. **Install as an app:**
-   - Windows (Chrome/Edge): menu → **Install**, then pin it to the taskbar and set it to open at start-up.
-   - iPad: Share → **Add to Home Screen**.
-   - Android: menu → **Install app**.
-4. **Kiosk use (optional):** Windows assigned access, or the browser's kiosk mode, so staff can't leave the POS.
+### O.1 Connecting phones, tablets and counter PCs
 
-**Print Agent** (on the counter PC, or a mini-PC that is always on). It prints bills and kitchen tickets for every device, and opens the cash drawer.
+Every POS device is connected **once**, with a one-time code. It then has its own login, which works over the internet from Wi-Fi or mobile data and can be removed on its own.
+
+1. On a computer, the owner or a manager signs in to the back office: **POS Configuration → Workstations & printers → Connect a phone**.
+2. Type the phone's name (who uses it, or where: *Nimal's phone*, *Bar phone 1*). Choose **+ New workstation for this phone** (it suggests `P01`, `P02`…) or an existing workstation. Press **Show the code**.
+3. On the phone, open the **camera** and scan the QR code, then tap the link. (Or open `https://PROJECT-ID.web.app/pair` and type the 8-character code.) Press **Connect**.
+4. The phone opens the POS on its workstation. **Add it to the home screen** so it opens like an app:
+   - iPhone/iPad (Safari): Share → **Add to Home Screen**.
+   - Android (Chrome): ⋮ → **Install app** (or Add to Home screen).
+   - Windows counter PC (Chrome/Edge): menu → **Install**, pin it to the taskbar and set it to open at start-up.
+5. Staff sign in on the POS with their **employee number and PIN**, as on any terminal.
+
+A code works **once, for 15 minutes**. Connect phones one at a time, while you have each phone in your hand. The device list on the same page shows every connected device, its workstation and when it was last seen.
+
+**Staff's own phones** are fine:
+- The phone's login can only use the POS. Without an employee PIN it can't even do that, and it never sees the back office, the books or other businesses.
+- Keep **automatic sign-out** short (M.1, for example 120 seconds), so a phone left on a table signs its user out.
+- When someone leaves, or a phone is lost or replaced, press **Remove** next to it. Its login is deleted at once and the phone shows *This phone is no longer connected*. Also end the employee (People & Security → Employees). Removing a phone does not touch its workstation's bills.
+- Data on a removed phone stops updating. The menu and recent orders may stay in that browser's storage until the browser data is cleared.
+
+**Restaurant-owned phones and tablets** are connected the same way. For a counter PC, kiosk use (Windows assigned access, or the browser's kiosk mode) keeps staff in the POS.
+
+**Each workstation on one device at a time.** Bills are numbered per workstation. If two devices use the same one, the POS warns *also open on another device*. Give the second device its own workstation.
+
+### O.2 Internet
+
+- **Phones** use the restaurant Wi-Fi, or mobile data when the Wi-Fi is weak. Short drops are fine: orders and payments carry on and are sent when the connection returns, with a notice on screen meanwhile.
+- **Printing needs the Print Agent PC online.** If the restaurant's internet is down, phones on mobile data can still take orders, but nothing prints until the Print Agent is back online. Hence the **4G backup router** for the Print Agent PC and printers (section A).
+- Test both before go-live: switch off the Wi-Fi on a phone, take an order on mobile data, and check it prints.
+
+### O.3 The Print Agent
+
+The Print Agent runs on the counter PC, or on a mini-PC that is always on. It prints bills and kitchen tickets for every device, including phones, and opens the cash drawer.
 1. Install Git, Node.js 22 LTS and pnpm on that PC (as in E.1), then clone the code and run `pnpm install`.
 2. Copy `apps/print-agent/.env.example` to `apps/print-agent/.env` and fill it in:
    - the six web config values (`apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`): Firebase console → **Project settings → General → Your apps → POS web → SDK setup and configuration → Config**;
-   - `AGENT_EMAIL` and `AGENT_PASSWORD`: a login with the **POS terminal** role;
+   - `AGENT_EMAIL` and `AGENT_PASSWORD`: the Print Agent's login with the **POS terminal** role (M.4);
    - `TENANT_ID`: the business id from I.1;
    - `AGENT_ID`: the same id you set on the printers;
    - `DRY_RUN=0`.
@@ -434,15 +473,16 @@ pnpm agent
 
    Keep the PC from sleeping (Power settings → never sleep).
 
-- [ ] Every device signed in, workstation chosen, installed as an app
-- [ ] Print Agent running and starting with Windows; test page, bill, kitchen ticket and drawer all work
+- [ ] Every phone, tablet and counter PC connected with a code, on its own workstation, added to the home screen; all listed under Connected phones and tablets
+- [ ] Print Agent running and starting with Windows; test page, bill, kitchen ticket and drawer all work, **from a phone** as well
+- [ ] An order taken on mobile data (Wi-Fi off) prints in the kitchen
 
 ---
 
 ## P. Training and the dry run
 
 1. **Train staff in the demo business** (H.3) with the [training manuals](manual/training/README.md): one per role, with exercises and sign-off checklists. Print them, with the [user manual](manual/user-manual.md), as PDFs carrying the client's name: `pnpm manual:pdf -- --client "Client name"` (files in `manual-pdf/`).
-   - **Cashiers and stewards:** sign in, tables, orders, modifiers, allergies, send, split, transfer, payment, bill (on the phones in the chosen app style).
+   - **Cashiers and stewards:** sign in, tables, orders, modifiers, allergies, send, split, transfer, payment, bill (on the phones in the chosen app style). To practise on their phones, connect them to the demo business (O.1); before go-live, **Remove** them there and connect them to the real business.
    - **Supervisors:** voids, discounts and approvals.
    - **Manager:** reports on the POS, End of Day, 86, unlock employee.
    - **Storekeeper, accountant, administrator:** their back-office workspaces.
@@ -463,7 +503,7 @@ pnpm agent
 1. **Before opening:**
    - internet and backup 4G working;
    - Print Agent running;
-   - every device signed in;
+   - every phone connected and showing *last seen: just now* (Workstations & printers), staff phones charged;
    - opening cash float counted;
    - integrations still in mock, or switched to live if the bank and PayHere have approved them.
 2. **Opening stock count** (if inventory is used).
@@ -486,7 +526,7 @@ pnpm agent
 | Weekly | Manager / owner | Reports and menu engineering; stock counts of key items; **Audit Center → Integrity** |
 | Monthly | Accountant | Bank reconciliation; supplier invoices and payments; depreciation; **close the month**; VAT/SSCL working |
 | Monthly | Owner / you | **Backups**: Audit Center → Auditor exports (audit package and SAF-T) and the Excel export of master data, stored off-site. On the free tier these exports are the backup. Optional paid Firestore backups cost a few cents a month ([10](10-firebase-free-tier.md)). |
-| Monthly | Owner / you | **Access review**: remove leavers (employees → terminated; logins → removed) |
+| Monthly | Owner / you | **Access review**: remove leavers (employees → terminated; logins → removed; **their phones → Remove**); remove phones not seen for weeks |
 | Monthly | You | Firebase usage and billing (should be USD 0); budget alert still set |
 | Yearly | You | Renew the licence; year-end close in Finance; review roles and limits |
 
@@ -520,12 +560,18 @@ Staff can use the system at `https://PROJECT-ID.web.app` from anywhere. A domain
 |---|---|
 | Deploy fails the first time with a permissions / service-agent / Eventarc error | New Google services are still being set up. Wait 5 minutes and run `pnpm firebase:deploy` again. |
 | "Billing account not configured" when deploying functions | Blaze plan missing (section C). |
-| "Missing or insufficient permissions" in the app | The signed-in login doesn't have the role for that action. Check Back-office logins. Devices need the POS terminal role. |
+| "Missing or insufficient permissions" in the app | The signed-in login doesn't have the role for that action. Check Back-office logins. |
+| Phone: "This code isn't valid any more" | Codes work once, for 15 minutes. Create a new one (Connect a phone). |
+| Phone: "No connection to the system" while connecting | The phone has no internet. Switch to Wi-Fi or mobile data and try again. |
+| Phone shows "This phone is no longer connected" | It was removed (lost phone, leaver). Connect it again with a new code if it should be used. |
+| Phone shows the email/password sign-in | It isn't connected: use **Connect it with the code** on that screen, not a password. |
+| Phone orders don't print | The Print Agent PC is off or offline, or the workstation's bill printer isn't set. Orders still reach the cloud; they print when the agent is back. |
 | Licence: "This licence is for project …" | Issued for another project id. Re-issue with `--project` set to the id shown on the Licence page. |
 | Licence: "signature is not valid" | The deployment's public key doesn't match the key that signed it. Check `VITE_LICENCE_PUBLIC_KEY` and `LICENCE_PUBLIC_KEY`, then redeploy. |
 | Accounting buttons fail with a region error | `LOCATION` (functions) and `VITE_FUNCTIONS_REGION` (web) must both equal the Firestore location. |
 | Nothing prints | Print Agent not running, or wrong agent id, printer address, tenant id or login. The agent window shows the error. Print a test page. |
-| A device shows another workstation's numbers | Two devices use one workstation. Give each device its own workstation code. |
+| A device shows another workstation's numbers, or "also open on another device" | Two devices use one workstation. Give each device its own workstation (connect the second phone to a new one). |
+| "The licence allows N active workstations" | Every phone uses a workstation. Deactivate unused ones, or issue a licence with more (section I). |
 | Employee locked out | A manager uses Functions → Unlock employee on the POS, or People & Security → Employees. |
 | "Failed to resolve import" after `git pull` (your computer) | Run `pnpm install`. Scripts now do this automatically. |
 | Phone on the local network can't run the dev demo | Use the deployed **https** site, or `pnpm demo` for a local preview. |
@@ -541,7 +587,8 @@ Staff can use the system at `https://PROJECT-ID.web.app` from anywhere. A domain
 - [ ] Business, tax and branding confirmed by the accountant
 - [ ] Menu, stock and recipes imported; data quality clean
 - [ ] Every employee has their own PIN; roles and limits signed off by the owner
-- [ ] Devices installed; Print Agent auto-starts; printers and drawer tested
+- [ ] Every phone, tablet and PC connected with a code (own workstation, home-screen app); owner and manager know how to connect and remove a phone
+- [ ] Print Agent auto-starts; printers and drawer tested from a phone, also on mobile data
 - [ ] Staff trained and signed off (training manuals); manager can run End of Day; dry run clean
 - [ ] User manual and training manuals handed over (PDF with the client's name)
 - [ ] Monthly routine (section R) explained; first export of the audit package done

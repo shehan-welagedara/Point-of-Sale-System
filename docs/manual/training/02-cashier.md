@@ -59,6 +59,8 @@ The bill prints and the drawer opens for cash. The invoice number appears at the
 
 Order → **Proceed to Payment** → choose the method → enter the cash received or the reference → **Pay Now**. The **Payment Successful** screen shows the invoice and the change. **Print Receipt** prints it if it did not print automatically.
 
+The phone (connected once by the manager) works on Wi-Fi or mobile data. The bill prints on the restaurant's bill printer; the cash drawer opens there too. If a bill doesn't print, the payment is still recorded: tell the manager (the printer PC may be offline), and use **Print Receipt** later.
+
 ![Payment successful](../img/app-bright-success.jpg)
 
 ## 5. Cash drawer work (20 min)
