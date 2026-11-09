@@ -90,6 +90,14 @@ On the phone, **Reports** shows the dashboard with charts; **Detailed reports** 
 
 **Time cards:** check clock-ins and clock-outs for payroll.
 
+**Staff phones** (POS Configuration → Workstations & printers):
+
+1. **Connect a phone:** name it (*Nimal's phone*), choose **+ New workstation for this phone**, **Show the code**. The steward scans the QR code with the phone's camera and taps **Connect**. Then they add it to the home screen.
+2. **Connected phones and tablets** shows each phone, its workstation and when it was last seen.
+3. **Remove** a phone when it is lost or replaced, or its owner leaves (and end the employee). It is locked out at once.
+
+**Exercise 5a.** In the demo business, connect a phone, take an order on it, then remove it and see the phone show *This phone is no longer connected*.
+
 **Exercise 6.** Add a new steward with your own PIN, sign in on a phone with it, then suspend the employee and try again.
 
 ## 6. Weekly checks (10 min)
@@ -108,5 +116,6 @@ On the phone, **Reports** shows the dashboard with charts; **Detailed reports** 
 - [ ] Balances cash against the X report
 - [ ] Runs End of Day and understands what it does
 - [ ] Adds an employee with a PIN and ends an employee correctly
+- [ ] Connects a staff phone with a code and removes it
 
 Trainee: ____________________ Trainer: ____________________ Date: __________

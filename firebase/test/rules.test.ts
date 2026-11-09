@@ -333,3 +333,23 @@ describe("accounting and stock first (no POS)", () => {
     await assertFails(setDoc(doc(as("store"), "tenants", B, "assets", "FA-002"), { id: "FA-002", name: "Fridge", status: "active", accumulatedDep: 0 }));
   });
 });
+
+describe("connected phones and tablets", () => {
+  it("keeps pairing codes server-only and connected devices as POS terminals", async () => {
+    await seedTenant();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "devicePairings", "abc"), { tenantId: T, workstationId: "P01", label: "Phone", expiresAt: "2099-01-01T00:00:00Z" });
+      await setDoc(doc(db, "tenants", T, "members", "dev-1"), { id: "dev-1", uid: "dev-1", role: "terminal", tenantId: T, name: "Phone", email: "dev-1@devices.pos-suite.invalid", device: { workstationId: "P01" } });
+    });
+    for (const uid of ["owner", "mgr", "dev-1"]) {
+      await assertFails(getDoc(doc(as(uid), "devicePairings", "abc")));
+      await assertFails(setDoc(doc(as(uid), "devicePairings", "new"), { tenantId: T }));
+    }
+    const owner = as("owner");
+    await assertSucceeds(updateDoc(doc(owner, "tenants", T, "members", "dev-1"), { name: "Bar phone" }));
+    await assertFails(updateDoc(doc(owner, "tenants", T, "members", "dev-1"), { role: "manager" }));
+    // The device itself can't change its own record either.
+    await assertFails(updateDoc(doc(as("dev-1"), "tenants", T, "members", "dev-1"), { role: "admin" }));
+  });
+});

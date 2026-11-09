@@ -2,6 +2,25 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.2.0 — 2026-11-09
+
+**Type:** Minor (new features) · **Deploy:** functions (new `deviceApi`), security rules, hosting
+
+### For clients
+
+- **Staff can use the POS on their own phones over the internet.** A manager connects each phone once: POS Configuration → Workstations & printers → **Connect a phone** shows a QR code; the phone scans it and opens the POS. No passwords to share.
+- **Connected phones and tablets** lists every device and when it was last seen. **Remove** cuts off a lost phone or a leaver's phone at once.
+- A phone's workstation can be created while connecting it; the licence's workstation limit is now checked when workstations are added.
+
+### Changes
+
+- `deviceApi` Cloud Function: one-time pairing codes (8 characters, single use, 15 minutes, stored as SHA-256 hashes and unreadable to clients); each device gets its own POS terminal login; revoke deletes it. Used codes are cleared hourly.
+- Rules: `devicePairings` closed to clients; connected devices can't be promoted from POS terminal.
+- `/pair` page on the phone; a removed phone shows *This phone is no longer connected*; the sign-in screen points restaurant phones to their code; terminals open straight into the POS.
+- Back-office logins and the licence's user count no longer include devices.
+- Deployment manual re-validated for phones over the internet (sections A, G, K, M, O, P, Q, R, U, V and an overview); user, training and security docs updated; Noura Kitchen plan: Professional licence (12 workstations) for staff phones.
+- Tests: emulator test for pairing, rules tests, and `pnpm test:pairing` (browser, against the emulators).
+
 ## 1.1.1 — 2026-11-09
 
 **Type:** Patch

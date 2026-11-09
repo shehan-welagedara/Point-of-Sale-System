@@ -42,11 +42,15 @@ import { AuditCenter } from "./pages/audit/AuditCenter";
 import { BrandingPage, BusinessTaxPage, IntegrationsPage } from "./pages/emc/Setup";
 import { DataPage, LoginsPage, PrintQueuePage } from "./pages/emc/Admin";
 import { PosApp } from "./pages/pos/SignIn";
+import { DeviceDisconnected, PairDevice, isDeviceLogin } from "./pages/auth/Pair";
 
 export function App() {
-  const { ready, mode, user, tenant } = useApp();
+  const { ready, mode, user, tenant, role } = useApp();
   if (!ready) return <Loading />;
+  // Connecting a phone works before anyone has signed in on it.
+  if (location.pathname === "/pair") return <PairDevice />;
   if (mode === "firebase" && !user) return <Login />;
+  if (!tenant && isDeviceLogin(user?.email)) return <DeviceDisconnected />;
   if (!tenant) return <Onboarding />;
   return (
     <Routes>
@@ -118,7 +122,8 @@ export function App() {
         <Route path="setup/data" element={<DataPage />} />
         <Route index element={<Navigate to="home" replace />} />
       </Route>
-      <Route path="*" element={<Navigate to="/emc/home" replace />} />
+      {/* Connected phones and terminals only use the POS. */}
+      <Route path="*" element={<Navigate to={role === "terminal" ? "/pos" : "/emc/home"} replace />} />
     </Routes>
   );
 }

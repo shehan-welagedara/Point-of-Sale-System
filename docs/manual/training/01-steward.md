@@ -14,10 +14,13 @@
 
 ![Sign in](../img/app-bright-signin.jpg)
 
-1. Open the POS on your phone. Enter your **employee number** and **PIN**, then **Sign In**.
+1. Open the POS on your phone (the app on its home screen). Enter your **employee number** and **PIN**, then **Sign In**.
+   - Your manager connects the phone once with a code. If it shows an email and password screen, or *This phone is no longer connected*, ask the manager to connect it: never type a password there.
+   - It works on the restaurant Wi-Fi or mobile data. If the connection drops for a moment, carry on: orders are sent when it returns.
 2. Never share your PIN. Everything you do is recorded under your name.
 3. Five wrong PINs lock you out: ask your supervisor to unlock you.
 4. The phone signs you out after a short time without a touch. Sign in again; nothing is lost.
+5. Lost your phone, or got a new one? Tell the manager at once so the old one is removed.
 
 **Exercise 1.** Sign in with a wrong PIN once and read the message. Then sign in correctly.
 

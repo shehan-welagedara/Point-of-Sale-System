@@ -119,7 +119,12 @@ export function Login() {
             ← Back to sign in
           </button>
         ) : null}
-        <p className="tiny muted">POS staff sign in on the terminal with their employee number and PIN. This login is for owners, managers, accountants and POS terminal devices.</p>
+        {mode === "in" ? (
+          <div className="callout small">
+            <strong>Restaurant phone or tablet?</strong> Don't sign in here: <a href="/pair">connect it with the code</a> from the manager's screen. Staff then sign in on the POS with their employee number and PIN.
+          </div>
+        ) : null}
+        <p className="tiny muted">This login is for owners, managers, accountants and other back-office staff.</p>
       </form>
     </div>
   );

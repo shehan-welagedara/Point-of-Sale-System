@@ -7,6 +7,7 @@
  *  - auditSealer  hourly: seals new audit events into the hash chain
  *  - licenceApi   callable: verifies a vendor licence key and applies the entitlement
  *  - posAuth      callable: checks employee PINs and cards (hashes are unreadable to clients)
+ *  - deviceApi    callable: connects phones and tablets with one-time codes, and removes them
  */
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
@@ -17,6 +18,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { type Member, type StaffAuthRequest, type Tenant, DEMO_LICENCE_PUBLIC_KEY, LicenceError, TRIAL_DAYS, builtInEntitlements, clampModules, isOn, licenceStatus, newId, runStaffAuth, verifyLicence } from "@pos/core";
 import { type Actor, type LedgerRequest, LedgerError, PermissionError, UNAUDITED, makeAuditEvent, runLedgerRequest, sealPending } from "@pos/ledger";
 import { AdminStore, adminRunner, collectionRef } from "./admin-store.js";
+import { type DeviceRequest, handleDeviceRequest, prunePairings } from "./devices.js";
 
 initializeApp();
 const db = getFirestore();
@@ -111,6 +113,9 @@ export const posAuth = onCall<{ tenantId: string } & StaffAuthRequest>({ maxInst
   return runStaffAuth(new AdminStore(db, tenantId), req as StaffAuthRequest, new Date());
 });
 
+/** Phones and tablets: one-time pairing codes instead of shared passwords (see devices.ts). */
+export const deviceApi = onCall<DeviceRequest>({ maxInstances: 5 }, async (request) => handleDeviceRequest(db, request.auth?.uid, request.data));
+
 function actorType(authType: string): "user" | "service" | "system" | "unknown" {
   if (authType === "app_user") return "user";
   if (authType === "service_account" || authType === "api_key") return "service";
@@ -163,4 +168,6 @@ export const auditSealer = onSchedule({ schedule: "every 60 minutes", timeZone: 
       console.error(`sealing ${t.id} failed`, e);
     }
   }
+  // Housekeeping on the same schedule: used and expired device pairing codes.
+  await prunePairings(db, new Date()).catch((e) => console.error("pruning pairing codes failed", e));
 });

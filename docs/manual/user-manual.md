@@ -99,7 +99,7 @@ The back office is divided into **workspaces**. You only see the ones your licen
 | Storekeeper | Stock, receiving, counts, waste and purchase orders |
 | Auditor | Read-only access to everything, including the audit trail and exports |
 | Viewer | Read-only access to reports and settings |
-| POS terminal | A device login for terminals: checks, payments and print jobs only |
+| POS terminal | Connected phones, tablets and PCs (section 3.1), and the Print Agent: checks, payments and print jobs only |
 
 > **Tip:** POS staff (stewards, cashiers) do not need back-office logins. They sign in to the POS with an employee number and PIN.
 
@@ -111,9 +111,23 @@ This section covers the **terminal layout** used on counter terminals, PCs and l
 
 ### 3.1 Setting up the device (once)
 
+**Phones, tablets and counter PCs are connected with a code**, once, by the owner or a manager:
+
+1. In the back office: **POS Configuration → Workstations & printers → Connect a phone**. Name the phone (*Nimal's phone*), choose **+ New workstation for this phone** or an existing one, and press **Show the code**.
+
+   ![Connect a phone](img/pos-connect.jpg)
+
+2. On the phone, scan the QR code with the camera and tap the link (or open the system's address followed by `/pair` and type the code). Press **Connect**.
+
+   ![Connect this phone](img/pos-pair.jpg)
+
+3. The POS opens on that phone's workstation. Add it to the home screen: Share → **Add to Home Screen** (iPhone), ⋮ → **Install app** (Android).
+
+The phone now has its own login for the POS only; nobody types or shares a password. It works over the internet on Wi-Fi or mobile data. **Connected phones and tablets** on the same page lists every device and when it was last seen. **Remove** one when a phone is lost or replaced, or its owner leaves: it is locked out at once and shows *This phone is no longer connected*.
+
 ![Choose the workstation](img/pos-device.jpg)
 
-The first time the POS opens on a device, it asks **which workstation** this device is. Choose it from the list. Each workstation:
+A device connected without a workstation (or a PC opened by a manager) asks **which workstation** it is the first time the POS opens. Choose it from the list. Each workstation:
 
 - numbers its own bills (the workstation code is part of every invoice number, for example `26NOV_W01_112`);
 - keeps its own tamper-evident transaction journal;
@@ -252,7 +266,7 @@ Buttons marked **Needs approval** ask for a senior employee (see [section 5](#5-
 
 ## 4. The POS app on phones and tablets
 
-On phones (and on tablets if the administrator chooses), the POS opens as an app. There are two styles, chosen by the administrator in [POS Configuration → Mobile app style](#67-mobile-app-style):
+On phones (and on tablets if the administrator chooses), the POS opens as an app. Staff can use their own phones: a manager connects each one once with a code ([3.1](#31-setting-up-the-device-once)), and it works on the restaurant Wi-Fi or mobile data. Bills and kitchen tickets print on the restaurant's printers through the Print Agent; if the connection drops for a moment, orders carry on and are sent when it returns. There are two styles, chosen by the administrator in [POS Configuration → Mobile app style](#67-mobile-app-style):
 
 | Bright | Indigo |
 |---|---|
@@ -703,7 +717,7 @@ The standard roles are Owner/General Manager (level 1), Outlet Manager (10), Sup
 
 ### 13.4 Back-office logins
 
-Invite people by email and give them a back-office role (see [section 2](#2-signing-in-to-the-back-office)). Remove access when someone leaves.
+Invite people by email and give them a back-office role (see [section 2](#2-signing-in-to-the-back-office)). Remove access when someone leaves. Phones and tablets are not listed here: they are connected and removed under POS Configuration → Workstations & printers ([3.1](#31-setting-up-the-device-once)).
 
 ---
 
