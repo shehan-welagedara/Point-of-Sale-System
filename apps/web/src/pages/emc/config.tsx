@@ -15,6 +15,7 @@ import { resizeImage } from "../../lib/images";
 import { money, pct, stockQty } from "../../lib/format";
 import { queuePrint } from "../../lib/printing";
 import { Field, ModuleOff } from "../../components/ui";
+import { ConnectedDevices } from "./Devices";
 
 const yes = (b: unknown) => (b ? <span className="badge good">Yes</span> : <span className="badge">No</span>);
 const active = (b: unknown) => (b ? <span className="badge good">Active</span> : <span className="badge">Inactive</span>);
@@ -413,6 +414,10 @@ function PrinterTest({ printer }: { printer: Printer }) {
 export function DevicesPage() {
   const printers = useNames(C.printers);
   const rvcs = useNames(C.revenueCenters);
+  const { licence } = useApp();
+  const wsDocs = useCollection<{ id: string; active?: boolean }>(C.workstations) ?? [];
+  const existing = wsDocs.map((w) => w.id);
+  const activeCount = wsDocs.filter((w) => w.active !== false).length;
   return (
     <>
       <div className="page" style={{ paddingBottom: 0 }}>
@@ -422,19 +427,27 @@ export function DevicesPage() {
             <p className="small muted">Windows 10/11 PC or touch POS terminal running the POS full-screen. USB or network bill printer, cash drawer on the printer's RJ11 port, optional customer display.</p>
           </div>
           <div className="card pad stack tight">
-            <h3>Mobility (tablets)</h3>
-            <p className="small muted">iPad or Android tablet running the POS app. Bills and KOTs still print on the physical printers: tablets send print jobs to the Print Agent on the shop network, which drives the USB/network printers and cash drawer.</p>
+            <h3>Phones and tablets</h3>
+            <p className="small muted">Staff phones, iPads and Android tablets run the POS app in the browser over the internet (Wi-Fi or mobile data). Bills and KOTs still print on the physical printers: phones send print jobs through the cloud to the Print Agent in the restaurant, which drives the printers and cash drawer.</p>
           </div>
         </div>
       </div>
+      <ConnectedDevices />
       <CrudPage
+        fill={false}
         title="Workstations"
         subtitle="Every POS device. The code is the invoice classification code in IRD invoice numbers (e.g. 26NOV_W01_123)."
         col={C.workstations}
         idFrom="code"
         noun="workstation"
         newDoc={() => ({ code: "", name: "", propertyId: "", rvcId: "", deviceProfile: "dedicated", receiptPrinterId: "", printMode: "agent", active: true })}
-        validate={(d) => (/^[A-Z0-9]{1,15}$/.test(String(d.code ?? d.id).toUpperCase()) ? null : "Code must be 1–15 letters or digits (it appears in invoice numbers)")}
+        validate={(d) => {
+          const code = String(d.code ?? d.id).toUpperCase();
+          if (!/^[A-Z0-9]{1,15}$/.test(code)) return "Code must be 1–15 letters or digits (it appears in invoice numbers)";
+          const lim = licence.entitlements.limits.workstations;
+          if (!existing.includes(code) && d.active !== false && activeCount >= lim) return `The licence allows ${lim} active workstations. Deactivate one you no longer use, or ask your supplier for more.`;
+          return null;
+        }}
         fields={[
           { key: "code", label: "Code (invoice classification)", type: "text", required: true, readOnlyOnEdit: true },
           { key: "name", label: "Name", type: "text", required: true },
@@ -455,6 +468,7 @@ export function DevicesPage() {
         ]}
       />
       <CrudPage
+        fill={false}
         title="Printers"
         subtitle="Any 80 mm or 58 mm ESC/POS thermal printer (Epson TM series, Xprinter, Rongta, Sewoo…), USB or network."
         col={C.printers}

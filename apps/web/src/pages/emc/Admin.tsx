@@ -29,7 +29,10 @@ import { useApp, useCollection, useStore } from "../../state/app";
 export function LoginsPage() {
   const { mode, tenant, role, toast, user } = useApp();
   const store = useStore();
-  const members = useCollection<Member>(mode === "firebase" ? C.members : null);
+  const allMembers = useCollection<Member & { device?: unknown }>(mode === "firebase" ? C.members : null);
+  // Connected phones and tablets are managed with their workstations, not here.
+  const members = allMembers?.filter((m) => !m.device);
+  const devices = (allMembers?.length ?? 0) - (members?.length ?? 0);
   const [email, setEmail] = useState("");
   const [newRole, setNewRole] = useState<MemberRole>("manager");
   const canManage = role === "owner" || role === "admin";
@@ -67,6 +70,7 @@ export function LoginsPage() {
               <button className="btn primary" style={{ alignSelf: "flex-end" }} onClick={invite}>Invite</button>
             </div>
           ) : null}
+          {devices ? <p className="small muted">{devices} connected phone(s) and tablet(s) are listed under POS Configuration → Workstations &amp; printers.</p> : null}
           <div className="card table-wrap">
             {!members ? <Loading /> : (
               <table className="table">

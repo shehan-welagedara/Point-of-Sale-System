@@ -16,7 +16,8 @@ export function LicencePage() {
     revenueCenters: (useCollection<{ active: boolean }>(C.revenueCenters) ?? []).filter((p) => p.active).length,
     workstations: (useCollection<{ active: boolean }>(C.workstations) ?? []).filter((p) => p.active).length,
     employees: (useCollection<{ status: string }>(C.staff) ?? []).filter((s) => s.status === "active").length,
-    backOfficeUsers: (useCollection<Member>(C.members) ?? []).length || (mode === "local" ? 3 : 0),
+    // People only: POS terminals and connected phones count as workstations.
+    backOfficeUsers: (useCollection<Member>(C.members) ?? []).filter((m) => m.role !== "terminal").length || (mode === "local" ? 3 : 0),
   };
   const canEdit = mode === "local" || role === "owner" || role === "admin";
   const mods = tenant?.modules ?? {};

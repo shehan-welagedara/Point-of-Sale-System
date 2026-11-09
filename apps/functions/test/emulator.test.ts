@@ -211,3 +211,52 @@ describe("employee PIN checks on the server (posAuth)", () => {
     await expect(auth2({ action: "verify", staffId: "2002", pin: "7319", purpose: "signIn" })).rejects.toMatchObject({ code: "functions/permission-denied" });
   });
 });
+
+describe("phones and tablets connected with one-time codes (deviceApi)", () => {
+  const deviceApi = httpsCallable(fns, "deviceApi");
+  const dev = (data: Record<string, unknown>) => deviceApi(data).then((r) => r.data as Record<string, string>);
+
+  it("pairs a phone without a shared password, once, and removes it on its own", async () => {
+    await as(`own-${T}@demo.lk`);
+    await setDoc(doc(db, "tenants", T, "workstations", "P01"), { id: "P01", code: "P01", name: "Phone 1", propertyId: "CMB", rvcId: "R1", deviceProfile: "mobile", receiptPrinterId: "", printMode: "agent", active: true, ...stamp(owner) });
+
+    // Only managers create codes.
+    await as(`acc-${T}@demo.lk`);
+    await expect(dev({ action: "create", tenantId: T, workstationId: "P01", label: "Nimal's phone" })).rejects.toMatchObject({ code: "functions/permission-denied" });
+    await as(`own-${T}@demo.lk`);
+    await expect(dev({ action: "create", tenantId: T, workstationId: "NOPE", label: "x" })).rejects.toMatchObject({ code: "functions/failed-precondition" });
+    const { code, expiresAt } = await dev({ action: "create", tenantId: T, workstationId: "P01", label: "Nimal's phone" });
+    expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    expect(Date.parse(expiresAt!) - Date.now()).toBeGreaterThan(14 * 60_000);
+    // The codes themselves are unreadable to everyone, even the owner.
+    await expect(getDocs(collection(db, "devicePairings"))).rejects.toMatchObject({ code: "permission-denied" });
+
+    // The phone, signed out, redeems the code (lower case and without the dash works too).
+    await signOut(auth);
+    const paired = await dev({ action: "pair", code: code!.toLowerCase().replace("-", ""), userAgent: "Mozilla/5.0 (iPhone)" });
+    expect(paired).toMatchObject({ tenantId: T, workstationId: "P01", label: "Nimal's phone" });
+    await expect(dev({ action: "pair", code })).rejects.toMatchObject({ code: "functions/failed-precondition" });
+    await expect(dev({ action: "pair", code: "ABCD-EFGH" })).rejects.toMatchObject({ code: "functions/failed-precondition" });
+
+    // Its own login: a POS terminal of this business, nothing more.
+    const phone = (await signInWithEmailAndPassword(auth, paired.email!, paired.password!)).user.uid;
+    const me = (await getDoc(doc(db, "tenants", T, "members", phone))).data()!;
+    expect(me).toMatchObject({ role: "terminal", tenantId: T, name: "Nimal's phone", device: { workstationId: "P01", pairedBy: owner } });
+    await expect(dev({ action: "create", tenantId: T, workstationId: "P01", label: "Another" })).rejects.toMatchObject({ code: "functions/permission-denied" });
+    await expect(getDocs(collection(db, "tenants", T, "vouchers"))).rejects.toMatchObject({ code: "permission-denied" });
+
+    // An administrator can rename it but never promote it.
+    await as(`own-${T}@demo.lk`);
+    await setDoc(doc(db, "tenants", T, "members", phone), { name: "Nimal (bar phone)", ...stamp(owner) }, { merge: true });
+    await expect(setDoc(doc(db, "tenants", T, "members", phone), { role: "admin", ...stamp(owner) }, { merge: true })).rejects.toThrow(/PERMISSION_DENIED/);
+
+    // Removing it deletes its login: the phone can't get back in.
+    expect(await dev({ action: "revoke", tenantId: T, uid: phone })).toMatchObject({ removed: phone });
+    expect((await getDoc(doc(db, "tenants", T, "members", phone))).exists()).toBe(false);
+    await signOut(auth);
+    await expect(signInWithEmailAndPassword(auth, paired.email!, paired.password!)).rejects.toMatchObject({ code: "auth/user-not-found" });
+    // Only device logins can be removed this way.
+    await as(`own-${T}@demo.lk`);
+    await expect(dev({ action: "revoke", tenantId: T, uid: accountant })).rejects.toMatchObject({ code: "functions/not-found" });
+  }, 60_000);
+});

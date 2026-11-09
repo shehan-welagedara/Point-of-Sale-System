@@ -198,6 +198,8 @@ export interface CrudProps {
   filter?: (d: AnyDoc) => boolean;
   extraEditor?: (d: AnyDoc, setDoc: (d: AnyDoc) => void) => ReactNode;
   noun?: string;
+  /** Fit the list to the screen with its own scroll (default). Off when a page stacks several lists. */
+  fill?: boolean;
 }
 
 export function CrudPage(p: CrudProps) {
@@ -260,7 +262,7 @@ export function CrudPage(p: CrudProps) {
   }
 
   return (
-    <div className="page fill">
+    <div className={p.fill === false ? "page" : "page fill"}>
       <PageHead
         title={p.title}
         subtitle={p.subtitle}
