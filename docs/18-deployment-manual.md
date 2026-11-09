@@ -110,18 +110,22 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
    2. If asked for an edition, choose **Standard**.
    3. Location: **asia-south1 (Mumbai)**. It cannot be changed later.
    4. Choose **Production mode**; our security rules are deployed in section G.
-2. **Authentication.**
+2. **Authentication.** The back office is reached over the internet with an email and password, so set these carefully.
    1. Open **Build → Authentication → Get started → Sign-in method**.
    2. Enable **Email/Password**. Leave every other provider off, especially Phone.
+   3. **Settings → Password policy:** turn it on with *Require enforcement*, minimum length **10**, and require lowercase, uppercase and numeric characters. (The sign-up screen asks for 10 characters too; the policy makes Firebase itself refuse weaker passwords.)
+   4. **Settings → User actions:** leave **Email enumeration protection** on (the default). The "Forgot password?" screen then never reveals which addresses have accounts.
+   5. **Project settings → General → Public-facing name:** the restaurant's name, for example *Noura Kitchen*. Then **Authentication → Templates**: check the *Email address verification* and *Password reset* emails; set the sender name to the restaurant's name. Staff then receive "Noura Kitchen" emails rather than a project ID, and are less likely to find them in spam.
+   6. **Settings → Authorized domains** already lists `PROJECT-ID.web.app` and `PROJECT-ID.firebaseapp.com`. Add a custom domain here only if you set one up (section T).
 3. **Register the web app.**
    1. Open **Project settings → General → Your apps** → click the **Web** icon `</>`.
    2. Nickname: `POS web`. Leave "Firebase Hosting" unticked; the deploy sets it up.
    3. Click **Register app**.
-   4. Firebase shows a `firebaseConfig` block: `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`. **Copy these six values**; you need them in section F.
+   4. Firebase shows a `firebaseConfig` block. **You don't need to copy it:** once deployed, the app reads these settings from Firebase Hosting by itself (`/__/firebase/init.json`). Registering the app is what makes Hosting serve them. Click **Continue to console**.
 
 - [ ] Firestore created in asia-south1
-- [ ] Email/Password sign-in enabled
-- [ ] Web app registered; six config values copied
+- [ ] Email/Password sign-in enabled; password policy, public-facing name and email templates set
+- [ ] Web app registered
 
 ---
 
@@ -412,7 +416,7 @@ In **People & Security**:
 **Print Agent** (on the counter PC, or a mini-PC that is always on). It prints bills and kitchen tickets for every device, and opens the cash drawer.
 1. Install Git, Node.js 22 LTS and pnpm on that PC (as in E.1), then clone the code and run `pnpm install`.
 2. Copy `apps/print-agent/.env.example` to `apps/print-agent/.env` and fill it in:
-   - the six web config values from D.3;
+   - the six web config values (`apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`): Firebase console → **Project settings → General → Your apps → POS web → SDK setup and configuration → Config**;
    - `AGENT_EMAIL` and `AGENT_PASSWORD`: a login with the **POS terminal** role;
    - `TENANT_ID`: the business id from I.1;
    - `AGENT_ID`: the same id you set on the printers;
@@ -499,7 +503,9 @@ Devices pick up the new version by themselves: screens show **Version x is avail
 
 ---
 
-## T. Custom domain (optional)
+## T. Custom domain (optional, recommended)
+
+Staff can use the system at `https://PROJECT-ID.web.app` from anywhere. A domain of the restaurant's own (for example `books.nourakitchen.lk`) is easier to remember and to trust, and is worth setting up once the client has a domain.
 
 1. Open **Firebase console → Hosting → Add custom domain**, for example `pos.lagooncafe.lk`.
 2. Add the DNS records it shows at the client's domain registrar; certificates are issued automatically.
