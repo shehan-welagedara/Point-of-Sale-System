@@ -8,7 +8,7 @@ Follow the [deployment manual](../18-deployment-manual.md) for the technical ste
 
 ## 1. Project and deployment (vendor)
 
-The Firebase project exists and the Blaze plan is active (deployment manual B–D). The rest happens on your PC, in a terminal (Windows: PowerShell) inside the project folder; the deployment manual E–G explains each step.
+The Firebase project exists and the Blaze plan is active (deployment manual B–D). The rest happens on your PC, in **Command Prompt** (Start → *cmd*) inside the project folder; the deployment manual E–G explains each step.
 
 1. **Budget alert** on the project (deployment manual C): USD 5, alerts to the client and to you.
 2. **Your PC, once** (deployment manual E): install Git and Node.js 22 LTS; then `npm install -g pnpm@10`; get the code from the `main` branch and run `pnpm install`; sign in to Firebase (if it fails, `pnpm deploy:check` shows the fix, for example `setx NODE_OPTIONS "--use-system-ca"`):

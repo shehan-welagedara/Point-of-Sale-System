@@ -156,7 +156,7 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
 
 **What this does:** your PC gets the programs that publish the system, a copy of the code, and permission to publish to the client's project. Steps 1 and 2 are done **once** for all your clients.
 
-**Where to type the commands.** On Windows, open **Command Prompt** or **PowerShell** (Start → type *cmd* or *PowerShell*); the commands work in both. Copy each grey box, paste it, press Enter and wait until it finishes. From step 2 on, every command runs **inside the project folder** (`cd Point-of-Sale-System`).
+**Where to type the commands.** On Windows, use **Command Prompt**: Start → type *cmd* → **Command Prompt**. (In PowerShell, Windows blocks pnpm by default with *running scripts is disabled on this system*; see U if you prefer PowerShell.) Copy each grey box, paste it, press Enter and wait until it finishes. From step 2 on, every command runs **inside the project folder** (`cd Point-of-Sale-System`).
 
 1. **Install these programs** (normal installers; accept the defaults):
 
@@ -614,6 +614,7 @@ Staff can use the system at `https://PROJECT-ID.web.app` from anywhere. A domain
 | Symptom | Cause and fix |
 |---|---|
 | Deploy fails the first time with a permissions / service-agent / Eventarc error | New Google services are still being set up. Wait 5 minutes and run `pnpm release:deploy --target CLIENT-ID` again. |
+| PowerShell: *pnpm.ps1 cannot be loaded because running scripts is disabled on this system* | PowerShell blocks scripts by default. Use **Command Prompt** instead (Start → *cmd*), where the same commands work. To use PowerShell anyway, allow local scripts once for your account: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (answer **Y**), then open a new PowerShell window. |
 | `pnpm deploy:setup` shows ✗ | Do what it says on that line (install a program or sign in), then run it again. |
 | `pnpm exec firebase login` fails: *Unable to fetch the CLI MOTD and remote config*, *Failed to make request to https://auth.firebase.tools/attest*, *Your credentials are no longer valid*, or the browser page *Firebase CLI Login Failed* | The browser can reach Google but Node.js (which runs the Firebase tools) can't: antivirus HTTPS scanning, a company proxy or a firewall. Run `pnpm deploy:check`: it tests each Google service from Node.js and prints the fix for your PC. Most often that is `set NODE_OPTIONS=--use-system-ca` in Command Prompt, or `$env:NODE_OPTIONS="--use-system-ca"` in PowerShell (Node.js then trusts the same certificates as Windows; `setx NODE_OPTIONS "--use-system-ca"` keeps it for new terminals). Then run `pnpm exec firebase logout` and `pnpm exec firebase login --reauth`. If nothing helps, deploy from Cloud Shell (below). |
 | "Billing account not configured" when deploying functions | Blaze plan missing (section C). |
