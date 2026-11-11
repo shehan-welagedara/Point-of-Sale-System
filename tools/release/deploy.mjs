@@ -15,6 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { runCommand } from "./run-cmd.mjs";
+import { ensureFunctionsAccess } from "./functions-access.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -229,6 +230,18 @@ for (const c of list) {
     // First deploy: --force lets Firebase set the clean-up policy for old function images (it otherwise
     // stops to ask, which a scripted deploy can't answer). A new project has no functions to replace.
     const extra = first && parts.has("functions") ? ["--force"] : [];
+    // First deploy: Firebase's own permission step only says "We failed to modify the IAM policy". This
+    // switches on what the functions need, grants their roles and, if Google refuses, says why.
+    if (first && parts.has("functions")) {
+      if (dryRun) console.log("  first deploy: checks the project's permissions for the server functions (switches on the Compute Engine API if needed)");
+      else {
+        console.log("  checking the project's permissions for the server functions…");
+        const access = await ensureFunctionsAccess(c.projectId);
+        if (access.ok) console.log("  ✓ the server functions' permissions are in place");
+        else if (access.unexpected) console.warn(`  ! ${access.problems.join(" ")}; continuing, Firebase will try itself`);
+        else fail(`the server functions can't be deployed to ${c.projectId} yet:\n\n  ${access.problems.join("\n\n  ")}\n`);
+      }
+    }
     let done = firebase(c.projectId, rulesAndFunctions.join(","), extra, { soft: first });
     // A new project: Google switches on the services the functions need during this deploy and creates
     // their service accounts a few minutes later. Until then, granting them their roles fails ("We failed
