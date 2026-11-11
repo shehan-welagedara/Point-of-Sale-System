@@ -2,6 +2,20 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.5.3 — 2026-11-11
+
+**Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
+
+### For clients
+
+- No change in the system itself.
+
+### Changes
+
+- `release:deploy`: the first deploy of a new client needs only the Firebase login. With nothing live yet it skips both the backup and the data updates (migrations, which need the Google Cloud CLI's credentials); the next deploy runs them, and each is safe to run then.
+- Safer check of what is live: a deploy is treated as the first only when Firebase Hosting answers 404. Any other answer (no connection, an error page) stops the deploy instead of skipping the backup of a live client.
+- `pnpm deploy:setup`: the Google Cloud CLI and its two sign-ins are shown as "needed before the first update", not as blockers. Deployment manual and Noura Kitchen plan updated to match.
+
 ## 1.5.2 — 2026-11-11
 
 **Type:** Patch (deployment tools and documentation) · **Deploy:** hosting only (version number)

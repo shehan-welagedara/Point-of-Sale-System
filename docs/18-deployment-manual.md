@@ -164,7 +164,7 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
    |---|---|---|
    | **Git** | downloads the code and its updates | git-scm.com → *Download for Windows* |
    | **Node.js 22 LTS** | runs the build and the deploy tools | nodejs.org → the *LTS* button |
-   | **Google Cloud CLI** | backups and data updates on the client's project | cloud.google.com/sdk/docs/install → *Windows* installer |
+   | **Google Cloud CLI** | backups and data updates on the client's project. **Not needed for the first deploy** of a new client; install it before the first update | cloud.google.com/sdk/docs/install → *Windows* installer |
 
    Close the terminal, open a new one (so it sees the new programs), and install **pnpm**, the tool that installs the project's parts:
 
@@ -190,11 +190,13 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
 
    **Already have the code?** Bring it up to date instead: `git checkout main`, then `git pull`, then `pnpm install`.
 
-3. **Sign in** with *your* Google account, the one you added to the client's project in B.3. Each command opens the browser: choose that account and allow.
+3. **Sign in** with *your* Google account, the one you added to the client's project in B.3. The command opens the browser: choose that account and allow.
 
    ```bash
    pnpm exec firebase login
    ```
+
+   This is all the first deploy needs. **Before the first update**, install the Google Cloud CLI (table above), open a new terminal and sign in to it too, so the release tool can take backups and update the client's data:
 
    ```bash
    gcloud auth login
@@ -204,7 +206,7 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
    gcloud auth application-default login
    ```
 
-   The first lets you publish the app, the rules and the functions. The other two let the release tool take backups and update the client's data safely.
+   (`'gcloud' is not recognized` means the Google Cloud CLI isn't installed yet, or the terminal was opened before installing it.)
 
    **If `firebase login` fails** (*Unable to fetch the CLI MOTD*, *Failed to make request to auth.firebase.tools*, or *Firebase CLI Login Failed* in the browser), your PC's antivirus, proxy or firewall is stopping Node.js. Find the cause and the fix with:
 
@@ -214,9 +216,9 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
 
    It tests each Google service from Node.js and prints the exact fix (troubleshooting U has more). If nothing helps, use **Cloud Shell** in the browser instead (U, *Deploying from Cloud Shell*).
 
-- [ ] Git, Node.js 22, Google Cloud CLI and pnpm installed
+- [ ] Git, Node.js 22 and pnpm installed (Google Cloud CLI before the first update)
 - [ ] Code downloaded from `main`; `pnpm install` finished without errors
-- [ ] Signed in three times with your Google account
+- [ ] `pnpm exec firebase login` done (the two gcloud sign-ins before the first update)
 
 ---
 
@@ -262,7 +264,7 @@ You can run it again at any time: it only fills in or corrects these values. Car
    pnpm release:deploy --target CLIENT-ID --dry-run
    ```
 
-   Use the client id from F (for example `noura-kitchen`). It builds the app (about a minute) and lists each step. On the first installation it says *nothing deployed yet: this is the first deploy*, which is expected.
+   Use the client id from F (for example `noura-kitchen`). It builds the app (about a minute) and lists each step. On the first installation it says *nothing deployed yet: this is the first deploy*, which is expected: a new project has nothing to back up and no data to update, so those two steps are skipped (they run from the next deploy on, which is why the Google Cloud CLI is needed then).
 
 2. **Deploy for real:**
 
