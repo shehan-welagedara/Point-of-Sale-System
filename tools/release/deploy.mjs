@@ -51,7 +51,7 @@ function targets() {
 }
 
 const HINT = {
-  gcloud: "Install the Google Cloud CLI (https://cloud.google.com/sdk/docs/install), then run `gcloud auth login` and `gcloud auth application-default login`. For the very first deploy (nothing to back up yet) you can add --skip-backup.",
+  gcloud: "Install the Google Cloud CLI (https://cloud.google.com/sdk/docs/install), then run `gcloud auth login` and `gcloud auth application-default login`. The first deploy of a new client doesn't need it.",
   pnpm: "Install pnpm (https://pnpm.io/installation) and run `pnpm install` in the project folder.",
 };
 
@@ -90,14 +90,20 @@ function preflight() {
   return built;
 }
 
-/** The version live on a project, or null when nothing is deployed there yet. */
-async function liveVersion(projectId) {
+/**
+ * What is live on a project: { version } when a release is deployed, { none: true } only when Firebase
+ * Hosting clearly answers "nothing here" (404), and { unknown } for anything else (no connection, an
+ * error page): a live client is never mistaken for an empty one.
+ */
+async function liveState(projectId) {
   try {
-    const r = await fetch(`https://${projectId}.web.app/version.json?t=${Date.now()}`, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
-    if (!r.ok) return null;
-    return (await r.json()).version ?? null;
-  } catch {
-    return null;
+    const r = await fetch(`https://${projectId}.web.app/version.json?t=${Date.now()}`, { cache: "no-store", signal: AbortSignal.timeout(20_000) });
+    if (r.status === 404) return { none: true };
+    if (!r.ok) return { unknown: `HTTP ${r.status}` };
+    const v = (await r.json().catch(() => ({}))).version;
+    return v ? { version: v } : { unknown: "version.json without a version" };
+  } catch (e) {
+    return { unknown: e?.cause?.code ?? e?.message ?? "no connection" };
   }
 }
 
@@ -141,16 +147,22 @@ for (const c of list) {
   if (!c.projectId || c.projectId.startsWith("REPLACE")) fail(`${c.id}: set its projectId in release/clients.json`);
   console.log(`\n▶ ${c.name} (${c.projectId})`);
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const before = await liveVersion(c.projectId);
-  console.log(before ? `  live now: ${before}` : "  nothing deployed yet: this is the first deploy");
+  const state = await liveState(c.projectId);
+  if (state.unknown && !dryRun) fail(`can't tell what is live on https://${c.projectId}.web.app (${state.unknown}). Check the internet connection (\`pnpm deploy:check\`) and run the deploy again.`);
+  const first = Boolean(state.none);
+  const before = state.version;
+  console.log(before ? `  live now: ${before}` : first ? "  nothing deployed yet: this is the first deploy" : `  ! couldn't check what is live (${state.unknown})`);
   if (flag("skip-backup")) console.warn("  ! --skip-backup: no pre-release backup");
-  else if (!before) console.log("  first deploy: nothing to back up yet");
+  else if (first) console.log("  first deploy: nothing to back up yet");
   else if (c.backupBucket && !c.backupBucket.includes("REPLACE")) {
     ensureBackupBucket(c);
     run("gcloud", ["firestore", "export", `${c.backupBucket}/pre-release/${version}-${stamp}`, "--project", c.projectId, "--quiet"]);
   } else console.warn("  ! no backupBucket in release/clients.json: skipping the pre-release backup (run pnpm deploy:setup)");
   if (parts.has("indexes")) firebase(c.projectId, "firestore:indexes");
-  run("node", ["tools/release/migrate.mjs", "--project", c.projectId, ...(dryRun ? ["--dry-run"] : [])]);
+  // Data updates (migrations) need Google application default credentials (gcloud). A new project has
+  // no data yet: the first deploy skips them, and the next deploy runs them (each is safe to run later).
+  if (first) console.log("  first deploy: no data to update yet (data updates run from the next deploy on)");
+  else run("node", ["tools/release/migrate.mjs", "--project", c.projectId, ...(dryRun ? ["--dry-run"] : [])]);
   if (parts.has("functions")) {
     // Per-project function settings (Firebase reads .env.<projectId> next to the functions code).
     const env = [`LOCATION=${c.region ?? "asia-south1"}`, ...(process.env.LICENCE_PUBLIC_KEY ? [`LICENCE_PUBLIC_KEY=${process.env.LICENCE_PUBLIC_KEY}`] : [])].join("\n");

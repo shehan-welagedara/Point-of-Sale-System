@@ -11,19 +11,13 @@ Follow the [deployment manual](../18-deployment-manual.md) for the technical ste
 The Firebase project exists and the Blaze plan is active (deployment manual B–D). The rest happens on your PC, in a terminal (Windows: PowerShell) inside the project folder; the deployment manual E–G explains each step.
 
 1. **Budget alert** on the project (deployment manual C): USD 5, alerts to the client and to you.
-2. **Your PC, once** (deployment manual E): install Git, Node.js 22 LTS and the Google Cloud CLI; then `npm install -g pnpm@10`; get the code from the `main` branch and run `pnpm install`; sign in:
+2. **Your PC, once** (deployment manual E): install Git and Node.js 22 LTS; then `npm install -g pnpm@10`; get the code from the `main` branch and run `pnpm install`; sign in to Firebase (if it fails, `pnpm deploy:check` shows the fix, for example `setx NODE_OPTIONS "--use-system-ca"`):
 
 ```bash
 pnpm exec firebase login
 ```
 
-```bash
-gcloud auth login
-```
-
-```bash
-gcloud auth application-default login
-```
+   Before the first **update** (not needed now): install the Google Cloud CLI, open a new terminal, and run `gcloud auth login` and `gcloud auth application-default login`.
 
 3. **Set up Noura Kitchen** (deployment manual F). Answer *noura-kitchen*, *Noura Kitchen* and the Firebase project ID; the first time, let it create your licence key and back up `licence-keys/vendor-key.txt`:
 
