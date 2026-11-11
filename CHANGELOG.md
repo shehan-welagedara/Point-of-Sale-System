@@ -2,6 +2,20 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.5.7 — 2026-11-11
+
+**Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
+
+### For clients
+
+- No change in the system itself.
+
+### Changes
+
+- `release:deploy` gives Firebase 60 seconds instead of 10 to load the server functions before deploying them (`FUNCTIONS_DISCOVERY_TIMEOUT`). On a Windows PC with antivirus scanning the first load took longer, and the deploy stopped with *User code failed to load. Cannot determine backend specification. Timeout after 10000*.
+- First deploy: when the server functions fail, the tool now waits 3 minutes, then 5, and tries twice more (it tried once). On a new project Google creates the service accounts of the services it has just switched on a few minutes later, and Firebase can't grant them their roles until then (*We failed to modify the IAM policy for the project*).
+- Deployment manual U: rows for both messages, with a fallback through the Google Cloud console that doesn't need the Google Cloud CLI.
+
 ## 1.5.6 — 2026-11-11
 
 **Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
