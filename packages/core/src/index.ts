@@ -14,3 +14,4 @@ export * from "./journal.js";
 export * from "./validation.js";
 export * from "./cryptox.js";
 export * from "./staff-auth.js";
+export * from "./brand.js";

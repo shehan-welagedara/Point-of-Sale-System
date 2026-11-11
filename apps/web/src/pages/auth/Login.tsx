@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { COMPANY_NAME, PRODUCT_NAME } from "@pos/core";
 import { useApp } from "../../state/app";
 
 /** New back-office passwords: these logins reach the books over the internet. */
@@ -54,8 +55,9 @@ export function Login() {
         <div className="row">
           <div className="brand-logo">P</div>
           <div>
-            <h2>POS Suite</h2>
+            <h2>{PRODUCT_NAME}</h2>
             <div className="muted small">Restaurant POS · Back office · Inventory · Accounting</div>
+            <div className="tiny muted">by {COMPANY_NAME}</div>
           </div>
         </div>
         {mode === "reset" ? (

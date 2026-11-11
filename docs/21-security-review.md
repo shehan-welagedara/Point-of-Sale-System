@@ -28,6 +28,8 @@ It lists what was found, what was changed, the risk that remains, and the checkl
 | 12 | Low | Each client needed a separate build with its Firebase settings, a source of mix-ups (a build pointing at the wrong project). | **Fixed.** One build for all; settings are read from the client's hosting at start-up. The release tool refuses a build that contains a Firebase key. |
 | 13 | **High** | Staff phones over the internet needed one POS terminal login per device, each with its own verified mailbox; in practice one password would be shared and typed into every phone, and a leaver's or lost phone couldn't be cut off without signing out every phone. | **Fixed.** Devices are connected with a one-time code (8 characters, single use, 15 minutes, stored only as a hash and unreadable to clients). Each device gets its own login with the POS terminal role, created by the `deviceApi` function; nobody sees its password. **Remove** deletes that one login at once. The rules keep a connected device a POS terminal (it can't be promoted). |
 | 14 | Medium | No way to reset a forgotten back-office password except in the Firebase console. | **Fixed** (1.1.1). Forgot password? sends a reset link; the answer doesn't reveal whether an address has an account. New passwords need 10+ characters; the deployment manual sets the Firebase password policy. |
+| 15 | Medium | Bills printed "Powered by POS Suite (demo)" in real businesses: new businesses took the demo restaurant's default. | **Fixed** (1.6.0). The default is "Polymath Tech"; migration 0004 corrects existing businesses (a name the business typed itself is kept). |
+| 16 | Low | Deploying updates needed the Google Cloud CLI and a second, long-lived sign-in on the vendor's PC (application default credentials). | **Fixed** (1.6.0). The release tool uses the Firebase CLI's sign-in for backups, data updates and permissions. For data updates it lends that sign-in to the migration process through a temporary file readable only by the user, deleted when the step ends. |
 
 ## 2. Remaining risks (accepted, with controls)
 
@@ -56,7 +58,7 @@ For every client, before the first real bill:
 
 - [ ] The client owns the Google account and Firebase project, with **2-Step Verification** on; you are a member, not the owner.
 - [ ] **Budget alert** set (deployment manual, section C).
-- [ ] Deployed with `pnpm release:deploy`. `version.json` is live; six functions are listed, including `posAuth`.
+- [ ] Deployed with `pnpm release:deploy`. `version.json` is live; seven functions are listed, including `posAuth` and `deviceApi`.
 - [ ] `grant-access.sh` run: the **backup bucket** exists and Firestore **delete protection** is on.
 - [ ] The **deployment is claimed** by the client's owner: the first business was created by them, or migration 0001 ran. In the Firestore console, `deployment/config` shows their user id and `openSignup: false`.
 - [ ] **Authentication → Settings:**

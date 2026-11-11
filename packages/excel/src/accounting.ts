@@ -7,7 +7,7 @@
  * clients can see exactly what goes where, then replace the sample rows with their own.
  */
 import ExcelJS from "exceljs";
-import type { Account, Customer, InventoryItem, Vendor } from "@pos/core";
+import { type Account, type Customer, type InventoryItem, type Vendor, PRODUCT_FULL_NAME } from "@pos/core";
 
 type Col = { header: string; key: string; width: number; note?: string; list?: string[]; accountList?: boolean };
 
@@ -197,7 +197,7 @@ function header(ws: ExcelJS.Worksheet, cols: Col[], refRows: number) {
  */
 export async function buildAccountingWorkbook(opts: { chart: Account[]; items?: InventoryItem[]; asAt: string; sample: boolean; businessName?: string }): Promise<ArrayBuffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "POS Suite";
+  wb.creator = PRODUCT_FULL_NAME;
   wb.created = new Date();
   const readme = wb.addWorksheet("Read me");
   readme.columns = [{ width: 120 }];

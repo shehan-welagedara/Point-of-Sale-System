@@ -25,6 +25,8 @@ await db.doc("tenants/later-co").set({ id: "later-co", ownerUid: "owner-2", crea
 await db.doc("tenants/old-co/staff/1001").set({ id: "1001", name: "Kasun", pinHash: "h".repeat(64), pinSalt: "s".repeat(32), cardId: "CARD1001", status: "active" });
 await db.doc("tenants/old-co/accounts/3000").set({ id: "3000", code: "3000", name: "Stated capital", type: "equity" });
 await db.doc("tenants/old-co/staff/1002").set({ id: "1002", name: "Nimali", pinSet: true, status: "active" });
+await db.doc("tenants/old-co/settings/branding").set({ id: "branding", displayName: "Old Co", poweredBy: "POS Suite (demo)" });
+await db.doc("tenants/later-co/settings/branding").set({ id: "branding", displayName: "Later Co", poweredBy: "Cafe IT Services" });
 
 const migrate = () => execFileSync("node", ["tools/release/migrate.mjs", "--project", PROJECT], { cwd: root, env: process.env, encoding: "utf8" });
 console.log(migrate());
@@ -39,4 +41,6 @@ const again = migrate();
 check(/0 applied/.test(again), "second run applies nothing (recorded, idempotent)");
 check((await db.doc("tenants/old-co/accounts/3900").get()).data()?.name === "Opening balances (temporary)", "opening balances account added where books exist");
 check(!(await db.doc("tenants/later-co/accounts/3900").get()).exists, "businesses without books untouched");
-check((await db.collection("deployment/config/migrations").get()).size === 3, "every migration recorded");
+check((await db.doc("tenants/old-co/settings/branding").get()).data()?.poweredBy === "Polymath Tech", "bills: 'POS Suite (demo)' becomes 'Polymath Tech'");
+check((await db.doc("tenants/later-co/settings/branding").get()).data()?.poweredBy === "Cafe IT Services", "bills: a name the business chose is kept");
+check((await db.collection("deployment/config/migrations").get()).size === 4, "every migration recorded");

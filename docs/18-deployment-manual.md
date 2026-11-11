@@ -164,7 +164,6 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
    |---|---|---|
    | **Git** | downloads the code and its updates | git-scm.com → *Download for Windows* |
    | **Node.js 22 LTS** | runs the build and the deploy tools | nodejs.org → the *LTS* button |
-   | **Google Cloud CLI** | backups and data updates on the client's project. **Not needed for the first deploy** of a new client; install it before the first update | cloud.google.com/sdk/docs/install → *Windows* installer |
 
    Close the terminal, open a new one (so it sees the new programs), and install **pnpm**, the tool that installs the project's parts:
 
@@ -196,17 +195,7 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
    pnpm exec firebase login
    ```
 
-   This is all the first deploy needs. **Before the first update**, install the Google Cloud CLI (table above), open a new terminal and sign in to it too, so the release tool can take backups and update the client's data:
-
-   ```bash
-   gcloud auth login
-   ```
-
-   ```bash
-   gcloud auth application-default login
-   ```
-
-   (`'gcloud' is not recognized` means the Google Cloud CLI isn't installed yet, or the terminal was opened before installing it.)
+   This is the only sign-in you need, for the first deploy and for every update: the release tool uses it for the backups, the data updates and the project's permissions too. (Versions before 1.6.0 also needed the Google Cloud CLI; it isn't used any more.)
 
    **If `firebase login` fails** (*Unable to fetch the CLI MOTD*, *Failed to make request to auth.firebase.tools*, or *Firebase CLI Login Failed* in the browser), your PC's antivirus, proxy or firewall is stopping Node.js. Find the cause and the fix with:
 
@@ -216,9 +205,9 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
 
    It tests each Google service from Node.js and prints the exact fix (troubleshooting U has more). If nothing helps, use **Cloud Shell** in the browser instead (U, *Deploying from Cloud Shell*).
 
-- [ ] Git, Node.js 22 and pnpm installed (Google Cloud CLI before the first update)
+- [ ] Git, Node.js 22 and pnpm installed
 - [ ] Code downloaded from `main`; `pnpm install` finished without errors
-- [ ] `pnpm exec firebase login` done (the two gcloud sign-ins before the first update)
+- [ ] `pnpm exec firebase login` done
 
 ---
 
@@ -264,7 +253,7 @@ You can run it again at any time: it only fills in or corrects these values. Car
    pnpm release:deploy --target CLIENT-ID --dry-run
    ```
 
-   Use the client id from F (for example `noura-kitchen`). It builds the app (about a minute) and lists each step. On the first installation it says *nothing deployed yet: this is the first deploy*, which is expected: a new project has nothing to back up and no data to update, so those two steps are skipped (they run from the next deploy on, which is why the Google Cloud CLI is needed then).
+   Use the client id from F (for example `noura-kitchen`). It builds the app (about a minute) and lists each step. On the first installation it says *nothing deployed yet: this is the first deploy*, which is expected: a new project has nothing to back up and no data to update, so those two steps are skipped (they run from the next deploy on).
 
 2. **Deploy for real:**
 
@@ -273,7 +262,11 @@ You can run it again at any time: it only fills in or corrects these values. Car
    ```
 
    - The **first** deploy takes **5–10 minutes**: Google switches on Cloud Functions and the services it needs. There are no questions to answer.
-   - On a first deploy the tool also does three things by itself: it creates the web address (`PROJECT-ID.web.app`), sets the clean-up policy that stops old server-function images from costing money, and, if the server functions stop because Google is still setting up permissions on the new project (*Eventarc Service Agent*), says so, **waits 3 minutes and tries again**. Leave the window open.
+   - On a first deploy the tool also does these by itself:
+     - checks the project's permissions for the server functions: it switches on the *Compute Engine API* if needed (that creates the account the functions run as; it costs nothing by itself) and gives Google's own accounts the roles they need. If Google refuses, it says why and what to do (`pnpm deploy:access --project PROJECT-ID` runs only this check);
+     - creates the web address (`PROJECT-ID.web.app`);
+     - sets the clean-up policy that stops old server-function images from costing money;
+     - if the server functions stop because Google is still setting up the new project (*Eventarc Service Agent*), it says so, **waits 3, then 5 minutes and tries again**. Leave the window open.
    - If it still stops, read the red *Error* line, wait 5 minutes and run the same command again: every step is safe to repeat, and it continues where it stopped. Section U lists the usual messages.
    - Firebase may warn that *firebase-functions* is outdated: that's only a suggestion and can be ignored.
    - It finishes with ✓ *https://PROJECT-ID.web.app/version.json reports …*: the system is live.
@@ -586,7 +579,7 @@ If the printer is switched off or out of range, prints **wait on the phone**: th
 Updates go through the release process in [20 — Releases and updates](20-release-and-updates.md): one tested build, deployed to your staging project first, then to pilot clients, then to everyone, after closing time, with a backup before each client.
 
 - **Automatic (recommended):** tag the release (`pnpm release:version 1.1.0`, commit, `git tag v1.1.0`, push). GitHub builds and tests it, deploys to staging, and waits for your approval before each wave of clients.
-- **By hand, one client:** `pnpm build`, then `pnpm release:deploy --target CLIENT-ID` (add `--dry-run` to see the steps first).
+- **By hand, one client:** `git pull`, `pnpm install`, then `pnpm release:deploy --target CLIENT-ID` (add `--dry-run` to see the steps first). It builds the app, takes a backup of the client's database, runs any data updates and publishes, using only your Firebase sign-in.
 
 Devices pick up the new version by themselves: screens show **Version x is available**, and devices where nobody is signed in reload within a minute. **Administration → System status** shows which devices still run the old version. On the Print Agent PC, run `git pull` and `pnpm install`, then restart the agent if the release notes say so.
 
@@ -670,7 +663,7 @@ pnpm install
 pnpm exec firebase login --no-localhost
 ```
 
-4. Then continue with **F** (`pnpm deploy:setup`) and **G** exactly as on a PC. gcloud is already signed in.
+4. Then continue with **F** (`pnpm deploy:setup`) and **G** exactly as on a PC.
 5. **The licence key.** If you already created it on your PC, upload `licence-keys/vendor-key.txt` to the same folder in Cloud Shell first (⋮ menu → *Upload*), so every client uses the same key. If you create it in Cloud Shell, download it straight away (⋮ → *Download*, `Point-of-Sale-System/licence-keys/vendor-key.txt`) and back it up.
 6. After the deploy, keep a copy of `release/clients.json` (download it, or commit and push it), so the next update finds the client.
 

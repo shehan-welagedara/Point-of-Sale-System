@@ -29,8 +29,7 @@ import {
   type StaffAuthRequest,
   type StaffAuthResult,
   runStaffAuth,
-  withStaffSecrets,
-} from "@pos/core";
+  withStaffSecrets, PRODUCT_FULL_NAME, PRODUCT_NAME } from "@pos/core";
 import { type Actor, type LedgerRequest, type LedgerSettings, UNAUDITED, makeAuditEvent, runLedgerRequest, storeRunner } from "@pos/ledger";
 import { DEMO_PEOPLE, STARTER_PROPERTY_ID, type SampleKind, buildSampleStore, sampleSettings, starterConfig } from "@pos/sample-data";
 import { httpsCallable } from "firebase/functions";
@@ -201,7 +200,7 @@ function applyBrand(branding: BrandingSettings | undefined): void {
     root.style.setProperty("--brand-ink", deepenForWhite(branding.primaryColor, 6) ?? branding.primaryColor);
   }
   if (branding?.accentColor) root.style.setProperty("--accent", branding.accentColor);
-  document.title = branding?.displayName ? `${branding.displayName} · POS Suite` : "POS Suite";
+  document.title = branding?.displayName ? `${branding.displayName} · ${PRODUCT_NAME}` : PRODUCT_FULL_NAME;
 }
 
 async function sampleOps(kind: SampleKind): Promise<{ ops: WriteOp[]; modules: Tenant["modules"] }> {
