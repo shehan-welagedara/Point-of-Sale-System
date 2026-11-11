@@ -18,6 +18,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
+import { checkNetwork } from "./netcheck.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const argv = process.argv.slice(2);
@@ -69,12 +70,14 @@ console.log("1. Tools and sign-ins");
 const node = Number(process.versions.node.split(".")[0]);
 if (node >= 22) ok(`Node.js ${process.versions.node}`);
 else missing(`Node.js ${process.versions.node} (22 or newer needed)`, "Install Node.js 22 LTS from nodejs.org, then run `pnpm install` again.");
+if (await checkNetwork({ quiet: true })) ok("Node.js can reach Google and Firebase");
+else todo.push("Fix the connection as shown above (then `pnpm deploy:check` confirms it).");
 if (quiet("git", ["--version"]).ok) ok("Git");
 else missing("Git not found", "Install Git from git-scm.com (on Windows it includes Git Bash).");
 const fb = quiet("pnpm", ["exec", "firebase", "login:list"]);
 const fbAccount = /[\w.+-]+@[\w-]+\.[\w.]+/.exec(fb.out)?.[0];
 if (fb.ok && fbAccount && !/No authorized accounts/i.test(fb.out)) ok(`Firebase CLI signed in as ${fbAccount}`);
-else missing("Firebase CLI not signed in", "Run `pnpm exec firebase login` and sign in with the Google account that is a member of the client's project (manual B.3).");
+else missing("Firebase CLI not signed in", `Run \`pnpm exec firebase login${process.env.CLOUD_SHELL === "true" ? " --no-localhost" : ""}\` and sign in with the Google account that is a member of the client's project (manual B.3). If it fails, run \`pnpm deploy:check\`.`);
 const gcloud = quiet("gcloud", ["--version"]);
 if (gcloud.ok) {
   ok("Google Cloud CLI");
@@ -83,7 +86,7 @@ if (gcloud.ok) {
   else missing("gcloud not signed in", "Run `gcloud auth login`.");
 } else missing("Google Cloud CLI not found (needed for backups and data updates)", "Install the Google Cloud CLI from cloud.google.com/sdk/docs/install (Windows: the installer), then run `gcloud auth login`.");
 const adc = process.env.GOOGLE_APPLICATION_CREDENTIALS || join(win ? (process.env.APPDATA ?? join(homedir(), "AppData", "Roaming")) : join(homedir(), ".config"), "gcloud", "application_default_credentials.json");
-if (existsSync(adc)) ok("Application default credentials (used for data updates)");
+if (existsSync(adc) || process.env.CLOUD_SHELL === "true") ok("Application default credentials (used for data updates)");
 else missing("Application default credentials not set", "Run `gcloud auth application-default login` (after installing the Google Cloud CLI).");
 
 // ── 2. Licence key and settings files ──
