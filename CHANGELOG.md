@@ -2,6 +2,20 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.5.6 — 2026-11-11
+
+**Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
+
+### For clients
+
+- No change in the system itself.
+
+### Changes
+
+- Deploying from Windows: the server functions were never built, so the deploy stopped with *Could not detect runtime for functions at …\\apps\\functions\\dist*. The Firebase CLI runs `predeploy` commands through cross-env, which on Windows turns every `/` in the command into `\`; `pnpm --filter @pos/functions build` became `@pos\functions`, matched no package, and pnpm still reported success. The predeploy step is now `pnpm run build:functions` (no `/`; new root script).
+- `release:deploy` builds the server functions itself before deploying (the dry run too) and stops with a clear message if the build leaves no `apps/functions/dist/package.json` or `index.js`.
+- Clearer messages when the functions deploy fails on a first deploy, and a troubleshooting row in deployment manual U.
+
 ## 1.5.5 — 2026-11-11
 
 **Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
