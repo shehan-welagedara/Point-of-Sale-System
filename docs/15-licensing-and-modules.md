@@ -49,10 +49,10 @@ pnpm licence keygen
 - Run `keygen` once. It writes `licence-keys/vendor-key.txt`, which git ignores.
 - Back that file up offline. Losing it means re-issuing every licence.
 
-Put the public key it prints in each deployment:
+`pnpm deploy:setup` puts the public key it prints in the two settings files for you (deployment manual F). By hand, it goes in:
 
 ```bash
-# apps/web/.env.local
+# apps/web/.env.production
 VITE_LICENCE_PUBLIC_KEY=MFkw…
 # apps/functions/.env
 LICENCE_PUBLIC_KEY=MFkw…

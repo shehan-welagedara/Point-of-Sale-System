@@ -8,10 +8,18 @@ A restaurant platform for the Sri Lankan market. It combines **POS + back office
 
 | Edition | For | Stack | Branch |
 |---|---|---|---|
-| **Cloud Restaurant Edition** (Model 1, this branch) | Small to medium restaurants and cafés | Fully on Firebase, within the free tier | `claude/vigilant-allen-7sp0m4` (PR #1, to become `main`) |
+| **Cloud Restaurant Edition** (Model 1, this branch) | Small to medium restaurants and cafés | Fully on Firebase, within the free tier | [`main`](https://github.com/shehan-welagedara/Point-of-Sale-System/tree/main) |
 | **Enterprise Hotel Edition** (Model 2) | Medium to large hotels, up to 5-star | POS, guest system (OPERA Cloud-level functions) and ERPNext with HR on MariaDB, in each hotel and in Google Cloud; configured from the same Firebase console | [`enterprise/hotel-suite`](https://github.com/shehan-welagedara/Point-of-Sale-System/tree/enterprise/hotel-suite) (design and build documentation) |
 
 Shared code (`packages/*`) is changed on this branch first and merged into the enterprise branch regularly.
+
+**Branches**
+
+| Branch | What it is | Deploy from it? |
+|---|---|---|
+| `main` | The Cloud Restaurant Edition: released and tested. Every release is merged here. | **Yes**: always deploy clients from `main`. |
+| `develop` | Work in progress for the next release. It is merged into `main` (through a pull request, after the tests pass) and then matches `main` again. | No |
+| `enterprise/hotel-suite` | The Enterprise Hotel Edition: `main` plus the hotel design and build documentation. | Hotel projects only |
 
 ## Try it in one minute
 ```bash

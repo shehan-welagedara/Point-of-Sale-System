@@ -37,7 +37,7 @@ async function main() {
     mkdirSync(KEYS, { recursive: true });
     const k = await generateLicenceKeys();
     writeFileSync(file, `# Vendor licence signing key. KEEP PRIVATE. Back it up offline.\npublic=${k.publicKey}\nprivate=${k.privateKey}\n`, { mode: 0o600 });
-    console.log(`✓ Key pair written to ${file} (git-ignored).\n\nPut the PUBLIC key in every deployment:\n  apps/web/.env.local        VITE_LICENCE_PUBLIC_KEY=${k.publicKey}\n  apps/functions/.env        LICENCE_PUBLIC_KEY=${k.publicKey}`);
+    console.log(`✓ Key pair written to ${file} (git-ignored).\n\nPut the PUBLIC key in every deployment:\n  apps/web/.env.production   VITE_LICENCE_PUBLIC_KEY=${k.publicKey}\n  apps/functions/.env        LICENCE_PUBLIC_KEY=${k.publicKey}`);
     return;
   }
   if (cmd === "issue") {

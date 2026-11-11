@@ -8,11 +8,10 @@ Follow the [deployment manual](../18-deployment-manual.md) for the technical ste
 
 ## 1. Project and deployment (vendor)
 
-The Firebase project exists and the Blaze plan is active. These steps run on the vendor's PC (Windows, macOS or Linux) in the project folder.
+The Firebase project exists and the Blaze plan is active (deployment manual B–D). The rest happens on your PC, in a terminal (Windows: PowerShell) inside the project folder; the deployment manual E–G explains each step.
 
-1. Budget alert on the project (deployment manual C): USD 5, alerts to the client and to you. Bill photos add a little storage; a restaurant still normally stays within the free quotas.
-2. In `release/clients.json`, entry `noura-kitchen`: set `projectId` to the project ID and `backupBucket` to `gs://<project-id>-backups`.
-3. **Tools on this PC, once:** Node.js 22 and pnpm (`pnpm install` in the project folder), and the **Google Cloud CLI** (on Windows, the installer from cloud.google.com/sdk). Then sign in with the Google account that owns or can deploy the project:
+1. **Budget alert** on the project (deployment manual C): USD 5, alerts to the client and to you.
+2. **Your PC, once** (deployment manual E): install Git, Node.js 22 LTS and the Google Cloud CLI; then `npm install -g pnpm@10`; get the code from the `main` branch and run `pnpm install`; sign in:
 
 ```bash
 pnpm exec firebase login
@@ -26,13 +25,13 @@ gcloud auth login
 gcloud auth application-default login
 ```
 
-4. With the client's owner, run the access script once. On Windows run it in **Git Bash** (installed with Git for Windows) or in **Google Cloud Shell** (Google Cloud console → *Activate Cloud Shell*):
+3. **Set up Noura Kitchen** (deployment manual F). Answer *noura-kitchen*, *Noura Kitchen* and the Firebase project ID; the first time, let it create your licence key and back up `licence-keys/vendor-key.txt`:
 
 ```bash
-bash tools/release/grant-access.sh <project-id> pos-release@YOUR-VENDOR-PROJECT.iam.gserviceaccount.com asia-south1
+pnpm deploy:setup
 ```
 
-5. Set `"enabled": true` for `noura-kitchen`, then deploy. The release tool builds the web app first when needed (or run `pnpm build` yourself), so a dry run shows every step before anything changes:
+4. **Deploy** (deployment manual G): look at the steps first, then deploy. The first deploy takes 5–10 minutes; there is nothing to back up yet, so it skips the backup by itself.
 
 ```bash
 pnpm release:deploy --target noura-kitchen --dry-run
@@ -42,8 +41,9 @@ pnpm release:deploy --target noura-kitchen --dry-run
 pnpm release:deploy --target noura-kitchen
 ```
 
-   For the very first deploy there is nothing to back up yet: if the backup step fails because the bucket isn't ready, add `--skip-backup`. The first deploy switches on Cloud Functions and other Google services and can take 5–10 minutes; if it stops with a permissions or "service agent" error, wait 5 minutes and run it again.
-6. Check `https://<project-id>.web.app/version.json` shows the release, and that the back office's **About** page (launchpad → About) reports the same version.
+5. **Check** that `https://<project-id>.web.app` opens, and that the back office's **About** page (launchpad → About) shows the version you deployed.
+
+> Automatic updates from GitHub later (the access script in [20](../20-release-and-updates.md)) are optional; updates can always be deployed from your PC with the same `pnpm release:deploy` command.
 
 ## 2. Owner account and business
 
