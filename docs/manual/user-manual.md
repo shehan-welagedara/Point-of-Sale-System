@@ -427,12 +427,20 @@ Some roles have privileges marked **approval** (for example a cashier's paid-out
 | Hardware model | Dedicated POS / Windows PC, or Mobile (tablet / phone). |
 | **Screen style** | *Business setting* (follow Mobile app style), *Terminal layout*, *Bright app* or *Indigo app*: choose per device. |
 | Bill printer | The printer for this device's bills. |
-| Printing | *Print Agent* (recommended, works for tablets and phones), *Direct from POS Shell* (USB on this PC), or *On-screen only* (demo). |
+| Printing | *Print Agent* (the restaurant's printers, for every device), *Bluetooth printer next to this phone or tablet* (no Print Agent: for one phone and one printer), *Direct from POS Shell* (USB on this PC), or *On-screen only* (demo). |
+| Bluetooth route, paper, kitchen tickets | For Bluetooth printing: *From the browser* (Chrome on Android) or *Through the RawBT app* (Android, any Bluetooth printer); 80 or 58 mm paper; whether kitchen and bar tickets print on the same printer. |
 | Automatic sign-out | Overrides the business setting for this device (seconds; 0 = never). |
 
 **Printers:** name, role (receipt, kitchen, bar, report), model, connection (network/USB/Bluetooth), address and port, paper width (80 or 58 mm), the Print Agent that drives it, and a backup printer.
 
 **Print queue** (separate page) shows bills and tickets waiting for the Print Agent. Preview a job, print it from the browser, or mark it printed if it came out.
+
+**One phone and a Bluetooth printer.** A small business can run with one phone and one Bluetooth receipt printer beside it (for example an Xprinter XP-T80Q), without a PC: set the phone's workstation to *Bluetooth printer next to this phone or tablet*. On the phone, the **printer button** (home screen, or More → Bluetooth printer) shows whether the printer is connected:
+
+1. Switch the printer on, tap **Connect printer** → **Choose the printer** and pick it from the list.
+2. Press **Test print**.
+
+The phone remembers the printer and reconnects by itself. Bills, kitchen tickets, reports and the cash drawer all use it. If it is off, prints wait on the phone (*Printer: 2 waiting*) and come out once it is connected. Android with Chrome is recommended; on an iPhone use the Bluefy browser. A printer with classic Bluetooth only works through the RawBT app (Android).
 
 ### 6.3 Tables, order types and POS options
 
@@ -488,13 +496,16 @@ Choose exactly what your guest checks and invoices print. The preview on the rig
 
 | Group | What you can change |
 |---|---|
-| **Titles and wording** | Final bill title (fixed as TAX INVOICE when VAT registered), guest check title, what to call the employee (Server, Steward, Cashier…), total label, the note on guest checks, lines under the address, footer lines. |
+| **Final bill** | **Print the final bill as a TAX INVOICE**: on for VAT-registered businesses; off (and unavailable) when the business isn't registered, so bills print as a standard bill. |
+| **Titles and wording** | Final bill title (fixed as TAX INVOICE while bills print as tax invoices; for a standard bill, for example *INVOICE* or *BILL*), guest check title, what to call the employee (Server, Steward, Cashier…), total label, the note on guest checks, lines under the address, footer lines. |
 | **Print style** | Header alignment (centre or left), quantity style (*2 Kottu* or *Kottu x2*), title and total size, discounts shown one by one or as one total, blank lines before the cut. |
 | **Header** | Logo, address, phone, email, website, "Trading as". |
 | **Check details** | Check number, order type, table, employee name, guests, printed time. |
 | **Items** | Column headings, combine identical items, unit price for multiples, modifiers, modifier prices, notes, seat numbers. |
 | **Totals and payment** | Item count, subtotal, "You saved Rs …", payment methods, payment references, change. |
 | **Footer** | LankaQR pay-by-QR on guest checks, feedback QR on invoices (with your link and caption), guest name and loyalty points, "Powered by". |
+
+**Tax invoice or standard bill.** A business that isn't registered for VAT (or SSCL) prints a **standard bill**: the business name, address and phone, **Bill No** and **date and time**, table and server, items, service charge, total, payments and change. It has no TIN and no tax-invoice wording, as the law requires for an unregistered business. Once the business registers, turn on VAT under Administration → Business & tax, and the final bill becomes a tax invoice. A VAT-registered business can switch the tax invoice off only on its accountant's advice. A bill for a VAT-registered buyer (TIN entered on the POS) still prints as a tax invoice.
 
 **Tax invoice rules.** If your business is VAT registered, the Inland Revenue requires certain particulars on every tax invoice. These always print, and their switches show **Always on a tax invoice**:
 

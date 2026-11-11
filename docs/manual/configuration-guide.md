@@ -64,6 +64,8 @@ This guide explains each setting in plain words, with examples from a restaurant
 
 > If you are not VAT registered, leave VAT off. VAT on supplier bills is then simply part of the cost, and the system adds it to the expense for you.
 
+**Your bills.** A business that isn't VAT registered prints a **standard bill** (Bill No, date and time, items, service charge, total), not a tax invoice. Check it under POS Configuration → **Bill designer**: *Print the final bill as a TAX INVOICE* is off and can't be switched on until VAT is turned on here. Change the title there if you prefer **BILL** to **INVOICE**.
+
 ---
 
 ## 3. Accounting ideas in five minutes
