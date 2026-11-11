@@ -4,7 +4,7 @@
 
 | Branch | Edition | Rule |
 |---|---|---|
-| `claude/vigilant-allen-7sp0m4` → `main` once PR #1 is merged | Model 1: Cloud Restaurant Edition | Shared packages (`packages/*`) are changed here first |
+| `main` (work in progress on `develop`) | Model 1: Cloud Restaurant Edition | Shared packages (`packages/*`) are changed here first |
 | `enterprise/hotel-suite` (this branch) | Model 2: Enterprise Hotel Edition | Started from Model 1. **Merges Model 1 regularly** (at least every release) to receive shared fixes. Enterprise-only folders are never merged back. |
 
 Keeping the shared packages identical in both branches is what makes two editions affordable to maintain. If they drift, every tax change or bug fix must be done twice. A later option is to bring both editions into `main` behind an edition setting. The folder layout below is designed to allow that.

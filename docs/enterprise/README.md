@@ -14,7 +14,7 @@
 | Configuration | Web console on Firebase | **The same web console on Firebase**, distributing configuration to every MariaDB system |
 | ERP hosting | Built in | ERPNext **on the hotel server (option 1)** or **in Google Cloud (option 2)** |
 | Backups | Excel and audit exports (free tier) | Encrypted, locked backups in Google Cloud Storage, with restore drills |
-| Branch | `claude/vigilant-allen-7sp0m4` (PR #1, to become `main`) | `enterprise/hotel-suite` |
+| Branch | `main` (work in progress on `develop`) | `enterprise/hotel-suite` |
 
 Clients choose the edition that fits their size, requirements and budget.
 
