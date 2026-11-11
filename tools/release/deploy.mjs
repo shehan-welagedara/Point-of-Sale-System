@@ -220,7 +220,14 @@ for (const c of list) {
     // Per-project function settings (Firebase reads .env.<projectId> next to the functions code). The
     // functions are built into dist/ by Firebase just before they upload; on a fresh copy of the
     // project that folder doesn't exist yet.
-    const env = [`LOCATION=${c.region ?? "asia-south1"}`, ...(process.env.LICENCE_PUBLIC_KEY ? [`LICENCE_PUBLIC_KEY=${process.env.LICENCE_PUBLIC_KEY}`] : [])].join("\n");
+    // APP_VERSION: the release the functions report at check-in; CONSOLE_URL: where they check in
+    // (also in apps/functions/.env from `pnpm console:setup`; GitHub Actions passes it as a variable).
+    const env = [
+      `LOCATION=${c.region ?? "asia-south1"}`,
+      `APP_VERSION=${version}`,
+      ...(process.env.LICENCE_PUBLIC_KEY ? [`LICENCE_PUBLIC_KEY=${process.env.LICENCE_PUBLIC_KEY}`] : []),
+      ...(process.env.CONSOLE_URL ? [`CONSOLE_URL=${process.env.CONSOLE_URL}`] : []),
+    ].join("\n");
     if (!dryRun) {
       mkdirSync(join(root, "apps/functions/dist"), { recursive: true });
       writeFileSync(join(root, `apps/functions/dist/.env.${c.projectId}`), `${env}\n`);

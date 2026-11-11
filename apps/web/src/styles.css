@@ -211,7 +211,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .scrim, .mobile-nav { display: none; }
 .sidebar { grid-row: 2; }
 .shell > .main { grid-row: 2; display: flex; flex-direction: column; }
-.shell > .main > .sample-banner { flex: none; }
+.shell > .main > .sample-banner, .shell > .main > .supplier-banner { flex: none; }
+.supplier-banner { margin: 10px 16px 0; font-size: 14px; }
 .shell > .main > .page { width: 100%; }
 .appearance-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
 .appearance-col .grid.cols-3 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }

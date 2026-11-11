@@ -226,6 +226,19 @@ describe("licensing and POS controls", () => {
     await assertFails(setDoc(doc(as("bob"), "tenants", "bob-co"), { id: "bob-co", name: "Bob", ownerUid: "bob", plan: "enterprise", modules: {} }));
   });
 
+  it("keeps the supplier's suspension and notice server-only, while the owner controls figure sharing", async () => {
+    await seedLicensed();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), "tenants", "lic"), { supplier: { suspension: { since: "2026-11-01T00:00:00Z", graceUntil: "2026-11-08T00:00:00Z", message: "Please renew" } } });
+    });
+    const owner = as("owner");
+    await assertFails(updateDoc(doc(owner, "tenants", "lic"), { "supplier.suspension": null }));
+    await assertFails(updateDoc(doc(owner, "tenants", "lic"), { supplier: {} }));
+    await assertSucceeds(updateDoc(doc(owner, "tenants", "lic"), { shareUsage: false }));
+    await assertFails(updateDoc(doc(as("view"), "tenants", "lic"), { shareUsage: true }));
+    await assertFails(setDoc(doc(as("bob"), "tenants", "bob-co"), { id: "bob-co", name: "Bob", ownerUid: "bob", plan: "trial", modules: {}, supplier: { notice: { text: "x" } } }));
+  });
+
   it("lets terminals record sign-in control on employees but nothing else", async () => {
     await seedLicensed();
     const till = as("till");

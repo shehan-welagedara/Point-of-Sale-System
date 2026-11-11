@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { type Workstation, COLLECTIONS as C, COMPANY_NAME, MODULES, PRODUCT_NAME, editionInfo } from "@pos/core";
+import { type Tenant, type Workstation, COLLECTIONS as C, COMPANY_NAME, MODULES, PRODUCT_NAME, editionInfo } from "@pos/core";
 import { PageHead } from "../../components/ui";
 import { firebaseConfig } from "../../lib/firebase";
 import { dateColombo, dateTimeColombo } from "../../lib/format";
@@ -23,14 +23,15 @@ function inline(text: string): ReactNode[] {
   });
 }
 
-const STATUS_TEXT: Record<string, string> = { demo: "Demo", trial: "Trial", valid: "Licensed", grace: "Renewal due (grace period)", expired: "Expired" };
+const STATUS_TEXT: Record<string, string> = { demo: "Demo", trial: "Trial", valid: "Licensed", grace: "Renewal due (grace period)", expired: "Expired", suspended: "Suspended by the supplier" };
 
 /**
  * About this system: the version running here and on the server, whether an update is waiting, what
  * changed in recent releases, the licence and modules, and where the data lives. For owners and admins.
  */
 export function AboutPage() {
-  const { role, mode, tenant, licence, on, settings } = useApp();
+  const { role, mode, tenant, licence, on, settings, checkWithSupplier, updateTenant, toast } = useApp();
+  const [linkBusy, setLinkBusy] = useState(false);
   const [live, setLive] = useState<LiveVersion | null | undefined>(undefined);
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
   const devices = useCollection<DeviceStatus>(C.deviceStatus) ?? [];
@@ -149,13 +150,63 @@ export function AboutPage() {
           </p>
         </div>
         <div className="card card-body stack tight">
-          <h3>Help and support</h3>
+          <h3>{COMPANY_NAME}: help and support</h3>
+          <SupplierCard
+            link={tenant?.supplier}
+            mode={mode}
+            shareUsage={tenant?.shareUsage !== false}
+            busy={linkBusy}
+            onCheck={async () => {
+              setLinkBusy(true);
+              try {
+                const r = await checkWithSupplier();
+                if (r.ok) toast(r.applied.length ? `Checked in with ${COMPANY_NAME}: ${r.applied.join("; ")}` : `Checked in with ${COMPANY_NAME}: everything is up to date`);
+                else toast(r.error ?? "The check-in didn't work", true);
+              } catch (e) {
+                toast((e as Error).message, true);
+              } finally {
+                setLinkBusy(false);
+              }
+            }}
+            onShare={(v) => void updateTenant({ shareUsage: v }).then(() => toast(v ? "Daily figures will be shared" : "Daily figures will no longer be shared"))}
+          />
           <p className="small" style={{ margin: 0 }}>
             The user manual, the configuration guide and the training manuals come with the system as PDFs from {COMPANY_NAME}. For help, contact {COMPANY_NAME}, quoting the version and business ID above.
           </p>
           <p className="tiny muted" style={{ margin: 0 }}>{PRODUCT_NAME} © {new Date().getFullYear()} {COMPANY_NAME}. Built with open-source software including React, Vite, Firebase, ExcelJS and Zod, used under their licences.</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The link with the supplier's console: who to contact, the last check-in, and what is shared. */
+function SupplierCard({ link, mode, shareUsage, busy, onCheck, onShare }: { link: Tenant["supplier"]; mode: string; shareUsage: boolean; busy: boolean; onCheck: () => void; onShare: (v: boolean) => void }) {
+  const c = link?.contact;
+  return (
+    <div className="stack tight">
+      {c ? (
+        <dl className="about-dl">
+          {c.phone ? (<><dt>Phone</dt><dd><a href={`tel:${c.phone.replace(/\s/g, "")}`}>{c.phone}</a></dd></>) : null}
+          {c.whatsapp ? (<><dt>WhatsApp</dt><dd><a href={`https://wa.me/${c.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">{c.whatsapp}</a></dd></>) : null}
+          {c.email ? (<><dt>Email</dt><dd><a href={`mailto:${c.email}`}>{c.email}</a></dd></>) : null}
+          {c.website ? (<><dt>Website</dt><dd><a href={c.website.startsWith("http") ? c.website : `https://${c.website}`} target="_blank" rel="noreferrer">{c.website}</a></dd></>) : null}
+        </dl>
+      ) : null}
+      {mode === "firebase" ? (
+        <>
+          <span className="small">
+            {link?.lastCheckinAt ? (link.lastCheckinOk ? `Last check-in with ${COMPANY_NAME}: ${dateTimeColombo(link.lastCheckinAt)}` : `Last check-in didn't work (${dateTimeColombo(link.lastCheckinAt)}): ${link.lastCheckinError ?? "no answer"}`) : `This system checks in with ${COMPANY_NAME} once a day for licence renewals and support.`}
+          </span>
+          <div className="row wrap" style={{ gap: 8 }}>
+            <button className="btn sm" disabled={busy} onClick={onCheck}>{busy ? "Checking…" : "Check now"}</button>
+          </div>
+          <label className="row small" style={{ gap: 8 }}>
+            <input type="checkbox" checked={shareUsage} onChange={(e) => onShare(e.target.checked)} />
+            Share daily figures with {COMPANY_NAME} (number of bills, covers and sales totals for the day; no customers, items or staff)
+          </label>
+        </>
+      ) : null}
     </div>
   );
 }

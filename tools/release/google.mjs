@@ -50,6 +50,8 @@ export function clients() {
     iam: c(api.iamOrigin(), "v1"),
     storage: c(api.storageOrigin(), "storage/v1"),
     firestore: c(api.firestoreOrigin(), "v1"),
+    hosting: c(api.hostingApiOrigin(), "v1beta1"),
+    firebase: c(api.firebaseApiOrigin(), "v1beta1"),
   };
 }
 
@@ -130,4 +132,19 @@ export function childCredentials() {
   const file = join(dir, "credentials.json");
   writeFileSync(file, JSON.stringify({ type: "authorized_user", client_id: api.clientId(), client_secret: api.clientSecret(), refresh_token: refresh }), { mode: 0o600 });
   return { env: { GOOGLE_APPLICATION_CREDENTIALS: file }, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+}
+
+/**
+ * The project's web address (PROJECT-ID.web.app). New Firebase projects have no Hosting site until one
+ * is created, and a scripted deploy can't create it; this does, linked to the project's web app.
+ */
+export async function ensureHostingSite(projectId, log = () => {}) {
+  await signIn(projectId);
+  const { hosting, firebase } = clients();
+  const sites = (await hosting.get(`/projects/${projectId}/sites`)).body.sites ?? [];
+  if (sites.some((s) => s.type === "DEFAULT_SITE")) return { created: false };
+  const apps = (await firebase.get(`/projects/${projectId}/webApps`).catch(() => ({ body: {} }))).body.apps ?? [];
+  log(`creating the web address https://${projectId}.web.app`);
+  await hosting.post(`/projects/${projectId}/sites`, { ...(apps[0]?.appId ? { appId: apps[0].appId } : {}) }, { queryParams: { siteId: projectId } });
+  return { created: true, linkedApp: apps[0]?.appId ?? null };
 }

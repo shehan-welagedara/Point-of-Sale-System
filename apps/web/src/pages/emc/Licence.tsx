@@ -49,6 +49,7 @@ export function LicencePage() {
   return (
     <div className="page">
       <PageHead title="Licence & modules" subtitle="What this business is licensed for, how much of it is in use, and which licensed modules are switched on." />
+      {licence.status === "suspended" ? <div className="callout bad">The supplier has suspended this account{licence.suspension.message ? `: ${licence.suspension.message}` : ""}. Licensed modules are switched off until it is restored; data is kept.</div> : null}
       {licence.status === "expired" ? <div className="callout bad">The licence has expired. Modules are switched off until a renewed licence key is activated; data is kept.</div> : null}
       {licence.status === "grace" ? <div className="callout warn">The licence has expired and is in its grace period ({l?.graceDays} days). Activate the renewal key to avoid interruption.</div> : null}
       {l?.demoKey && mode === "firebase" ? <div className="callout warn">This licence is signed with the public demo key. Generate your own key pair (<code>pnpm licence keygen</code>) before selling licences.</div> : null}

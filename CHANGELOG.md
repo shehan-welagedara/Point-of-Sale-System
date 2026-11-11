@@ -2,6 +2,33 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.7.0 — 2026-11-11
+
+**Type:** Minor (Polymath Console and the link to it) · **Deploy:** full (new functions `consoleCheckin` and `consoleLinkNow`; security rules)
+
+### For clients
+
+- **About → Polymath Tech: help and support** shows Polymath Tech's phone, WhatsApp, email and website, and when the system last checked in with Polymath Tech. **Check now** checks in at once.
+- **Licence renewals arrive by themselves.** When Polymath Tech renews or upgrades your licence, the system picks it up within a day (or at once with Check now); there is no key to paste any more. Pasting a key by hand still works.
+- Owners and administrators see messages from Polymath Tech at the top of the back office, such as a renewal reminder a few days before the renewal date.
+- **Your choice:** About → *Share daily figures with Polymath Tech* (on by default) sends yesterday's number of bills and covers and the sales totals, nothing about customers, items or staff. Switch it off at any time.
+
+### Changes
+
+- **Polymath Console** (docs/22): Polymath Tech's own system to manage every client, in its own Firebase project. `apps/console` (React) and `apps/console-functions`:
+  - clients, with health from each daily check-in (server and device versions, errors, licences, businesses), usage figures, notes and an activity log;
+  - licences issued, renewed and upgraded from the browser, signed with the licence key held in Secret Manager; every licence kept;
+  - subscriptions and payments, with one-click licence renewal to the new paid-until date and automatic renewal reminders to the client;
+  - suspend and restore, with a grace period and a message, delivered as a signed directive;
+  - updates started from the console through the GitHub Actions release workflow, with each client's settings from the console;
+  - staff with roles (owner, admin, sales, support, engineer), Google or verified-email sign-in, and an audit log of every action.
+- **Check-in** (`packages/core/src/link.ts`, `apps/functions/src/console-link.ts`): a daily scheduled function plus *Check now*. The client proves its project with a Google-signed identity token of its own service account, so no secret is shared; the console verifies it (Google keys, audience, expiry) and matches it to the registered project (a new project number is confirmed once by an owner or admin).
+- Licences and the active/suspended status are signed with the vendor key and verified by the client with the public key it already has; older directives are ignored (no replay), and a licence is applied only when it is newer than the business's own.
+- A suspension past its grace period stops licensed modules like an expired licence (web app and server), and keeps the data. The tenant's `supplier` field is server-only (security rules).
+- Release tool: each deploy records `APP_VERSION` and `CONSOLE_URL` for the functions. Release workflow: `registry` and `request_id` inputs, a run name the console can find, and the `CONSOLE_URL` variable.
+- New commands: `pnpm console:setup`, `pnpm console:deploy`, `pnpm console:dev`, `pnpm test:console`.
+- Tests: console security rules (6), the client's `supplier` field (1), console logic unit tests (10), and an end-to-end run of the console and a client's real check-in code on the emulators.
+
 ## 1.6.0 — 2026-11-11
 
 **Type:** Minor (branding, deployment tools, fixes, documentation) · **Deploy:** full (data update 0004 runs)

@@ -10,6 +10,8 @@
     "demo": "pnpm --filter @pos/web build && pnpm --filter @pos/web exec vite preview --host --port 5173 --strictPort",
     "build": "pnpm --filter @pos/web build",
     "build:functions": "pnpm --filter @pos/functions build",
+    "build:console-functions": "pnpm --filter @pos/console-functions build",
+    "build:console": "pnpm --filter @pos/console build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "test:rules": "firebase emulators:exec --only firestore --project demo-pos-suite \"vitest run --root firebase\"",
@@ -28,6 +30,11 @@
     "deploy:setup": "node tools/release/setup.mjs",
     "deploy:check": "node tools/release/netcheck.mjs",
     "deploy:access": "node tools/release/functions-access.mjs",
+    "console:setup": "node tools/console/setup.mjs",
+    "console:deploy": "node tools/console/deploy.mjs",
+    "console:dev": "pnpm --filter @pos/console dev",
+    "test:console": "pnpm --filter @pos/console-functions build && node tools/console/emulator-env.mjs && firebase emulators:exec --config firebase.console.json --only auth,firestore,functions --project demo-polymath-console \"tsx tools/console/test-console.mts && node tools/console/ui-smoke.mjs\"",
+    "console:emulators": "pnpm --filter @pos/console-functions build && node tools/console/emulator-env.mjs && firebase emulators:start --config firebase.console.json --only auth,firestore,functions --project demo-polymath-console",
     "release:deploy": "node tools/release/deploy.mjs",
     "release:migrate": "node tools/release/migrate.mjs",
     "release:version": "node tools/release/version.mjs"
@@ -38,6 +45,7 @@
     "firebase": "11.10.0",
     "firebase-tools": "14.27.0",
     "marked": "13.0.3",
+    "tsx": "4.19.4",
     "vitest": "3.2.4"
   },
   "pnpm": {
@@ -50,5 +58,5 @@
       "@grpc/grpc-js": "^1.13.6"
     }
   },
-  "version": "1.6.0"
+  "version": "1.7.0"
 }

@@ -8,7 +8,9 @@
 #   GCP_WORKLOAD_IDENTITY_PROVIDER  projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
 #   GCP_DEPLOY_SERVICE_ACCOUNT      pos-release@<your-vendor-project>.iam.gserviceaccount.com
 #   LICENCE_PUBLIC_KEY              your licence public key (pnpm licence keygen); not a secret
+#   CONSOLE_URL                     the Polymath Console check-in address (docs/22), e.g. https://polymath-console.web.app/api/checkin
 name: Release
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Redeploy {0} {1}', github.event.inputs.target, github.event.inputs.request_id) || format('Release {0}', github.ref_name) }}
 
 on:
   push:
@@ -19,6 +21,14 @@ on:
         description: "Redeploy the current main build to: staging, wave:1, wave:2 or client ids (comma-separated)"
         required: true
         default: staging
+      registry:
+        description: "Clients as JSON (sent by the Polymath Console; empty = release/clients.json)"
+        required: false
+        default: ""
+      request_id:
+        description: "Polymath Console request id (shown in the run name)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -87,6 +97,7 @@ jobs:
         env:
           TARGET: staging
           LICENCE_PUBLIC_KEY: ${{ vars.LICENCE_PUBLIC_KEY }}
+          CONSOLE_URL: ${{ vars.CONSOLE_URL }}
 
   wave-1:
     if: github.event_name == 'push'
@@ -115,6 +126,7 @@ jobs:
         env:
           TARGET: "wave:1"
           LICENCE_PUBLIC_KEY: ${{ vars.LICENCE_PUBLIC_KEY }}
+          CONSOLE_URL: ${{ vars.CONSOLE_URL }}
 
   wave-2:
     if: github.event_name == 'push'
@@ -143,6 +155,7 @@ jobs:
         env:
           TARGET: "wave:2"
           LICENCE_PUBLIC_KEY: ${{ vars.LICENCE_PUBLIC_KEY }}
+          CONSOLE_URL: ${{ vars.CONSOLE_URL }}
 
   redeploy:
     if: github.event_name == 'workflow_dispatch'
@@ -167,7 +180,15 @@ jobs:
           service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
       - name: Deploy
-        run: node tools/release/deploy.mjs --target "${TARGET}"
+        run: |
+          if [ -n "${REGISTRY}" ]; then
+            printf '%s' "${REGISTRY}" > "${RUNNER_TEMP}/clients.json"
+            node tools/release/deploy.mjs --target "${TARGET}" --registry "${RUNNER_TEMP}/clients.json"
+          else
+            node tools/release/deploy.mjs --target "${TARGET}"
+          fi
         env:
           TARGET: ${{ github.event.inputs.target }}
+          REGISTRY: ${{ github.event.inputs.registry }}
           LICENCE_PUBLIC_KEY: ${{ vars.LICENCE_PUBLIC_KEY }}
+          CONSOLE_URL: ${{ vars.CONSOLE_URL }}
