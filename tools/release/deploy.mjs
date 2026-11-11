@@ -14,6 +14,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -58,7 +59,8 @@ const HINT = {
 function exec(cmd, args, { always = false } = {}) {
   console.log(`  $ ${cmd} ${args.join(" ")}`);
   if (dryRun && !always) return;
-  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", env: process.env, shell: win });
+  // Through the Windows shell, an argument with a space (a path under C:\Users\Some Name) needs quotes.
+  const r = spawnSync(cmd, win ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args, { cwd: root, stdio: "inherit", env: process.env, shell: win });
   if (r.error) fail(`${cmd} could not start (${r.error.message}). ${HINT[cmd] ?? ""}`);
   if (r.status !== 0) fail(`${cmd} ${args[0]} failed (exit ${r.status})${cmd === "gcloud" ? `. ${HINT.gcloud}` : ""}`);
 }
@@ -82,8 +84,37 @@ function preflight() {
   for (const f of readdirSync(assets).filter((n) => n.endsWith(".js"))) {
     if (/AIza[0-9A-Za-z_-]{35}/.test(readFileSync(join(assets, f), "utf8"))) fail(`the build contains a Firebase API key (${f}): build without apps/web/.env.local so each client uses its own project`);
   }
-  if (!process.env.LICENCE_PUBLIC_KEY) console.warn("! LICENCE_PUBLIC_KEY is not set: functions keep the value in apps/functions/.env (the public demo key if empty).");
+  const fnEnv = join(root, "apps/functions/.env");
+  const fnKey = existsSync(fnEnv) && /^LICENCE_PUBLIC_KEY=\S+/m.test(readFileSync(fnEnv, "utf8"));
+  if (!process.env.LICENCE_PUBLIC_KEY && !fnKey) console.warn("! No licence public key in apps/functions/.env: the system will accept only demo licence keys. Run `pnpm deploy:setup` to add yours.");
   return built;
+}
+
+/** The version live on a project, or null when nothing is deployed there yet. */
+async function liveVersion(projectId) {
+  try {
+    const r = await fetch(`https://${projectId}.web.app/version.json?t=${Date.now()}`, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    if (!r.ok) return null;
+    return (await r.json()).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The backup bucket (90-day retention) in the client's project, created the first time it's needed. */
+function ensureBackupBucket(c) {
+  if (dryRun) return;
+  const describe = spawnSync("gcloud", ["storage", "buckets", "describe", c.backupBucket, "--project", c.projectId], { cwd: root, stdio: "ignore", shell: win });
+  if (describe.error) fail(`gcloud could not start (${describe.error.message}). ${HINT.gcloud}`);
+  if (describe.status === 0) return;
+  console.log(`  creating the backup bucket ${c.backupBucket} (old backups deleted after 90 days)`);
+  exec("gcloud", ["storage", "buckets", "create", c.backupBucket, "--project", c.projectId, "--location", c.region ?? "asia-south1", "--uniform-bucket-level-access"]);
+  const lifecycle = join(tmpdir(), "pos-backup-lifecycle.json");
+  writeFileSync(lifecycle, '{"rule":[{"action":{"type":"Delete"},"condition":{"age":90}}]}');
+  exec("gcloud", ["storage", "buckets", "update", c.backupBucket, `--lifecycle-file=${lifecycle}`]);
+  // Firestore's own service agent writes the export files.
+  const number = spawnSync("gcloud", ["projects", "describe", c.projectId, "--format=value(projectNumber)"], { cwd: root, encoding: "utf8", shell: win }).stdout?.trim();
+  if (number) exec("gcloud", ["storage", "buckets", "add-iam-policy-binding", c.backupBucket, `--member=serviceAccount:service-${number}@gcp-sa-firestore.iam.gserviceaccount.com`, "--role=roles/storage.admin"]);
 }
 
 async function verify(projectId) {
@@ -110,10 +141,14 @@ for (const c of list) {
   if (!c.projectId || c.projectId.startsWith("REPLACE")) fail(`${c.id}: set its projectId in release/clients.json`);
   console.log(`\n▶ ${c.name} (${c.projectId})`);
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  if (!flag("skip-backup")) {
-    if (c.backupBucket && !c.backupBucket.includes("REPLACE")) run("gcloud", ["firestore", "export", `${c.backupBucket}/pre-release/${version}-${stamp}`, "--project", c.projectId, "--quiet"]);
-    else console.warn("  ! no backupBucket: skipping the pre-release backup (set one before go-live)");
-  }
+  const before = await liveVersion(c.projectId);
+  console.log(before ? `  live now: ${before}` : "  nothing deployed yet: this is the first deploy");
+  if (flag("skip-backup")) console.warn("  ! --skip-backup: no pre-release backup");
+  else if (!before) console.log("  first deploy: nothing to back up yet");
+  else if (c.backupBucket && !c.backupBucket.includes("REPLACE")) {
+    ensureBackupBucket(c);
+    run("gcloud", ["firestore", "export", `${c.backupBucket}/pre-release/${version}-${stamp}`, "--project", c.projectId, "--quiet"]);
+  } else console.warn("  ! no backupBucket in release/clients.json: skipping the pre-release backup (run pnpm deploy:setup)");
   if (parts.has("indexes")) firebase(c.projectId, "firestore:indexes");
   run("node", ["tools/release/migrate.mjs", "--project", c.projectId, ...(dryRun ? ["--dry-run"] : [])]);
   if (parts.has("functions")) {

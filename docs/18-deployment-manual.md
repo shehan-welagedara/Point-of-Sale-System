@@ -24,8 +24,8 @@ Phones work on the restaurant's Wi-Fi or on mobile data. They print in one of tw
 - B. Client's Google account and Firebase project
 - C. Billing, budget alerts and cost safety
 - D. Firebase services: database, sign-in, web app
-- E. Your computer: tools and the code
-- F. Configure the deployment
+- E. Your computer: tools, the code and sign-in
+- F. Set up the client (one command)
 - G. Deploy
 - H. First sign-in and the client's business
 - I. Licence key
@@ -42,6 +42,14 @@ Phones work on the restaurant's Wi-Fi or on mobile data. They print in one of tw
 - T. Custom domain (optional)
 - U. Troubleshooting
 - V. Hand-over checklist
+
+**The deployment in three parts:**
+
+| Part | Sections | Where you work | Roughly |
+|---|---|---|---|
+| 1. The client's Google project | A–D | In the browser (Google and Firebase consoles), with the client | 1 hour |
+| 2. Publish the system | E–G | On your PC: a few commands (E once for all clients) | 30 minutes |
+| 3. Set up, train and go live | H–V | In the system itself, with the client | 1–3 days |
 
 ---
 
@@ -144,126 +152,139 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
 
 ---
 
-## E. Your computer: tools and the code
+## E. Your computer: tools, the code and sign-in
 
-Do this once on your own laptop. You then use it for every client.
+**What this does:** your PC gets the programs that publish the system, a copy of the code, and permission to publish to the client's project. Steps 1 and 2 are done **once** for all your clients.
 
-1. **Install the tools:**
-   - **Git**: git-scm.com.
-   - **Node.js 22 LTS**: nodejs.org.
-   - **pnpm** in a terminal:
+**Where to type the commands.** On Windows, open **Windows Terminal** or **PowerShell** (Start → type *PowerShell*). Copy each grey box, paste it, press Enter and wait until it finishes. From step 2 on, every command runs **inside the project folder** (`cd Point-of-Sale-System`).
 
-     ```bash
-     npm install -g pnpm@10
-     ```
-   - **Java 21**, only if you will run the emulator tests.
-2. **Get the code** (main branch = Cloud Restaurant Edition):
+1. **Install these programs** (normal installers; accept the defaults):
 
-```bash
-git clone https://github.com/shehan-welagedara/Point-of-Sale-System.git
-```
+   | Program | Why it is needed | Where |
+   |---|---|---|
+   | **Git** | downloads the code and its updates | git-scm.com → *Download for Windows* |
+   | **Node.js 22 LTS** | runs the build and the deploy tools | nodejs.org → the *LTS* button |
+   | **Google Cloud CLI** | backups and data updates on the client's project | cloud.google.com/sdk/docs/install → *Windows* installer |
 
-```bash
-cd Point-of-Sale-System
-```
+   Close the terminal, open a new one (so it sees the new programs), and install **pnpm**, the tool that installs the project's parts:
 
-```bash
-pnpm install
-```
+   ```bash
+   npm install -g pnpm@10
+   ```
 
-3. **Your licence signing key**, once, ever ([15](15-licensing-and-modules.md)):
+   (Java 21 is only for running the emulator tests. You don't need it to deploy.)
 
-```bash
-pnpm licence keygen
-```
+2. **Get the code.** The **`main`** branch is the Cloud Restaurant Edition: always deploy from `main`.
 
-It prints a **public key** and saves the private key in `licence-keys/vendor-key.txt`. **Back this file up offline** (USB drive in a safe and a password manager). Never share it or commit it. Every client deployment needs the public key.
+   ```bash
+   git clone https://github.com/shehan-welagedara/Point-of-Sale-System.git
+   ```
 
-4. **Sign in to Firebase** from the terminal with *your* Google account (the member you added in B.3):
+   ```bash
+   cd Point-of-Sale-System
+   ```
 
-```bash
-pnpm exec firebase login
-```
+   ```bash
+   pnpm install
+   ```
 
-- [ ] Tools installed; `pnpm install` finished
-- [ ] Licence key pair created and backed up (first client only)
-- [ ] `firebase login` done
+   **Already have the code?** Bring it up to date instead: `git checkout main`, then `git pull`, then `pnpm install`.
+
+3. **Sign in** with *your* Google account, the one you added to the client's project in B.3. Each command opens the browser: choose that account and allow.
+
+   ```bash
+   pnpm exec firebase login
+   ```
+
+   ```bash
+   gcloud auth login
+   ```
+
+   ```bash
+   gcloud auth application-default login
+   ```
+
+   The first lets you publish the app, the rules and the functions. The other two let the release tool take backups and update the client's data safely.
+
+- [ ] Git, Node.js 22, Google Cloud CLI and pnpm installed
+- [ ] Code downloaded from `main`; `pnpm install` finished without errors
+- [ ] Signed in three times with your Google account
 
 ---
 
-## F. Configure the deployment
+## F. Set up the client (one command)
 
-1. **Select the client's project** and give it a short alias:
-
-```bash
-pnpm exec firebase use --add
-```
-
-Choose the project ID from B.2 and type an alias such as `lagoon`. Later, switch between clients with `pnpm exec firebase use lagoon`.
-
-2. **Web app settings: nothing per client.** The same build serves every client: on Firebase Hosting the app reads the client's project settings at start-up (`/__/firebase/init.json`). Do **not** put a client's `VITE_FIREBASE_…` values in `apps/web/.env.local` when you build a release; the release tool refuses a build that contains one. `.env.local` is only for development and the emulators. Set your licence public key once, for every build:
-
-```ini
-# apps/web/.env.production   (no Firebase values here)
-VITE_LICENCE_PUBLIC_KEY=MFkw…      # your public key from E.3
-```
-
-3. **Functions settings.** Copy `apps/functions/.env.example` to `apps/functions/.env`:
-
-```ini
-LOCATION=asia-south1               # must equal the Firestore location
-LICENCE_PUBLIC_KEY=MFkw…           # same public key
-```
-
-The release tool writes a per-client file (`.env.<project id>`) with the client's region, so one `.env` serves all clients.
-
-4. **Register the client for updates.** Add the client to `release/clients.json` (id, name, project id, region, wave, maintenance window). Then, with the client's owner, run the access script once. It lets your release robot deploy updates, creates the backup bucket (90-day retention) and switches on Firestore delete protection ([20](20-release-and-updates.md)):
+**What this does:** tells the deploy tools which Firebase project belongs to the client, and puts your licence key in place (it is what lets you issue the client's licence in section I).
 
 ```bash
-bash tools/release/grant-access.sh PROJECT-ID pos-release@YOUR-VENDOR-PROJECT.iam.gserviceaccount.com asia-south1
+pnpm deploy:setup
 ```
 
-- [ ] `firebase use` points at the client's project
-- [ ] `apps/web/.env.local` has **no** client Firebase values
-- [ ] `apps/functions/.env` filled in
-- [ ] Client in `release/clients.json`; access script run; backup bucket set
+It first checks section E (✓ for each tool and sign-in, or ✗ with exactly what to do). Then it asks three questions:
+
+| It asks | Answer with | Example |
+|---|---|---|
+| Client id | a short name, lowercase, with dashes | `noura-kitchen` |
+| Client name | the name as it appears in reports | Noura Kitchen |
+| Firebase project ID | the ID from B.2 (Firebase console → ⚙ **Project settings** → *Project ID*) | `noura-kitchen-pos` |
+
+**The first time on your PC** it also offers to create your **licence signing key**: answer `y`. The key is saved in `licence-keys/vendor-key.txt`. **Back this file up straight away** (a USB drive kept somewhere safe, and your password manager). Without it you can't issue or renew licences for any of your clients. Never share it and never upload it anywhere.
+
+It fills in, so you don't have to edit them by hand:
+
+- `release/clients.json`: the client's project ID, region (asia-south1, Mumbai), backup location, and *switched on*;
+- `apps/web/.env.production` and `apps/functions/.env`: your licence public key and the region.
+
+You can run it again at any time: it only fills in or corrects these values. Carry on to G when it finishes with no ✗.
+
+> **Automatic updates (optional, later).** If you want GitHub to deploy future updates by itself, without your PC, run the access script once with the client's owner: see [20](20-release-and-updates.md). It isn't needed for this installation.
+
+- [ ] `pnpm deploy:setup` finishes with no ✗
+- [ ] `licence-keys/vendor-key.txt` backed up (first client only)
 
 ---
 
 ## G. Deploy
 
-1. **Build and deploy** the web app, security rules, database indexes and the Cloud Functions. The release tool backs up, runs any data migrations, deploys in the safe order and checks the live version. It works from Windows, macOS and Linux; run by hand, it builds the web app itself when the build is missing or out of date. It needs the Firebase CLI login (`pnpm exec firebase login`) and the Google Cloud CLI with `gcloud auth login` and `gcloud auth application-default login`:
+**What this does:** builds the app and publishes it to the client's project together with the security rules, the database indexes and the server functions. The release tool does this in a safe order, takes a backup first whenever the client already has live data, and checks the result at the end.
+
+1. **See the steps first.** Nothing is changed:
+
+   ```bash
+   pnpm release:deploy --target CLIENT-ID --dry-run
+   ```
+
+   Use the client id from F (for example `noura-kitchen`). It builds the app (about a minute) and lists each step. On the first installation it says *nothing deployed yet: this is the first deploy*, which is expected.
+
+2. **Deploy for real:**
+
+   ```bash
+   pnpm release:deploy --target CLIENT-ID
+   ```
+
+   - The **first** deploy takes **5–10 minutes**: Google switches on Cloud Functions and the services it needs.
+   - If it stops with a permissions or *service agent* error, wait 5 minutes and run the same command again. The new services need a few minutes to be ready.
+   - If it asks whether to set up an **artifact clean-up policy**, answer **yes**.
+   - It finishes with ✓ *https://PROJECT-ID.web.app/version.json reports …*: the system is live.
+
+3. **Artifact clean-up policy**, if you weren't asked, once after the first deploy. This stops old build images from costing money:
 
 ```bash
-pnpm build
+pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1 --project PROJECT-ID
 ```
 
-```bash
-pnpm release:deploy --target CLIENT-ID
-```
-
-(`pnpm firebase:deploy` still works for a quick deploy to the project selected with `firebase use`, without backup or migrations.)
-
-- The **first** deploy switches on several Google services (Cloud Functions, Cloud Build, Artifact Registry, Eventarc, Pub/Sub, Cloud Scheduler) and can take 5–10 minutes.
-- If it stops with a permissions or "service agent" error, wait 5 minutes and run it again. The new services need a few minutes to be ready.
-- If the CLI asks whether to set up an **artifact clean-up policy**, answer **yes**.
-
-2. **Artifact clean-up policy**, if you weren't asked, after the first successful deploy. This stops old build images from costing money:
-
-```bash
-pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1
-```
-
-3. **Check** in the Firebase console:
+4. **Check** in the Firebase console:
    - **Hosting** shows a release.
    - **Firestore → Rules** shows our rules.
    - **Firestore → Indexes** lists the indexes (they may show "Building" for a few minutes).
    - **Functions** lists `ledgerApi`, `licenceApi`, `posAuth`, `deviceApi`, `auditTrail`, `auditTenant` and `auditSealer`.
    - **Firestore → Time-to-live** has a policy on `printJobs`.
 
-The system is now live at **https://PROJECT-ID.web.app** (also `.firebaseapp.com`).
+5. **Keep `release/clients.json`.** It is how the next update finds this client. If you keep your copy of the code on GitHub, commit and push it.
 
-- [ ] Deploy succeeded; seven functions listed; `https://PROJECT-ID.web.app/version.json` shows the release
+The system is now live at **https://PROJECT-ID.web.app** (also `.firebaseapp.com`). Open it: the back office **About** page (section H onwards) shows the version you deployed.
+
+- [ ] Deploy finished with ✓; seven functions listed
 - [ ] Clean-up policy set
 - [ ] The site opens on https://PROJECT-ID.web.app
 
@@ -582,7 +603,8 @@ Staff can use the system at `https://PROJECT-ID.web.app` from anywhere. A domain
 
 | Symptom | Cause and fix |
 |---|---|
-| Deploy fails the first time with a permissions / service-agent / Eventarc error | New Google services are still being set up. Wait 5 minutes and run `pnpm firebase:deploy` again. |
+| Deploy fails the first time with a permissions / service-agent / Eventarc error | New Google services are still being set up. Wait 5 minutes and run `pnpm release:deploy --target CLIENT-ID` again. |
+| `pnpm deploy:setup` shows ✗ | Do what it says on that line (install a program or sign in), then run it again. |
 | "Billing account not configured" when deploying functions | Blaze plan missing (section C). |
 | "Missing or insufficient permissions" in the app | The signed-in login doesn't have the role for that action. Check Back-office logins. |
 | Phone: "This code isn't valid any more" | Codes work once, for 15 minutes. Create a new one (Connect a phone). |

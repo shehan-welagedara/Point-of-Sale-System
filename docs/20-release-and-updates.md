@@ -49,7 +49,7 @@ For each project, `tools/release/deploy.mjs` runs, stopping at the first failure
 
 ## 4. Per client (at installation)
 
-1. Add the client to `release/clients.json`:
+1. Add the client to `release/clients.json`. `pnpm deploy:setup` does this for you (deployment manual F); by hand it looks like:
 
    ```json
    { "id": "kandy-myst", "name": "Kandy Myst Restaurant", "projectId": "kandy-myst-pos", "region": "asia-south1",
@@ -57,7 +57,7 @@ For each project, `tools/release/deploy.mjs` runs, stopping at the first failure
    ```
 
    Put your first and most closely supported clients in wave 1, everyone else in wave 2.
-2. With the client's owner, run the access script once. It grants your robot the deploy roles, creates the backup bucket (90-day retention) and switches on Firestore delete protection:
+2. **For automatic updates from GitHub (optional):** with the client's owner, run the access script once. It grants your release robot the deploy roles, creates the backup bucket (90-day retention) and switches on Firestore delete protection. If you deploy updates from your own PC with `pnpm release:deploy`, you can skip it: the release tool creates the backup bucket itself the first time it needs one. On Windows, run it in Git Bash or Google Cloud Shell:
 
    ```bash
    bash tools/release/grant-access.sh kandy-myst-pos pos-release@YOUR-VENDOR-PROJECT.iam.gserviceaccount.com asia-south1
