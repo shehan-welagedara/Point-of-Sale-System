@@ -30,9 +30,31 @@
   --m-hero-grad: linear-gradient(135deg, var(--m-accent), var(--m-accent-2));
   /* Earlier days in the bar chart: clearly visible against the card, quieter than today. */
   --m-bar-past: color-mix(in srgb, var(--m-accent) 40%, var(--m-card));
-  /* Shared dialogs (modifiers, approvals, receipts) take the app's colours. */
+  /* Shared dialogs (modifiers, approvals, receipts), keypads and notices take the app's colours, whatever
+     the device's light/dark setting: the app styles are always light. */
   --brand: var(--m-accent);
   --brand-soft: var(--m-accent-soft);
+  --brand-text: color-mix(in srgb, var(--m-accent) 88%, var(--m-text));
+  --bg: var(--m-bg);
+  --surface: var(--m-card);
+  --surface-2: color-mix(in srgb, var(--m-card) 96%, var(--m-text));
+  --sunken: color-mix(in srgb, var(--m-card) 91%, var(--m-text));
+  --text: var(--m-text);
+  --text-2: var(--m-muted);
+  --text-3: var(--m-muted);
+  --line: var(--m-line);
+  --line-strong: color-mix(in srgb, var(--m-line) 70%, var(--m-text));
+  --good: var(--m-good);
+  --good-bg: var(--m-good-soft);
+  --warn: var(--m-warn);
+  --warn-bg: var(--m-warn-soft);
+  --bad: var(--m-bad);
+  --bad-bg: var(--m-bad-soft);
+  --info: var(--m-accent);
+  --info-bg: var(--m-accent-soft);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05);
+  color-scheme: light;
   font-family: "Inter", "Segoe UI", Roboto, system-ui, sans-serif;
   color: var(--m-text);
   background: var(--m-bg);

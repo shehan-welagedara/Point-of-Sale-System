@@ -80,7 +80,7 @@ export function PayDialog({ check, amountDue, tenders, staffId, reference, onPay
           <div className="card card-body stack tight">
             <div className="row between"><span className="muted">Amount due</span><strong className="num" style={{ fontSize: 22 }}>{money(amountDue)}</strong></div>
             <div className="row between"><span className="muted">Paid</span><span className="num">{money(paid)}</span></div>
-            <div className="row between"><span className="muted">Balance</span><strong className="num" style={{ fontSize: 26, color: balance ? "var(--accent)" : "var(--good)" }}>{money(balance)}</strong></div>
+            <div className="row between"><span className="muted">Balance</span><strong className="num" style={{ fontSize: 26, color: balance ? "var(--warn)" : "var(--good)" }}>{money(balance)}</strong></div>
             {change > 0 ? <div className="row between"><span>Change due</span><strong className="num" style={{ fontSize: 26 }}>{money(change)}</strong></div> : null}
           </div>
           <div className="tender-grid">

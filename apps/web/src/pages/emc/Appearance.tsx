@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { readableTextOn } from "../../lib/contrast";
 import { type MenuCategory, type MenuImage, type MenuItem, type MobileStyle, type MobileUi, type PosSettings, type PosTheme, COLLECTIONS as C, DEFAULT_SIGN_IN } from "@pos/core";
 import { resizeImage } from "../../lib/images";
 import { useDraft } from "../../lib/useDraft";
@@ -58,7 +59,7 @@ function Preview({ theme }: { theme: PosTheme }) {
                   </>
                 );
                 return (
-                  <div key={m.id} className={`pos-item${pic ? " has-img" : ""}`} style={{ ["--cat" as string]: m.buttonColor || color.get(m.categoryId) }}>
+                  <div key={m.id} className={`pos-item${pic ? " has-img" : ""}`} style={{ ["--cat" as string]: m.buttonColor || color.get(m.categoryId), ["--cat-text" as string]: readableTextOn(m.buttonColor || color.get(m.categoryId)) }}>
                     {pic ? (<><img src={pic} alt="" /><span className="meta">{meta}</span></>) : meta}
                   </div>
                 );

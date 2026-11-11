@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 export const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "0.0.0-dev";
 export const APP_COMMIT = typeof __APP_COMMIT__ === "string" ? __APP_COMMIT__ : "dev";
 export const APP_BUILT_AT = typeof __APP_BUILT_AT__ === "string" ? __APP_BUILT_AT__ : "";
+/** Release notes for clients of the latest versions (from CHANGELOG.md at build time). */
+export const RELEASE_NOTES: { version: string; date: string; type: string; notes: string[] }[] = typeof __APP_RELEASE_NOTES__ === "object" ? __APP_RELEASE_NOTES__ : [];
 
 export interface LiveVersion {
   version: string;
