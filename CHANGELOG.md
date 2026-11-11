@@ -2,6 +2,26 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.6.0 — 2026-11-11
+
+**Type:** Minor (branding, deployment tools, fixes, documentation) · **Deploy:** full (data update 0004 runs)
+
+### For clients
+
+- The system now shows its maker: **POS Suite by Polymath Tech** on the sign-in page, the About page and the manuals.
+- **Bills:** the "Powered by" line said *POS Suite (demo)* in businesses set up before this version. It now says **Powered by Polymath Tech**. (If you typed your own text under Administration → Branding, it stays.)
+- The auditor's SAF-T file now carries the system's real version number.
+
+### Changes
+
+- `packages/core/src/brand.ts`: product and company names in one place (`PRODUCT_NAME`, `COMPANY_NAME`, `PRODUCT_FULL_NAME`, `DEFAULT_POWERED_BY`), used by the login, the page title, the About page, Excel exports (workbook author), SAF-T and the manual PDFs (cover and footer). New businesses and the demo restaurants default to "Powered by Polymath Tech".
+- Migration **0004-powered-by**: replaces exactly "POS Suite (demo)" with "Polymath Tech" in each business's branding; tested on the emulator (`pnpm test:migrations`).
+- **Updates no longer need the Google Cloud CLI.** New `tools/release/google.mjs` talks to Google with the Firebase CLI's sign-in: the pre-release backup creates the bucket (90-day retention, Firestore service agent access) and exports the database through the Firestore and Storage APIs, waiting until it finishes; data migrations get the same sign-in through a temporary credentials file (owner-only, deleted after the step). On GitHub Actions the workflow's own credentials are used. `deploy:setup` no longer checks for gcloud.
+- `functions-access.mjs` uses the shared module.
+- Removed the `pnpm firebase:deploy` script: every deploy goes through `pnpm release:deploy`, including your staging project.
+- Full system review: typecheck, unit (93), security rules (24), migrations, functions (6), phone pairing (8), browser end-to-end (67) and go-live rehearsal (25) all pass.
+- Documentation re-validated against the system: README (product name, status, printing, commands, layout), getting started (staging and client deploys through the release tool; no web config in builds), Firebase free tier (release tool sets the region and clean-up policy), accounting (deploy), deployment manual (no Google Cloud CLI; the first deploy's permissions check; updates by hand), releases (rollback from the Google Cloud console instead of gcloud), security review (findings 15–16), decisions log (D33 product and company, D34 updates without gcloud), Noura Kitchen plan (deployed).
+
 ## 1.5.8 — 2026-11-11
 
 **Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)

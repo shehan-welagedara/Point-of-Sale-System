@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { PRODUCT_FULL_NAME } from "@pos/core";
 
 export interface TableColumn<T> {
   header: string;
@@ -20,7 +21,7 @@ export interface TableSheet<T = unknown> {
 /** Report/journal export: one formatted sheet per table, money as real numbers so Excel can sum them. */
 export async function tablesToWorkbook(sheets: TableSheet<any>[]): Promise<ArrayBuffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "POS Suite";
+  wb.creator = PRODUCT_FULL_NAME;
   for (const sheet of sheets) {
     const ws = wb.addWorksheet(sheet.name.slice(0, 31));
     let start = 1;

@@ -20,6 +20,7 @@ import {
   type PosEventType,
   dataHealth,
   employeeActivity,
+  PRODUCT_FULL_NAME,
 } from "@pos/core";
 import {
   type AccountBalance,
@@ -38,6 +39,7 @@ import {
   trialBalance,
 } from "@pos/ledger";
 import { DEMO_PEOPLE } from "@pos/sample-data";
+import { APP_VERSION } from "../../lib/version";
 import { tablesToWorkbook } from "../../lib/excel";
 import { Drawer, Field, Loading, PageHead, Seg, Stat } from "../../components/ui";
 import { amount, dateTimeColombo, downloadBuffer, money, todayColombo } from "../../lib/format";
@@ -540,7 +542,7 @@ function ExportsTab() {
       const d = await load();
       const xml = generateSaft({
         business: settings.business,
-        software: { name: "POS Suite", version: "0.1.0" },
+        software: { name: PRODUCT_FULL_NAME, version: APP_VERSION },
         currency: "LKR",
         fromDate: from,
         toDate: to,
@@ -576,7 +578,7 @@ function ExportsTab() {
       const buf = await tablesToWorkbook([
         { name: "Read me", title: `Audit package – ${settings.business.legalName} (TIN ${settings.business.tin || "—"}) – ${from} to ${to}`, rows: [
           { k: "Prepared", v: new Date().toISOString() },
-          { k: "Source", v: "POS Suite ledger (universal journal), audit trail and document register" },
+          { k: "Source", v: `${PRODUCT_FULL_NAME}: ledger (universal journal), audit trail and document register` },
           { k: "Journal entries", v: `${d.entries.length} lines, debits ${d.entries.reduce((a, e) => a + e.debit, 0) / 100}, credits ${d.entries.reduce((a, e) => a + e.credit, 0) / 100}` },
           { k: "Documents", v: `${d.vouchers.length}` },
           { k: "Audit events", v: `${d.events.length}` },

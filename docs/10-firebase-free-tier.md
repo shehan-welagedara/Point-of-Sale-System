@@ -36,10 +36,9 @@ Deploy the functions for every client: licence activation and the server-side au
 4. **Usage monitoring**
    - Firestore → *Usage* tab: shows reads and writes per day against the free quota.
    - Cloud Console → *Billing → Reports*: filter by this project, and check it shows USD 0.00.
-5. **Cloud Functions settings** (before the first `pnpm firebase:deploy`)
-   - Copy `apps/functions/.env.example` to `apps/functions/.env`. Set `LOCATION` to **the same region as your Firestore database** (for example `asia-south1`). Set `VITE_FUNCTIONS_REGION` in `apps/web/.env.local` to the same value. Firestore triggers must run in the database's region.
-   - Set the Artifact Registry clean-up policy once per project and region, so old build images are deleted. The first deploy usually offers it: answer yes. If it doesn't, run this **after** the first deploy (the image repository only exists from then):
-     `pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1`
+5. **Cloud Functions settings** (the release tool handles these; listed so you know what it does)
+   - The functions run in **the same region as the Firestore database** (`asia-south1`, Mumbai): Firestore triggers must. `pnpm deploy:setup` writes `LOCATION` into `apps/functions/.env`; the web app calls `asia-south1` unless `VITE_FUNCTIONS_REGION` says otherwise. Use asia-south1 for every client and nothing needs changing.
+   - The Artifact Registry clean-up policy (old build images are deleted after a day) is set by the first `pnpm release:deploy`. To set it by hand: `pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1 --project PROJECT-ID --force`.
    - Leave **minimum instances at 0** (the code sets it). Each warm instance kept alive is billed.
    - Do not enable "Retry on failure" for the triggers.
 6. **Firestore TTL policy** (keeps the print queue from growing)
@@ -97,20 +96,17 @@ Cost-saving choices already built in:
 
 - Repeat §2 in the client's project, with the budget alert sent to the client's billing contact.
 - For one restaurant, Firestore, Hosting and Auth usually stay inside the free tier as well. The estimate is in [09-costing-proposal.md](09-costing-proposal.md).
-- Cloud Functions: repeat §2 step 5 (same region as Firestore, artifact clean-up policy, minimum instances 0).
+- Cloud Functions: the release tool sets them up (§2 step 5: same region as Firestore, artifact clean-up policy, minimum instances 0).
 - Turning on live **PayHere/WhatsApp** adds a few more functions within the same free quotas.
 
 ## 7. Commands
 
 ```bash
-# one-off
+# one-off, on your PC
 pnpm install
-npx firebase login
-npx firebase use --add          # pick your demo project, alias "demo"
+pnpm exec firebase login
 
-# deploy the web app, security rules, indexes and functions (no Storage)
-cp apps/web/.env.example apps/web/.env.local          # paste the Firebase web config
-cp apps/functions/.env.example apps/functions/.env    # LOCATION = your Firestore region
-pnpm firebase:deploy
-pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1   # after the first deploy, if it didn't ask
+# a client (or your staging project): register it once, then deploy
+pnpm deploy:setup
+pnpm release:deploy --target CLIENT-ID      # web app, security rules, indexes and functions (no Storage)
 ```

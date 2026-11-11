@@ -34,6 +34,7 @@ import {
   postGoodsReceipt,
   processDepletion,
   sendRound,
+  DEFAULT_POWERED_BY,
 } from "@pos/core";
 import { defaultChartOfAccounts, defaultLedgerSettings } from "@pos/ledger";
 import { CATEGORIES, CUSTOMERS, INVENTORY, MENU, MODIFIER_GROUPS, PREP, RECIPES, STAFF, VENDORS } from "./catalog.js";
@@ -89,7 +90,7 @@ export function sampleSettings(): {
       accentColor: "#C2410C",
       receiptHeaderLines: ["Authentic Sri Lankan Kitchen"],
       receiptFooterLines: ["Thank you for dining with us!", "Rate us: scan the QR below"],
-      poweredBy: "POS Suite (demo)",
+      poweredBy: DEFAULT_POWERED_BY,
     },
     tax: {
       id: "tax",
@@ -211,7 +212,7 @@ export function nouraSettings(): ReturnType<typeof sampleSettings> {
   return {
     ...s,
     business: { ...s.business, legalName: "Noura Kitchen", tradingName: "Noura Kitchen", tin: "", vatRegistered: false, ssclLiable: false, addressLines: ["Demo address (replace under Business & tax)", "Sri Lanka"], phone: "", email: "", website: "", isSample: true },
-    branding: { ...s.branding, displayName: "Noura Kitchen", receiptHeaderLines: [], receiptFooterLines: ["Thank you! Please come again."], poweredBy: "POS Suite (demo)" },
+    branding: { ...s.branding, displayName: "Noura Kitchen", receiptHeaderLines: [], receiptFooterLines: ["Thank you! Please come again."], poweredBy: DEFAULT_POWERED_BY },
     pos: { ...s.pos, defaultPropertyId: NOURA_PROPERTY_ID, mobile: { style: "bright", useOn: "all", showSalesOnHome: true } },
     accounting: { ...s.accounting, ledger: defaultLedgerSettings(NOURA_PROPERTY_ID) } as AccountingSettings,
     integrations: {

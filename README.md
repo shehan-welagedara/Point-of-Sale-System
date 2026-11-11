@@ -1,11 +1,11 @@
-# Point-of-Sale-System (POS Suite)
+# POS Suite by Polymath Tech
 
 > **This is the `enterprise/hotel-suite` branch: Enterprise Hotel Edition (Model 2).** It is for medium to large hotels and runs POS, guest system and ERPNext on MariaDB, in each hotel and in Google Cloud, all configured from the Firebase console. **Status: design and build documentation; the build has not started.** Start with [docs/enterprise](docs/enterprise/README.md). The rest of this README describes the Cloud Restaurant Edition (Model 1) that this branch starts from and reuses.
 
 
-A restaurant platform for the Sri Lankan market. It combines **POS + back office (EMC) + recipes and costing + inventory and purchasing (ERP) + customers (CRM) + a full general ledger + revenue reports**, with a system-wide audit trail,, all sharing one Firebase/Firestore database. Each client gets **only the modules they buy**.
+**POS Suite** is a restaurant platform for the Sri Lankan market, made by **Polymath Tech**. It combines **POS + back office (EMC) + recipes and costing + inventory and purchasing (ERP) + customers (CRM) + a full general ledger + revenue reports**, with a system-wide audit trail, all sharing one Firebase/Firestore database. Each client gets **only the modules they buy**.
 
-> **Status:** working product foundation with full demo data. Runs locally with no setup, or on Firebase within the free tier. Integrations (PayHere, LankaQR, WhatsApp) run as templates in mock mode until client accounts are approved.
+> **Status:** in production (first client: Noura Kitchen, November 2026). Runs locally with no setup for demos, and in each client's own Firebase project within the free tier. Integrations (PayHere, LankaQR, WhatsApp) run as templates in mock mode until client accounts are approved.
 
 ## Editions
 
@@ -56,7 +56,7 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | **Reports & revenue** | Dashboard, **Daily Revenue, Item-wise, Covers, Sales** (category, hour, order type, payments), checks list, **menu engineering**, monthly target, Excel export, **WhatsApp end-of-day report** (simulated until Meta approval) |
 | **CRM** | Customers, visits and spend, loyalty points, tags, business buyers printed on VAT invoices |
 | **Excel data feeders** | One workbook for menu, prices, modifiers, stock items, recipes, vendors and customers, with row-level validation on import |
-| **Printing** | Print Agent for USB/network ESC/POS printers and the cash drawer. Tablets print physical bills and KOTs through it |
+| **Printing** | Print Agent for USB/network ESC/POS printers and the cash drawer; or a phone printing straight to a **Bluetooth** receipt printer (no PC). Bills and kitchen tickets (KOTs) can share one printer |
 
 ## Documentation
 | # | Document |
@@ -77,7 +77,7 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | 14 | [**Feature coverage vs Simphony and S/4HANA**](docs/14-feature-coverage.md) |
 | 15 | [**Licensing and modules**](docs/15-licensing-and-modules.md) |
 | 16 | [**Users, access control, audit and QA**](docs/16-users-access-and-audit.md) |
-| 18 | [**Client deployment manual (A to Z)**](docs/18-deployment-manual.md) (Cloud Restaurant Edition) |
+| 18 | [**Client deployment manual (A to Z)**](docs/18-deployment-manual.md) (Cloud Restaurant Edition) · client plans: [Noura Kitchen](docs/clients/noura-kitchen.md) |
 | 19 | [**User manual and role-based training manuals for clients**](docs/manual/README.md) (Cloud Restaurant Edition; PDFs: `pnpm manual:pdf`) |
 | 20 | [**Releases and updates**](docs/20-release-and-updates.md): versions, waves, approvals, backups, migrations, rollback, support levels |
 | 21 | [**Security and reliability review**](docs/21-security-review.md) and the go-live security checklist |
@@ -95,18 +95,25 @@ pnpm test:pairing      # connecting phones with codes, in a browser against the 
 pnpm test:contrast     # text colour contrast (WCAG AA) on every POS and back-office screen, all sizes and styles
 pnpm test:golive       # go-live rehearsal: a new restaurant from empty to its first day in the books
 pnpm test:migrations   # data migrations on the Firestore emulator (needs Java)
+pnpm deploy:setup      # vendor PC: check tools and sign-in, licence key, register a client (deployment manual F)
+pnpm deploy:check      # vendor PC: can Node.js reach Google and Firebase? (antivirus, proxy, firewall)
+pnpm deploy:access --project ID  # check and fix a client project's permissions for the server functions
 pnpm release:version 1.1.0       # start a release: version + CHANGELOG entry (then tag vX.Y.Z and push)
-pnpm release:deploy --target …   # deploy the build: staging, wave:N or client ids (backup → indexes → migrations → rules/functions → hosting)
+pnpm release:deploy --target …   # deploy: staging, wave:N or client ids (backup → indexes → migrations → rules/functions → hosting); needs only `firebase login`
 pnpm manual:screenshots  # refresh the manual screenshots from the demo restaurant
 pnpm manual:pdf -- --client "Name"  # user and training manuals as A4 PDFs in manual-pdf/
 pnpm licence keygen    # vendor: create your licence signing key (once)
 pnpm licence issue …   # vendor: issue a client licence key (see docs/15)
 pnpm emulators         # local Firebase Auth + Firestore + Functions
 pnpm build             # production build of the web app
-pnpm firebase:deploy   # deploy hosting, Firestore rules/indexes and functions (see docs/10 first)
+pnpm build:functions   # build the Cloud Functions bundle
 pnpm templates         # regenerate templates/*.xlsx
 pnpm agent             # run the Print Agent (apps/print-agent/.env)
 ```
 
 ## Repository layout
-`apps/web` (back office + POS) · `apps/functions` (ledger + audit) · `apps/print-agent` · `packages/{engine,core,ledger,printing,sample-data,excel}` · `firebase/` (rules, indexes, rules tests) · `templates/` (Excel feeders) · `docs/`
+`apps/web` (back office + POS) · `apps/functions` (ledger, licence, PIN checks, phone pairing, audit) · `apps/print-agent` · `packages/{engine,core,ledger,printing,sample-data,excel}` · `firebase/` (rules, indexes, rules tests) · `tools/` (release, licence, manuals) · `release/` (clients and policy) · `templates/` (Excel feeders) · `docs/`
+
+---
+
+POS Suite © 2026 Polymath Tech. All rights reserved.

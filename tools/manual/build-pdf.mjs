@@ -26,7 +26,7 @@ const flag = (name) => {
   return i >= 0 ? argv[i + 1] : undefined;
 };
 const client = flag("client");
-const product = flag("product") ?? "Restaurant POS & Back Office";
+const product = flag("product") ?? "POS Suite by Polymath Tech · Restaurant POS & Back Office";
 const issued = new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
 const docs = [
@@ -112,7 +112,7 @@ try {
       printBackground: true,
       displayHeaderFooter: true,
       headerTemplate: "<span></span>",
-      footerTemplate: `<div style="font: 8pt sans-serif; color: #94a3b8; width: 100%; padding: 0 16mm; display: flex; justify-content: space-between;"><span>${title.replace(/</g, "&lt;")}${client ? ` · ${client.replace(/</g, "&lt;")}` : ""}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
+      footerTemplate: `<div style="font: 8pt sans-serif; color: #94a3b8; width: 100%; padding: 0 16mm; display: flex; justify-content: space-between;"><span>${title.replace(/</g, "&lt;")}${client ? ` · ${client.replace(/</g, "&lt;")}` : ""} · © Polymath Tech</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
       margin: { top: "18mm", bottom: "20mm", left: "16mm", right: "16mm" },
     });
     console.log(`  ${basename(pdf)}`);

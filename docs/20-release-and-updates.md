@@ -96,7 +96,7 @@ For each project, `tools/release/deploy.mjs` runs, stopping at the first failure
 
 Deploys run at the time you approve them. Approve after the clients' closing time (each client's `maintenanceWindow`).
 
-**By hand** (for example from your laptop, for one client):
+**By hand** (for example from your laptop, for one client). It needs only your Firebase sign-in (`pnpm exec firebase login`): the backup, the data migrations and the permissions check use it too.
 
 ```bash
 pnpm build
@@ -139,7 +139,7 @@ pnpm release:deploy --target kandy-myst
 |---|---|
 | Web app | Firebase console → Hosting → release history → **Rollback** on the previous release (one click, immediate). |
 | Rules, functions | Check out the previous tag and deploy: `git checkout v1.4.2 && pnpm build && pnpm release:deploy --target CLIENT --skip-backup`, then `git checkout main`. |
-| Data | Last resort: restore the pre-release export (`gcloud firestore import gs://…/pre-release/<version>-<time>`). This overwrites changes made since, so agree it with the client and note the invoice numbers issued in between. |
+| Data | Last resort: restore the pre-release export. Google Cloud console (the client's project) → **Firestore → Import/Export → Import**, and choose the folder `gs://PROJECT-ID-backups/pre-release/<version>-<time>`. This overwrites changes made since, so agree it with the client and note the invoice numbers issued in between. |
 
 Because each release works with the previous version's data, rolling back the app is safe without touching data.
 
