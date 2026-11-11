@@ -26,6 +26,9 @@ importers:
       marked:
         specifier: 13.0.3
         version: 13.0.3
+      tsx:
+        specifier: 4.19.4
+        version: 4.19.4
       vitest:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.15.3)(tsx@4.19.4)(yaml@2.9.1)

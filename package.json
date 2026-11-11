@@ -45,6 +45,7 @@
     "firebase": "11.10.0",
     "firebase-tools": "14.27.0",
     "marked": "13.0.3",
+    "tsx": "4.19.4",
     "vitest": "3.2.4"
   },
   "pnpm": {
