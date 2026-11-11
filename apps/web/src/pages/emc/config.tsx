@@ -435,6 +435,7 @@ export function DevicesPage() {
       <ConnectedDevices />
       <CrudPage
         fill={false}
+        beforeSave={(d) => (d.printMode === "bluetooth" ? { ...d, bluetoothVia: d.bluetoothVia === "rawbt" ? "rawbt" : "browser", paperWidthMm: Number(d.paperWidthMm) === 58 ? 58 : 80, kitchenOnBluetooth: d.kitchenOnBluetooth !== false } : d)}
         title="Workstations"
         subtitle="Every POS device. The code is the invoice classification code in IRD invoice numbers (e.g. 26NOV_W01_123)."
         col={C.workstations}
@@ -456,7 +457,17 @@ export function DevicesPage() {
           { key: "deviceProfile", label: "Hardware model", type: "select", options: [{ value: "dedicated", label: "Dedicated POS / Windows PC" }, { value: "mobile", label: "Mobile (tablet / phone)" }] },
           { key: "uiStyle", label: "Screen style", type: "select", options: [{ value: "default", label: "Business setting (Mobile app style page)" }, { value: "terminal", label: "Terminal layout" }, { value: "bright", label: "Bright app" }, { value: "indigo", label: "Indigo app" }] },
           { key: "receiptPrinterId", label: "Bill printer", type: "select", optionsFrom: { col: C.printers, filter: (p) => p.role === "receipt" } },
-          { key: "printMode", label: "Printing", type: "select", options: [{ value: "agent", label: "Print Agent (recommended, works for tablets)" }, { value: "direct", label: "Direct from POS Shell (USB on this PC)" }, { value: "preview", label: "On-screen only (demo)" }] },
+          { key: "printMode", label: "Printing", type: "select", options: [{ value: "agent", label: "Print Agent (the restaurant's printers, for every device)" }, { value: "bluetooth", label: "Bluetooth printer next to this phone or tablet (no Print Agent)" }, { value: "direct", label: "Direct from POS Shell (USB on this PC)" }, { value: "preview", label: "On-screen only (demo)" }] },
+          {
+            key: "bluetoothVia",
+            label: "Bluetooth route",
+            type: "select",
+            show: (d) => d.printMode === "bluetooth",
+            help: "Chrome on Android talks to Bluetooth LE printers directly. The RawBT app (Android) works with any Bluetooth printer. iPhone: use the Bluefy browser.",
+            options: [{ value: "browser", label: "From the browser (Chrome on Android)" }, { value: "rawbt", label: "Through the RawBT app (Android, any Bluetooth printer)" }],
+          },
+          { key: "paperWidthMm", label: "Bluetooth printer paper", type: "select", show: (d) => d.printMode === "bluetooth", options: [{ value: "80", label: "80 mm" }, { value: "58", label: "58 mm" }] },
+          { key: "kitchenOnBluetooth", label: "Kitchen and bar tickets print on this printer too", type: "bool", show: (d) => d.printMode === "bluetooth", help: "Off when the kitchen has its own printer through the Print Agent." },
           { key: "active", label: "Active", type: "bool" },
         ]}
         columns={[
@@ -464,7 +475,7 @@ export function DevicesPage() {
           { header: "Name", render: (d) => d.name },
           { header: "Model", render: (d) => (d.deviceProfile === "mobile" ? <span className="badge info">Mobile</span> : <span className="badge brand">Dedicated</span>) },
           { header: "Revenue centre", render: (d) => rvcs.get(d.rvcId) ?? "—" },
-          { header: "Bill printer", render: (d) => printers.get(d.receiptPrinterId) ?? "—" },
+          { header: "Bill printer", render: (d) => (d.printMode === "bluetooth" ? <span className="badge info">Bluetooth{d.bluetoothVia === "rawbt" ? " (RawBT)" : ""}</span> : d.printMode === "preview" ? "On screen" : (printers.get(d.receiptPrinterId) ?? "—")) },
         ]}
       />
       <CrudPage

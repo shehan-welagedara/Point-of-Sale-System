@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { type BillLayout, type BrandingSettings, type Check, type Discount, type MenuItem, type TenderMedia, COLLECTIONS as C, activeLines, computeCheckTotals, lankaQrPayload } from "@pos/core";
-import { DEFAULT_BILL_LAYOUT, TAX_INVOICE_ALWAYS, TAX_INVOICE_LOCKED, buildBill, feedbackLink, resolveBillLayout, widthForPaper } from "@pos/printing";
+import { DEFAULT_BILL_LAYOUT, TAX_INVOICE_ALWAYS, TAX_INVOICE_LOCKED, buildBill, feedbackLink, isTaxInvoice, resolveBillLayout, widthForPaper } from "@pos/printing";
 import { Field, PageHead, Seg, Toggle } from "../../components/ui";
 import { ReceiptView } from "../../components/Receipt";
 import { useDraft } from "../../lib/useDraft";
@@ -120,6 +120,8 @@ export function BillDesignerPage() {
   const [discount, setDiscount] = useState(true);
   const set = (patch: Partial<BillLayout>) => setLayout({ ...layout, ...patch });
   const vat = settings.business.vatRegistered;
+  /** The final bill prints as a tax invoice (VAT registered and switched on, or a buyer with a TIN). */
+  const taxOn = isTaxInvoice(vat, layout, buyer);
   const sample = useSampleCheck(buyer, discount);
   const branding: BrandingSettings = { ...settings.branding, receiptHeaderLines: lines(header), receiptFooterLines: lines(footer), bill: layout };
   const qr =
@@ -141,7 +143,7 @@ export function BillDesignerPage() {
     toast("Bill layout saved. New bills print with it straight away.");
   }
 
-  const locked = (k: keyof BillLayout) => vat && doc === "invoice" && k in TAX_INVOICE_LOCKED;
+  const locked = (k: keyof BillLayout) => taxOn && doc === "invoice" && k in TAX_INVOICE_LOCKED;
 
   return (
     <div className="page fill">
@@ -157,15 +159,33 @@ export function BillDesignerPage() {
       />
       <div className="appearance-grid bill-grid">
         <div className="stack appearance-col">
-          {vat ? (
-            <div className="callout small">
-              <strong>Tax invoice rules apply.</strong> Your business is VAT registered, so every final bill is an IRD tax invoice. These always print, whatever you switch off: {TAX_INVOICE_ALWAYS.join("; ")}.
+          <div className="card card-body stack">
+            <h3>Final bill: tax invoice or standard bill</h3>
+            <div className="row between bill-switch">
+              <span className="small">
+                <strong>Print the final bill as a TAX INVOICE</strong>
+                <span className="tiny muted" style={{ display: "block" }}>
+                  {vat ? "IRD tax invoice format (Gazette 2481/22). Switch off to print a standard bill." : "Only a business registered for VAT can issue tax invoices. Turn on VAT under Administration → Business & tax once the business is registered."}
+                </span>
+              </span>
+              <Toggle on={vat && layout.taxInvoice} disabled={!vat} onChange={(v) => set({ taxInvoice: v })} label="Print the final bill as a TAX INVOICE" />
             </div>
-          ) : null}
+            {vat && layout.taxInvoice ? (
+              <div className="callout small"><strong>Tax invoice rules apply.</strong> These always print, whatever you switch off below: {TAX_INVOICE_ALWAYS.join("; ")}.</div>
+            ) : vat ? (
+              <div className="callout warn small">
+                <strong>Standard bills while VAT registered.</strong> A VAT-registered business must give tax invoices; switch this off only on your accountant's advice. A bill for a VAT-registered buyer (their TIN entered on the POS) still prints as a tax invoice, and VAT is still charged and shown.
+              </div>
+            ) : (
+              <div className="callout small">
+                <strong>Standard bill</strong> (for businesses not registered for VAT or SSCL): business name, address and phone, bill number, date and time, table and server, items, service charge, total, payments and change. No TIN and no tax-invoice wording.
+              </div>
+            )}
+          </div>
           <div className="card card-body stack">
             <h3>Titles and wording</h3>
             <div className="grid cols-2">
-              <Field label="Final bill title" help={vat ? "Fixed as TAX INVOICE for VAT-registered businesses." : undefined}><input className="input" disabled={vat} value={vat ? "TAX INVOICE" : layout.invoiceTitle} onChange={(e) => set({ invoiceTitle: e.target.value })} /></Field>
+              <Field label="Final bill title" help={taxOn ? "Fixed as TAX INVOICE while bills print as tax invoices." : "For example INVOICE or BILL."}><input className="input" disabled={taxOn} value={taxOn ? "TAX INVOICE" : layout.invoiceTitle} onChange={(e) => set({ invoiceTitle: e.target.value })} aria-label="Final bill title" /></Field>
               <Field label="Guest check title"><input className="input" value={layout.guestCheckTitle} onChange={(e) => set({ guestCheckTitle: e.target.value })} /></Field>
               <Field label="Employee label"><input className="input" value={layout.serverLabel} placeholder="Server" onChange={(e) => set({ serverLabel: e.target.value })} /></Field>
               <Field label="Total label"><input className="input" value={layout.totalLabel} onChange={(e) => set({ totalLabel: e.target.value })} /></Field>
@@ -212,7 +232,7 @@ export function BillDesignerPage() {
         <div className="stack appearance-col bill-preview-col">
           <div className="card card-body stack">
             <div className="row wrap between">
-              <Seg<Doc> value={doc} onChange={setDoc} options={[{ value: "invoice", label: vat ? "Tax invoice" : "Invoice" }, { value: "guestCheck", label: "Guest check" }]} />
+              <Seg<Doc> value={doc} onChange={setDoc} options={[{ value: "invoice", label: vat && layout.taxInvoice ? "Tax invoice" : "Final bill" }, { value: "guestCheck", label: "Guest check" }]} />
               <Seg<"80" | "58"> value={String(paper) as "80" | "58"} onChange={(v) => setPaper(Number(v) as 80 | 58)} options={[{ value: "80", label: "80 mm" }, { value: "58", label: "58 mm" }]} />
             </div>
             <div className="row wrap">

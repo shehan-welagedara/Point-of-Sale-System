@@ -156,7 +156,7 @@ export function PaySuccess({ api, result, onDone }: { api: PosApi; result: PaidR
     if (!printed) {
       void api.print("receipt", { ...result.doc, blocks: result.doc.blocks.filter((b) => b.t !== "drawer") }, printer).then(() => {
         setPrinted(true);
-        if (printer && api.ws.printMode !== "preview") toast("Receipt sent to the printer");
+        if ((printer || api.ws.printMode === "bluetooth") && api.ws.printMode !== "preview") toast("Receipt sent to the printer");
       });
       return;
     }

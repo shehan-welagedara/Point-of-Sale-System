@@ -395,6 +395,69 @@ try {
     check("setup checklist lists the steps for the chosen modules", (await page.locator("tbody tr").count()) >= 8);
   }
 
+  // ── One phone, one Bluetooth printer, no Print Agent (small businesses): an Android phone prints
+  //    bills, kitchen tickets and the drawer kick straight to an Xprinter over Web Bluetooth.
+  {
+    await page.goto(`${B}/emc/setup/devices?mode=local`);
+    await page.waitForTimeout(900);
+    await page.locator("tr.clickable", { hasText: "T01" }).first().click();
+    await page.locator(".drawer .field", { hasText: /^Printing/ }).locator("select").selectOption("bluetooth");
+    await page.waitForTimeout(200);
+    check("the workstation offers the Bluetooth options", (await page.locator(".drawer .field", { hasText: "Bluetooth route" }).count()) === 1 && (await page.locator(".drawer .field", { hasText: "Kitchen and bar tickets" }).count()) === 1);
+    await page.locator(".drawer .btn.primary", { hasText: "Save" }).click();
+    await page.waitForTimeout(800);
+    check("the workstation list shows Bluetooth printing", (await page.locator("tr", { hasText: "T01" }).locator(".badge", { hasText: "Bluetooth" }).count()) === 1);
+
+    const ctx = await browser.newContext({ ...devices["Pixel 7"], storageState: await page.context().storageState() });
+    // A simulated XP-T80Q: a Bluetooth LE printer on service 18F0 / characteristic 2AF1.
+    await ctx.addInitScript(() => {
+      localStorage.setItem("pos-suite.workstation", "T01");
+      const writes = [];
+      window.__btWrites = writes;
+      // Like many printers' Bluetooth modules, it accepts only 20-byte packets.
+      const take = async (d) => { if (d.byteLength > 20) throw new DOMException("GATT operation failed", "NetworkError"); writes.push(...new Uint8Array(d)); };
+      const ch = { uuid: "00002af1-0000-1000-8000-00805f9b34fb", properties: { write: true, writeWithoutResponse: true }, writeValue: take, writeValueWithoutResponse: take };
+      const svc = { uuid: "000018f0-0000-1000-8000-00805f9b34fb", getCharacteristics: async () => [ch] };
+      const server = { connected: false, async connect() { this.connected = true; return this; }, disconnect() { this.connected = false; }, async getPrimaryService(u) { if (u === svc.uuid) return svc; throw new DOMException("no such service", "NotFoundError"); } };
+      const dev = Object.assign(new EventTarget(), { id: "xp-t80q-1", name: "XP-T80Q", gatt: server });
+      Object.defineProperty(navigator, "bluetooth", { value: { getAvailability: async () => true, requestDevice: async () => dev, getDevices: async () => [dev] } });
+    });
+    const ph = await ctx.newPage();
+    ph.on("pageerror", (e) => errors.push(`bt: ${e.message}`));
+    const printed = async () => ph.evaluate(() => String.fromCharCode(...window.__btWrites));
+    await ph.goto(`${B}/pos?mode=local`);
+    await ph.waitForTimeout(900);
+    await ph.getByLabel("Employee number or card").fill("1002");
+    await ph.getByLabel("PIN", { exact: true }).fill("2222");
+    await ph.getByRole("button", { name: "Sign In" }).click();
+    await ph.waitForTimeout(800);
+    if (await ph.locator(".mauth-list button").count()) await ph.locator(".mauth-list button").first().click();
+    await ph.waitForTimeout(600);
+    check("the phone shows Connect printer", (await ph.getByRole("button", { name: "Connect printer" }).count()) === 1);
+    await ph.getByRole("button", { name: "Connect printer" }).click();
+    await ph.getByRole("button", { name: /Choose the printer|Connect printer/ }).last().click();
+    await ph.waitForTimeout(500);
+    await ph.getByRole("button", { name: "Test print" }).click();
+    await ph.waitForTimeout(1200);
+    check("the phone connects to the Bluetooth printer and test-prints", (await ph.locator(".modal", { hasText: "XP-T80Q" }).count()) === 1 && (await printed()).includes("TEST"));
+    await ph.locator(".modal .btn.primary", { hasText: "Close" }).click();
+    await ph.evaluate(() => { window.__btWrites.length = 0; });
+    await ph.locator(".m-nav button", { hasText: "Menu" }).click();
+    await ph.waitForTimeout(500);
+    await ph.locator(".m-product:not(.out) .m-add").first().click();
+    await ph.waitForTimeout(300);
+    if (await ph.locator(".modal").count()) await ph.locator(".modal .btn.primary").last().click();
+    await ph.locator(".m-cartbar").click();
+    await ph.waitForTimeout(400);
+    await ph.getByRole("button", { name: /Proceed to Payment/ }).click();
+    await ph.waitForTimeout(500);
+    await ph.getByRole("button", { name: /Pay Now|Complete Payment/ }).click();
+    await ph.waitForTimeout(2500);
+    const out = await printed();
+    check("kitchen ticket, bill and drawer kick print over Bluetooth", out.includes("KOT - ") && out.includes("TAX INVOICE") && out.includes("\x1bp"), `${out.length} bytes`);
+    await ctx.close();
+  }
+
   check("no browser errors", errors.length === 0, errors.slice(0, 5).join(" | "));
 } catch (e) {
   for (const c of browser.contexts()) for (const pg of c.pages()) await pg.screenshot({ path: resolve(root, `e2e-failure-${browser.contexts().indexOf(c)}.png`) }).catch(() => {});

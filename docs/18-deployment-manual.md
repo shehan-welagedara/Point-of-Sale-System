@@ -14,7 +14,10 @@ This manual takes one client from nothing to live trading on the **Cloud Restaur
 | Stewards, cashiers, bar and kitchen staff | **Phones** (their own or the restaurant's), tablets, a counter PC | The device is **connected once with a one-time code** (section O); each person then signs in with their employee number and PIN |
 | The Print Agent | One always-on PC in the restaurant, on the same network as the printers | A POS terminal login (section O) |
 
-Phones work on the restaurant's Wi-Fi or on mobile data. They don't print directly: bills and kitchen tickets go through the cloud to the Print Agent, which drives the printers and the cash drawer. So the restaurant itself needs only the printers, the Print Agent PC and a reliable internet line (with 4G backup).
+Phones work on the restaurant's Wi-Fi or on mobile data. They print in one of two ways:
+
+- **Through the Print Agent** (several devices, network printers): bills and kitchen tickets go through the cloud to the Print Agent PC in the restaurant, which drives the printers and the cash drawer.
+- **To a Bluetooth printer beside the phone** (a small business with one phone and one printer, no PC): the phone prints straight to the printer. See O.4.
 
 ## Contents
 - A. Before you start
@@ -62,9 +65,9 @@ Collect from the client:
 
 Hardware ready at the site:
 - **Staff phones** (and any tablets): Android 10 or newer with Chrome, or iPhone/iPad with iOS 16 or newer with Safari. Charged, with Wi-Fi or mobile data. Staff's own phones are fine (see O.1).
-- **Print Agent PC:** any small always-on Windows PC or mini-PC on the restaurant network, with the printers. It can also be the counter PC.
+- **Print Agent PC:** any small always-on Windows PC or mini-PC on the restaurant network, with the printers. It can also be the counter PC. **Not needed** for a small business with one phone and a Bluetooth printer (O.4).
 - **Counter PC (optional):** Windows 10/11 with a touch screen, Chrome or Edge, if the cash desk uses a big screen.
-- **Bill printer and kitchen printer:** ESC/POS network printers (LAN or Wi-Fi), for example Epson TM-T82III. Network printers let the Print Agent PC sit anywhere on the network.
+- **Bill printer and kitchen printer:** ESC/POS network printers (LAN or Wi-Fi), for example Epson TM-T82III. Network printers let the Print Agent PC sit anywhere on the network. **Or**, for one phone: a Bluetooth ESC/POS printer such as the Xprinter XP-T80Q (O.4).
 - **Cash drawer** connected to the bill printer.
 - **Restaurant Wi-Fi** covering the dining area and kitchen, a **4G router as backup internet** for the Print Agent PC and printers, and a **UPS** for the router, PC and printers.
 
@@ -337,7 +340,7 @@ In **POS Configuration**:
    - **Workstations:** one per POS device: **every phone**, tablet and counter PC has its own.
      - **Code** `W01` (counter PC), `P01`, `P02`… (phones), `T01` (tablets); the code appears in IRD invoice numbers, so never reuse one.
      - Default revenue centre, plus which revenue centres it may switch to.
-     - Receipt printer, and **printing via Print Agent** (the only way phones and tablets print).
+     - Receipt printer, and **printing via Print Agent**, or **Bluetooth printer next to this phone or tablet** (O.4: no printer records or Print Agent needed).
      - Phones' workstations can also be created while connecting the phone (section O), which is quicker.
      - The licence limits active workstations (Starter 3, Professional 12): count every phone, plus one or two spares.
 3. **Tables** (if table service) and **Order types**.
@@ -452,6 +455,8 @@ A code works **once, for 15 minutes**. Connect phones one at a time, while you h
 
 ### O.3 The Print Agent
 
+Skip this part when the only POS device prints to its own Bluetooth printer (O.4).
+
 The Print Agent runs on the counter PC, or on a mini-PC that is always on. It prints bills and kitchen tickets for every device, including phones, and opens the cash drawer.
 1. Install Git, Node.js 22 LTS and pnpm on that PC (as in E.1), then clone the code and run `pnpm install`.
 2. Copy `apps/print-agent/.env.example` to `apps/print-agent/.env` and fill it in:
@@ -473,8 +478,26 @@ pnpm agent
 
    Keep the PC from sleeping (Power settings → never sleep).
 
+### O.4 One phone and a Bluetooth printer (small businesses, no Print Agent)
+
+A small restaurant can run on **one phone** (or tablet) with **one Bluetooth receipt printer** beside it, for example an **Xprinter XP-T80Q** (80 mm, USB + Bluetooth, ESC/POS, cash drawer port). Bills, kitchen tickets, X/Z reports and the cash drawer all go to that printer. No PC, no Print Agent, no network printers. See [11](11-hardware-and-printing.md) (Model C).
+
+1. **Phone:** Android with **Chrome** is recommended. On an iPhone, open the POS in the **Bluefy** browser instead (Safari and Chrome on iOS can't use Bluetooth from web apps).
+2. **Printer:** load the paper, switch it on, and connect the cash drawer to the printer's drawer port.
+3. **Connect the phone** (O.1): in **How this phone prints**, choose **Bluetooth printer beside it (Chrome on Android)**. (For an existing workstation: Workstations & printers → the workstation → **Printing: Bluetooth printer next to this phone or tablet**, **Bluetooth route: From the browser**, **paper 80 mm**, and **Kitchen and bar tickets print on this printer too** on.)
+4. **On the phone**, in the POS: tap **Connect printer** (home screen, or More → Bluetooth printer) → **Choose the printer** → pick it from the list (named like *XP-T80Q* or *Printer001*) → **Test print**. The phone remembers it and reconnects by itself while the POS is open.
+5. **If the printer isn't in the list**, or the test doesn't print, its Bluetooth is classic only. Then:
+   1. install **RawBT** from Google Play;
+   2. pair the printer in Android **Settings → Bluetooth** (PIN usually `0000` or `1234`);
+   3. in RawBT, choose the printer and 80 mm paper;
+   4. set the workstation's **Bluetooth route** to **Through the RawBT app**;
+   5. **Test print** again.
+6. **Test a sale:** send an order (the kitchen ticket prints) and take a cash payment (the bill prints and the drawer opens).
+
+If the printer is switched off or out of range, prints **wait on the phone**: the printer button shows how many. They print as soon as the printer is connected again. A bill that never printed can be reprinted from **Orders**.
+
 - [ ] Every phone, tablet and counter PC connected with a code, on its own workstation, added to the home screen; all listed under Connected phones and tablets
-- [ ] Print Agent running and starting with Windows; test page, bill, kitchen ticket and drawer all work, **from a phone** as well
+- [ ] Print Agent running and starting with Windows; test page, bill, kitchen ticket and drawer all work, **from a phone** as well (or, for one phone with a Bluetooth printer: test page, kitchen ticket, bill and drawer from the phone, O.4)
 - [ ] An order taken on mobile data (Wi-Fi off) prints in the kitchen
 
 ---
@@ -566,6 +589,9 @@ Staff can use the system at `https://PROJECT-ID.web.app` from anywhere. A domain
 | Phone shows "This phone is no longer connected" | It was removed (lost phone, leaver). Connect it again with a new code if it should be used. |
 | Phone shows the email/password sign-in | It isn't connected: use **Connect it with the code** on that screen, not a password. |
 | Phone orders don't print | The Print Agent PC is off or offline, or the workstation's bill printer isn't set. Orders still reach the cloud; they print when the agent is back. |
+| Bluetooth printer: "Printer: 2 waiting" / "Connect printer" | The printer is off, out of range, or the phone restarted. Switch it on, tap the printer button → **Connect printer**. Waiting prints then come out. |
+| Bluetooth printer not in the phone's list | Its Bluetooth is classic only, or Bluetooth/location is off on the phone. Switch them on; otherwise use the RawBT route (O.4 step 5). |
+| iPhone: "can't print to Bluetooth printers" | Safari and Chrome on iOS have no Web Bluetooth. Open the POS in the Bluefy browser, or print through the Print Agent. |
 | Licence: "This licence is for project …" | Issued for another project id. Re-issue with `--project` set to the id shown on the Licence page. |
 | Licence: "signature is not valid" | The deployment's public key doesn't match the key that signed it. Check `VITE_LICENCE_PUBLIC_KEY` and `LICENCE_PUBLIC_KEY`, then redeploy. |
 | Accounting buttons fail with a region error | `LOCATION` (functions) and `VITE_FUNCTIONS_REGION` (web) must both equal the Firestore location. |
