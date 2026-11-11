@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { MobileStyle, MobileUi, Workstation } from "@pos/core";
+import { deepenForWhite } from "../../../lib/contrast";
 
 /** New businesses: the app style on every screen (phones, tablets and PCs, each with its own layout). */
 export const DEFAULT_MOBILE_UI: MobileUi = { style: "bright", useOn: "all", showSalesOnHome: true };
@@ -56,7 +57,8 @@ export function useUiStyle(saved: MobileUi | undefined, ws?: Pick<Workstation, "
 
 /** CSS variables for the accent colour override. */
 export function mobileVars(saved: MobileUi | undefined): Record<string, string> {
-  const accent = saved?.accent;
+  // A light accent is deepened just enough for white text on it and for it as text on white.
+  const accent = deepenForWhite(saved?.accent, 5.5);
   return accent ? { "--m-accent": accent, "--m-accent-2": accent } : {};
 }
 

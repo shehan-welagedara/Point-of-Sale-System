@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { readableTextOn } from "../../lib/contrast";
 import { Link } from "react-router-dom";
 import {
   type Check,
@@ -668,7 +669,7 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
                   </>
                 );
                 return (
-                  <button key={m.id} className={`pos-item${m.available ? "" : " out"}${img ? " has-img" : ""}`} style={{ ["--cat" as string]: m.buttonColor || catColor.get(m.categoryId) }} onClick={() => tapItem(m)}>
+                  <button key={m.id} className={`pos-item${m.available ? "" : " out"}${img ? " has-img" : ""}`} style={{ ["--cat" as string]: m.buttonColor || catColor.get(m.categoryId), ["--cat-text" as string]: readableTextOn(m.buttonColor || catColor.get(m.categoryId)) }} onClick={() => tapItem(m)}>
                     {!m.available ? <span className="badge bad tag86">86</span> : null}
                     {img ? (
                       <>

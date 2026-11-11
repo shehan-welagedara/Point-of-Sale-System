@@ -2,6 +2,25 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.5.0 — 2026-11-11
+
+**Type:** Minor (new features and fixes) · **Deploy:** hosting only (no rule, function or data changes)
+
+### For clients
+
+- **Noura Kitchen demo.** *+ Business → Load the Noura Kitchen demo* creates a training copy set up like Noura Kitchen: not VAT or SSCL registered, a restaurant and a takeaway counter, one counter phone with the Bluetooth printer, and an office PC that shows bills on screen. It comes with a Sri Lankan menu with recipes, stock, suppliers, a month of sales and books, so staff and the owner can explore every module before go-live.
+- **About this system.** A new **About** tile on the launchpad (owners and administrators) shows the version you are running, whether an update is waiting (with **Update now**), what's new in recent releases, the licence and modules, and where the data is kept.
+- **Clearer POS screens in every theme.** On the terminal layout, messages such as *Unknown employee number or card* and *Wrong PIN* were unreadable when the computer was set to dark mode, and a dark band showed under the sign-in screen. Fixed for all three terminal themes (Modern, Classic, Midnight). Buttons and dish tiles now pick white or dark text to suit any brand, accent or category colour.
+- **Finance:** when Accounting is switched on after the business was created, the Finance overview asks to **Open fiscal year** instead of showing an empty year.
+
+### Changes
+
+- Sample data: a `noura-kitchen` profile (property `MAIN`, workstations `P01` Bluetooth and `W01` on-screen, cash/card/LankaQR, no VAT on purchases or sales, smaller books) next to Spice Lagoon; unit test for its books, invoices and data health.
+- Terminal themes set every colour themselves (status colours, shadows, `--on-brand`, `--brand-text`), so they no longer mix with the device's dark mode; the app styles map the shared colours (dialogs, keypads, notices) to their own palette for the same reason. `readableTextOn` and `deepenForWhite` keep text readable on any chosen colour.
+- `pnpm test:contrast` also checks the terminal in its three themes with the device in light and dark mode, the app with the device in dark mode, and error states (unknown employee, wrong PIN), dish choices, discount and payment dialogs: 0 below WCAG AA.
+- `release:deploy` works from Windows (pnpm and gcloud started through the shell), builds the web app first when run by hand, and explains a missing Google Cloud CLI or login. Noura Kitchen plan: deployment steps for a Windows PC.
+- e2e: the Noura Kitchen demo (modules, not VAT registered, balanced books, standard bill on the office PC), the About page, and opening the fiscal year when Accounting is switched on later.
+
 ## 1.4.0 — 2026-11-11
 
 **Type:** Minor (new features and fixes) · **Deploy:** hosting only (no rule, function or data changes)

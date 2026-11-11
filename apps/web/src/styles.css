@@ -21,8 +21,10 @@
   --bad-bg: #fdecec;
   --info-bg: #e8f1fd;
   --brand-soft: color-mix(in srgb, var(--brand) 12%, transparent);
+  /* Text on the brand colour (white, or dark on a light brand colour); set with the brand at runtime. */
+  --on-brand: #ffffff;
   /* The brand colour as text: nudged toward the text colour so any brand stays readable (AA) in light and dark. */
-  --brand-text: color-mix(in srgb, var(--brand) 80%, var(--text));
+  --brand-text: var(--brand-ink, color-mix(in srgb, var(--brand) 80%, var(--text)));
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 1px rgba(0, 0, 0, 0.03);
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05);
   --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.18);
@@ -125,7 +127,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn:hover { background: var(--surface-2); }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .btn.primary:hover { background: color-mix(in srgb, var(--brand) 88%, black); }
 .btn.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
 .btn.danger.solid { background: #c62828; border-color: #c62828; color: #fff; }
@@ -172,7 +174,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .toggle.on::after { transform: translateX(18px); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 550; }
-.chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.chip.on { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .seg { display: inline-flex; background: var(--sunken); border-radius: 999px; padding: 3px; gap: 2px; }
 .seg button { border: 0; background: transparent; padding: 6px 14px; border-radius: 999px; cursor: pointer; font-weight: 550; font-size: 13px; color: var(--text-2); }
 .seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
@@ -215,7 +217,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .appearance-col .grid.cols-3 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .sidebar { background: color-mix(in srgb, var(--surface) 75%, transparent); backdrop-filter: saturate(180%) blur(20px); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
 .brand-block { display: flex; align-items: center; gap: 10px; padding: 18px 16px 12px; }
-.brand-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; overflow: hidden; flex: none; }
+.brand-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--brand); color: var(--on-brand); display: grid; place-items: center; font-weight: 700; overflow: hidden; flex: none; }
 .brand-logo img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
 .nav { overflow-y: auto; padding: 4px 10px 16px; flex: 1; }
 .nav-group { margin-top: 14px; }
@@ -288,6 +290,14 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .paper .cut { color: #6b6b6b; }
 
 /* ── Auth ── */
+/* The POS sign-in screens fill the window in the terminal's own colours (no page background showing below). */
+.pos-theme { min-height: 100%; display: flex; flex-direction: column; }
+/* About page */
+.about-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 13px; }
+.about-dl dt { color: var(--text-2); }
+.about-dl dd { margin: 0; overflow-wrap: anywhere; }
+.release-note + .release-note { border-top: 1px solid var(--line); padding-top: 12px; }
+.pos-theme > .auth { flex: 1; }
 .auth { min-height: 100%; display: grid; place-items: center; padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, var(--brand-soft), transparent), var(--bg); }
 .auth-card { width: min(440px, 100%); padding: 30px; display: flex; flex-direction: column; gap: 16px; }
 
@@ -369,18 +379,18 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .pos .btn, .pos .keypad button, .pos .tender-btn, .pos .table-tile, .pos .card, .pos .input, .pos .select { color: var(--text); }
 .pos .btn.primary { color: #fff; }
 .pos.by-cat .pos-item { background: color-mix(in srgb, var(--cat, var(--brand)) 20%, var(--pos-btn, var(--surface))); }
-.pos.tpl-classic .pos-item { background: var(--cat, var(--pos-btn)); color: #fff; border: 0; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2); }
+.pos.tpl-classic .pos-item { background: var(--cat, var(--pos-btn)); color: var(--cat-text, var(--pos-btn-text, #fff)); border: 0; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2); }
 .pos.tpl-classic .pos-item::before { display: none; }
-.pos.tpl-classic .pos-item .price { color: rgba(255, 255, 255, 0.85); }
-.pos.tpl-classic .pos-top { background: var(--brand); color: #fff; border-bottom: 0; backdrop-filter: none; }
+.pos.tpl-classic .pos-item .price { color: inherit; }
+.pos.tpl-classic .pos-top { background: var(--brand); color: var(--on-brand); border-bottom: 0; backdrop-filter: none; }
 .pos.tpl-classic .pos-top .muted, .pos.tpl-classic .pos-top .tiny, .pos.tpl-classic .pos-top .btn.ghost { color: rgba(255, 255, 255, 0.9); }
 .pos.tpl-classic .pos-top .seg { background: rgba(255, 255, 255, 0.16); }
 .pos.tpl-classic .pos-top .seg button { color: rgba(255, 255, 255, 0.85); }
 .pos.tpl-classic .pos-top .seg button.on { color: var(--text); }
-.pos.tpl-classic .pos-cat.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.pos.tpl-classic .pos-cat.on { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .pos.tpl-midnight .pos-item { box-shadow: none; }
-.pos.tpl-midnight .pos-cat.on { background: var(--brand); color: #04121a; border-color: var(--brand); }
-.pos.tpl-midnight .btn.primary { color: #04121a; }
+.pos.tpl-midnight .pos-cat.on { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.pos.tpl-midnight .btn.primary { color: var(--on-brand); }
 .pos.tpl-midnight .pos-top { background: color-mix(in srgb, var(--surface) 90%, transparent); }
 .pos.check-left .pos-body { grid-template-columns: 400px minmax(0, 1fr); }
 .pos.check-left .pos-check { order: -1; border-left: 0; border-right: 1px solid var(--line); }
@@ -414,7 +424,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .pos-pager .btn { min-width: 64px; }
 .pos-grid.paged { overflow: hidden; }
 .launch-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 18px 22px; align-items: start; }
-.launch-groups .tiles { grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr)); }
+.launch-groups .tiles { grid-template-columns: repeat(auto-fill, minmax(min(100%, 166px), 1fr)); }
 .launch-groups .tile { min-height: 124px; padding: 16px; }
 .cards4 { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); align-items: start; }
 .stats { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }

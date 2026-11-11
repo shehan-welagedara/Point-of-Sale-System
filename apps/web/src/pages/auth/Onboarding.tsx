@@ -38,12 +38,24 @@ export function Onboarding() {
             ? "Local demo mode: everything is stored in this browser only. Add a Firebase config to use the cloud."
             : `Signed in as ${user?.email}. Each business (restaurant or group) is a separate tenant with its own data.`}
         </p>
+        {mode === "local" && tenant ? (
+          <div className="callout warn small">This browser keeps one business at a time. Loading a demo or creating a business here replaces <strong>{tenant.name}</strong> in this browser.</div>
+        ) : null}
+        <div className="card pad stack" style={{ background: "var(--surface-2)" }}>
+          <h3>Noura Kitchen demo</h3>
+          <p className="small muted">
+            Set up the way Noura Kitchen runs, to explore before go-live: <strong>not VAT or SSCL registered</strong> (standard bills), a restaurant and a takeaway counter, one <strong>counter phone</strong> printing kitchen tickets and bills to a Bluetooth printer (Xprinter XP-T80Q), and an <strong>office PC</strong> that shows bills on screen. Sri Lankan menu with recipes and costs, stock, suppliers, a month of sales, and books (opening balances, supplier bills, payroll, assets). Sign in to the POS with number <strong>1001</strong> and PIN <strong>1111</strong> (manager), 1002/2222 (cashier) or 1003/3333 (steward).
+          </p>
+          <button className="btn primary" disabled={Boolean(busy)} onClick={() => run("noura", () => createTenant("Noura Kitchen (demo)", "noura-kitchen"))}>
+            {busy === "noura" ? "Building demo data…" : "Load the Noura Kitchen demo"}
+          </button>
+        </div>
         <div className="card pad stack" style={{ background: "var(--surface-2)" }}>
           <h3>Demo restaurant</h3>
           <p className="small muted">
-            Loads “Spice Lagoon”, a sample Colombo restaurant: 37 menu items with recipes and costs, 57 stock items plus 6 prep sub-recipes, vendors, employees (sign in with number 1001 and PIN 1111, or 1002/2222, 1006/6666…), customers, a week of sales, stock and full books. VAT-registered, SSCL not liable.
+            Loads “Spice Lagoon”, a larger sample Colombo restaurant: 37 menu items with recipes and costs, 57 stock items plus 6 prep sub-recipes, vendors, employees (sign in with number 1001 and PIN 1111, or 1002/2222, 1006/6666…), customers, a week of sales, stock and full books. VAT-registered, SSCL not liable, network printers with a Print Agent.
           </p>
-          <button className="btn primary" disabled={Boolean(busy)} onClick={() => run("demo", () => createTenant("Spice Lagoon (demo)", true))}>
+          <button className="btn" disabled={Boolean(busy)} onClick={() => run("demo", () => createTenant("Spice Lagoon (demo)", "spice-lagoon"))}>
             {busy === "demo" ? "Building demo data…" : "Load the demo restaurant"}
           </button>
         </div>

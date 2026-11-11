@@ -1,5 +1,6 @@
 import {
   type AccountingSettings,
+  type ModuleKey,
   type BrandingSettings,
   type BusinessSettings,
   type Check,
@@ -36,7 +37,7 @@ import {
 } from "@pos/core";
 import { defaultChartOfAccounts, defaultLedgerSettings } from "@pos/ledger";
 import { CATEGORIES, CUSTOMERS, INVENTORY, MENU, MODIFIER_GROUPS, PREP, RECIPES, STAFF, VENDORS } from "./catalog.js";
-import { seedFinance } from "./finance.js";
+import { NOURA_FINANCE, seedFinance } from "./finance.js";
 
 export * from "./catalog.js";
 export * from "./finance.js";
@@ -185,12 +186,44 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** The demo businesses: the full Spice Lagoon restaurant, or a small one set up like Noura Kitchen. */
+export type SampleKind = "spice-lagoon" | "noura-kitchen";
+
 export interface SampleOptions {
   /** Business date treated as "today" (YYYY-MM-DD). */
   today: string;
   historyDays?: number;
   checksPerDay?: number;
+  /** Which demo business (default Spice Lagoon). */
+  kind?: SampleKind;
 }
+
+export const NOURA_PROPERTY_ID = "MAIN";
+
+/**
+ * Noura Kitchen's demo: the same Sri Lankan menu, recipes and stock as Spice Lagoon, set up the way
+ * Noura Kitchen runs: not VAT or SSCL registered (standard bills), one outlet with a restaurant and a
+ * takeaway counter, one counter phone printing kitchen tickets and bills to a Bluetooth printer
+ * (Xprinter XP-T80Q), an office PC that shows bills on screen for exploring, and smaller books.
+ */
+export function nouraSettings(): ReturnType<typeof sampleSettings> {
+  const s = sampleSettings();
+  return {
+    ...s,
+    business: { ...s.business, legalName: "Noura Kitchen", tradingName: "Noura Kitchen", tin: "", vatRegistered: false, ssclLiable: false, addressLines: ["Demo address (replace under Business & tax)", "Sri Lanka"], phone: "", email: "", website: "", isSample: true },
+    branding: { ...s.branding, displayName: "Noura Kitchen", receiptHeaderLines: [], receiptFooterLines: ["Thank you! Please come again."], poweredBy: "POS Suite (demo)" },
+    pos: { ...s.pos, defaultPropertyId: NOURA_PROPERTY_ID, mobile: { style: "bright", useOn: "all", showSalesOnHome: true } },
+    accounting: { ...s.accounting, ledger: defaultLedgerSettings(NOURA_PROPERTY_ID) } as AccountingSettings,
+    integrations: {
+      ...s.integrations,
+      lankaqr: { ...s.integrations.lankaqr, merchantName: "NOURA KITCHEN", merchantId: "SAMPLE-MID-NK01" },
+      whatsapp: { ...s.integrations.whatsapp, eodRecipients: [{ name: "Owner (sample)", phone: "+94 77 000 0001" }] },
+    },
+  };
+}
+
+/** Modules Noura Kitchen uses (Starter with the Inventory, Purchasing, Recipes and Accounting add-ons). */
+const NOURA_MODULES = new Set<ModuleKey>(["pos", "tables", "recipes", "inventory", "purchasing", "accounting", "crm", "revenue", "lankaqr"]);
 
 /**
  * Builds the complete demo tenant in a MemoryStore by running the real services: goods receipts,
@@ -199,8 +232,11 @@ export interface SampleOptions {
  */
 export async function buildSampleStore(opts: SampleOptions): Promise<{ store: MemoryStore; tenant: Omit<Tenant, "ownerUid" | "createdAt"> }> {
   const store = new MemoryStore();
-  const s = sampleSettings();
-  const tenders = sampleTenders();
+  const noura = opts.kind === "noura-kitchen";
+  const s = noura ? nouraSettings() : sampleSettings();
+  const propertyId = noura ? NOURA_PROPERTY_ID : SAMPLE_PROPERTY_ID;
+  // Noura Kitchen takes cash, cards and LankaQR; the other payment methods are there but switched off.
+  const tenders = sampleTenders().map((td) => (noura && !["CASH", "CARD-VM", "LANKAQR"].includes(td.id) ? { ...td, active: false } : td));
   const now = new Date().toISOString();
   const ops: WriteOp[] = [];
   const put = <T extends { id: string }>(col: string, data: T) => ops.push({ op: "set", col, data });
@@ -208,6 +244,18 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
   for (const doc of Object.values(s)) put(C.settings, doc);
 
   // Organisation & devices
+  if (noura) {
+    put(C.properties, { id: propertyId, code: propertyId, name: "Noura Kitchen", addressLines: s.business.addressLines, phone: s.business.phone, active: true });
+    put(C.revenueCenters, { id: "RESTAURANT", propertyId, code: "RESTAURANT", name: "Restaurant", serviceMode: "table", defaultOrderTypeId: "dine-in", active: true });
+    put(C.revenueCenters, { id: "TAKEAWAY", propertyId, code: "TAKEAWAY", name: "Takeaway", serviceMode: "quick", defaultOrderTypeId: "takeaway", active: true });
+    // One phone at the counter prints kitchen tickets and bills on the Bluetooth printer beside it (no
+    // printer records, no Print Agent). The office PC shows bills on screen, for exploring and training.
+    put(C.workstations, { id: "P01", propertyId, rvcId: "RESTAURANT", allowedRvcIds: ["RESTAURANT", "TAKEAWAY"], code: "P01", name: "Counter phone (Bluetooth printer XP-T80Q)", deviceProfile: "mobile", receiptPrinterId: "", printMode: "bluetooth", bluetoothVia: "browser", paperWidthMm: 80, kitchenOnBluetooth: true, active: true });
+    put(C.workstations, { id: "W01", propertyId, rvcId: "RESTAURANT", allowedRvcIds: ["RESTAURANT", "TAKEAWAY"], code: "W01", name: "Office PC (training: bills on screen)", deviceProfile: "dedicated", receiptPrinterId: "", printMode: "preview", active: true });
+    const nAreas: [string, number, number][] = [["Indoor", 8, 4], ["Outdoor", 2, 2]];
+    let nt = 1;
+    for (const [area, count, seats] of nAreas) for (let i = 0; i < count; i++, nt++) put(C.tables, { id: `T${nt}`, propertyId, name: String(nt), area, seats, sortOrder: nt });
+  } else {
   put(C.properties, { id: SAMPLE_PROPERTY_ID, code: SAMPLE_PROPERTY_ID, name: "Colombo 03 (Galle Road)", addressLines: s.business.addressLines, phone: s.business.phone, active: true });
   put(C.revenueCenters, { id: "DINING", propertyId: SAMPLE_PROPERTY_ID, code: "DINING", name: "Restaurant", serviceMode: "table", defaultOrderTypeId: "dine-in", active: true });
   put(C.revenueCenters, { id: "TAKEAWAY", propertyId: SAMPLE_PROPERTY_ID, code: "TAKEAWAY", name: "Takeaway counter", serviceMode: "quick", defaultOrderTypeId: "takeaway", active: true });
@@ -221,11 +269,12 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
   const areas: [string, number, number][] = [["Indoor", 8, 4], ["Garden", 3, 6], ["Bar", 1, 2]];
   let t = 1;
   for (const [area, count, seats] of areas) for (let i = 0; i < count; i++, t++) put(C.tables, { id: `T${t}`, propertyId: SAMPLE_PROPERTY_ID, name: String(t), area, seats, sortOrder: t });
+  }
   [["dine-in", "Dine-in", true], ["takeaway", "Takeaway", false], ["delivery", "Delivery", false]].forEach(([id, name, requiresTable], i) =>
     put(C.orderTypes, { id: id as string, name: name as string, requiresTable: requiresTable as boolean, sortOrder: i + 1, active: true }),
   );
   put(C.locations, { id: SAMPLE_LOCATION_ID, name: "Main store", isDefault: true });
-  put(C.locations, { id: "BAR", name: "Bar store", isDefault: false });
+  if (!noura) put(C.locations, { id: "BAR", name: "Bar store", isDefault: false });
 
   // Menu
   CATEGORIES.forEach(([id, name, majorGroup, color], i) => put(C.menuCategories, { id, name, majorGroup, color, sortOrder: i + 1, active: true } satisfies MenuCategory));
@@ -284,9 +333,13 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
 
   // People
   DEFAULT_ROLES.forEach((r) => put(C.roles, r));
-  for (const [employeeNo, name, roleId, pin, jobTitle, rvcIds, cardId] of STAFF) {
+  // Noura Kitchen: the same people and PINs (so the manuals' examples work), without the bar.
+  const people = noura
+    ? STAFF.filter(([, , roleId]) => roleId !== "bartender").map(([no, name, roleId, pin, jobTitle, rvcIds, cardId]) => [no, name, roleId, pin, jobTitle, rvcIds.filter((r) => r !== "BAR").map((r) => (r === "DINING" ? "RESTAURANT" : r)), cardId] as (typeof STAFF)[number])
+    : STAFF;
+  for (const [employeeNo, name, roleId, pin, jobTitle, rvcIds, cardId] of people) {
     const { hash, salt } = await hashPin(pin);
-    put(C.staff, { id: employeeNo, employeeNo, name, roleId, jobTitle, propertyIds: [SAMPLE_PROPERTY_ID], ...(rvcIds.length ? { rvcIds } : {}), ...(cardId ? { hasCard: true } : {}), pinSet: true, status: "active", hireDate: "2026-09-01", pinChangedAt: now });
+    put(C.staff, { id: employeeNo, employeeNo, name, roleId, jobTitle, propertyIds: [propertyId], ...(rvcIds.length ? { rvcIds } : {}), ...(cardId ? { hasCard: true } : {}), pinSet: true, status: "active", hireDate: "2026-09-01", pinChangedAt: now });
     // PIN hashes and card numbers live where clients can't read them (see @pos/core staff-auth).
     put(C.staffSecrets, { id: employeeNo, pinHash: hash, pinSalt: salt, pinChangedAt: now, ...(cardId ? { cardId } : {}) });
   }
@@ -296,7 +349,7 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
     put(C.customers, { id: `CUS${String(i + 1).padStart(4, "0")}`, name, phone, tags, ...(birthday ? { birthday } : {}), marketingConsent: true, visits: 0, totalSpend: 0, points: 0, createdAt: now } satisfies Customer),
   );
   defaultChartOfAccounts().forEach((a) => put(C.accounts, a));
-  put(C.budgets, { id: `${opts.today.slice(0, 7)}__${SAMPLE_PROPERTY_ID}`, month: opts.today.slice(0, 7), propertyId: SAMPLE_PROPERTY_ID, salesTarget: lkr(2_500_000), foodCostTargetBp: 3200 });
+  put(C.budgets, { id: `${opts.today.slice(0, 7)}__${propertyId}`, month: opts.today.slice(0, 7), propertyId, salesTarget: lkr(noura ? 1_100_000 : 2_500_000), foodCostTargetBp: 3200 });
   await store.batch(ops);
 
   // Opening purchases: one goods receipt per vendor, the day before the history starts.
@@ -315,7 +368,8 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
       supplierInvoiceNo: `INV-${vendorId}-001`,
       date: openDate,
       lines,
-      inputVat: vendorId === "V004" || vendorId === "V005" ? Math.round(value * 0.18) : 0,
+      // A business that isn't VAT registered can't claim input VAT: it is part of the cost.
+      inputVat: !noura && (vendorId === "V004" || vendorId === "V005") ? Math.round(value * 0.18) : 0,
       status: "draft",
     };
     grnNo++;
@@ -349,12 +403,12 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
     categories: new Map(CATEGORIES.map(([id, name, majorGroup, color], i) => [id, { id, name, majorGroup, color, sortOrder: i, active: true }])),
     inventoryOn: true,
     crmOn: true,
-    loyaltyOn: true,
+    loyaltyOn: !noura,
   };
   const food = menuItems.filter((m) => m.kotRoute === "kitchen");
   const drinks = menuItems.filter((m) => m.kotRoute === "bar");
   const servers = ["1002", "1003", "1004"];
-  const tenderMix: [string, number][] = [["CASH", 0.45], ["CARD-VM", 0.3], ["LANKAQR", 0.18], ["PAYHERE", 0.04], ["CARD-AMEX", 0.03]];
+  const tenderMix: [string, number][] = noura ? [["CASH", 0.6], ["CARD-VM", 0.2], ["LANKAQR", 0.2]] : [["CASH", 0.45], ["CARD-VM", 0.3], ["LANKAQR", 0.18], ["PAYHERE", 0.04], ["CARD-AMEX", 0.03]];
   const chooseTender = () => {
     let r = rnd();
     for (const [id, p] of tenderMix) if ((r -= p) <= 0) return id;
@@ -368,7 +422,7 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
     const count = isToday ? Math.ceil(perDay / 3) : perDay + (weekday === 0 || weekday === 6 ? 6 : 0) + Math.floor(rnd() * 5);
     for (let n = 1; n <= count; n++) {
       const r = rnd();
-      const orderTypeId = r < 0.68 ? "dine-in" : r < 0.9 ? "takeaway" : "delivery";
+      const orderTypeId = noura ? (r < 0.55 ? "dine-in" : r < 0.95 ? "takeaway" : "delivery") : r < 0.68 ? "dine-in" : r < 0.9 ? "takeaway" : "delivery";
       const covers = orderTypeId === "dine-in" ? 1 + Math.floor(rnd() * 4) : 1;
       const lines: CheckLine[] = [];
       const addLine = (m: MenuItem, qty: number) => {
@@ -388,12 +442,13 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
       const closedAt = new Date(`${date}T${String(hour).padStart(2, "0")}:${String(Math.floor(rnd() * 60)).padStart(2, "0")}:00+05:30`);
       let check: Check = {
         id: `H${date.replace(/-/g, "")}${String(n).padStart(3, "0")}`,
-        propertyId: SAMPLE_PROPERTY_ID,
-        rvcId: orderTypeId === "dine-in" ? "DINING" : "TAKEAWAY",
-        workstationId: orderTypeId === "dine-in" ? "W01" : "W02",
+        propertyId,
+        rvcId: orderTypeId === "dine-in" ? (noura ? "RESTAURANT" : "DINING") : "TAKEAWAY",
+        // Noura Kitchen takes every order on its one counter phone.
+        workstationId: noura ? "P01" : orderTypeId === "dine-in" ? "W01" : "W02",
         checkNo: n,
         orderTypeId,
-        ...(orderTypeId === "dine-in" ? { tableId: `T${1 + Math.floor(rnd() * 12)}` } : {}),
+        ...(orderTypeId === "dine-in" ? { tableId: `T${1 + Math.floor(rnd() * (noura ? 10 : 12))}` } : {}),
         covers,
         staffId: pick(servers),
         ...(rnd() < 0.3 ? { customerId: `CUS${String(1 + Math.floor(rnd() * CUSTOMERS.length)).padStart(4, "0")}` } : {}),
@@ -424,8 +479,12 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
   await processDepletion(store, { locationId: SAMPLE_LOCATION_ID, by: "sample-data", limit: 2000 });
 
   // Books: opening balances, assets, POS days, supplier and customer invoices, payments, budgets.
-  await seedFinance(store, { today: opts.today, historyStart: startDate, openDate, propertyId: SAMPLE_PROPERTY_ID });
+  await seedFinance(store, { today: opts.today, historyStart: startDate, openDate, propertyId, ...(noura ? { profile: NOURA_FINANCE } : {}) });
 
+  if (noura) {
+    const modules = Object.fromEntries(Object.keys(allModulesOn()).map((k) => [k, NOURA_MODULES.has(k as ModuleKey)])) as Record<ModuleKey, boolean>;
+    return { store, tenant: { id: "demo-noura-kitchen", name: "Noura Kitchen (demo)", modules, plan: "demo", entitlements: builtInEntitlements("demo"), status: "active" } };
+  }
   return {
     store,
     tenant: { id: "demo-spice-lagoon", name: "Spice Lagoon (demo)", modules: allModulesOn(), plan: "demo", entitlements: builtInEntitlements("demo"), status: "active" },

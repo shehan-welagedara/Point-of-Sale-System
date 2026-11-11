@@ -8,6 +8,7 @@ import { LicencePage } from "./pages/emc/Licence";
 import { MobileStylePage, PosOptionsPage, PosThemesPage, SignInPolicyPage } from "./pages/emc/Appearance";
 import { BillDesignerPage } from "./pages/emc/BillDesigner";
 import { SystemStatusPage } from "./pages/emc/SystemStatus";
+import { AboutPage } from "./pages/emc/About";
 import { SetupChecklistPage } from "./pages/emc/SetupChecklist";
 import { BillsInboxPage, DailySalesPage, RecordExpensePage } from "./pages/finance/Everyday";
 import { AccountingImportPage } from "./pages/finance/AccountingImport";
@@ -104,6 +105,7 @@ export function App() {
         <Route path="pos/options" element={<PosOptionsPage />} />
         <Route path="setup/licence" element={<LicencePage />} />
         <Route path="setup/status" element={<SystemStatusPage />} />
+        <Route path="about" element={<AboutPage />} />
         <Route path="setup/checklist" element={<SetupChecklistPage />} />
         <Route path="finance/expense" element={<RecordExpensePage />} />
         <Route path="finance/sales" element={<DailySalesPage />} />

@@ -258,6 +258,9 @@ try {
   await page.goto(`${B}/emc/setup/status?mode=local`);
   await wait(page, 900);
   await shot(page, "admin-status");
+  await page.goto(`${B}/emc/about?mode=local`);
+  await wait(page, 900);
+  await shot(page, "admin-about");
 
   // Bills & receipts with a photographed bill, the expense recorded from it, and the Excel import check.
   {
