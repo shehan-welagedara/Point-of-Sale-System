@@ -14,7 +14,6 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -33,12 +32,6 @@ const registryPath = resolve(root, opt("registry") ?? "release/clients.json");
 
 const ok = (m) => console.log(`  ✓ ${m}`);
 const todo = [];
-/** Not needed for the first deploy, but before the first update (backups and data updates). */
-const later = [];
-const notYet = (m, fix) => {
-  console.log(`  ! ${m}`);
-  later.push(fix);
-};
 const missing = (m, fix) => {
   console.log(`  ✗ ${m}`);
   todo.push(fix);
@@ -85,17 +78,6 @@ const fb = quiet("pnpm", ["exec", "firebase", "login:list"]);
 const fbAccount = /[\w.+-]+@[\w-]+\.[\w.]+/.exec(fb.out)?.[0];
 if (fb.ok && fbAccount && !/No authorized accounts/i.test(fb.out)) ok(`Firebase CLI signed in as ${fbAccount}`);
 else missing("Firebase CLI not signed in", `Run \`pnpm exec firebase login${process.env.CLOUD_SHELL === "true" ? " --no-localhost" : ""}\` and sign in with the Google account that is a member of the client's project (manual B.3). If it fails, run \`pnpm deploy:check\`.`);
-const gcloud = quiet("gcloud", ["--version"]);
-if (gcloud.ok) {
-  ok("Google Cloud CLI");
-  const acct = quiet("gcloud", ["config", "get-value", "account"]).out.trim().split(/\s+/).find((s) => s.includes("@"));
-  if (acct) ok(`gcloud signed in as ${acct}`);
-  else notYet("gcloud not signed in (needed from the second deploy on)", "Run `gcloud auth login`.");
-} else notYet("Google Cloud CLI not installed (not needed for the first deploy; needed for backups and data updates from the second deploy on)", "Install the Google Cloud CLI from cloud.google.com/sdk/docs/install (Windows: the installer), open a new terminal, then run `gcloud auth login`.");
-const adc = process.env.GOOGLE_APPLICATION_CREDENTIALS || join(win ? (process.env.APPDATA ?? join(homedir(), "AppData", "Roaming")) : join(homedir(), ".config"), "gcloud", "application_default_credentials.json");
-if (existsSync(adc) || process.env.CLOUD_SHELL === "true") ok("Application default credentials (used for data updates)");
-else notYet("Application default credentials not set (needed from the second deploy on)", "Run `gcloud auth application-default login` (after installing the Google Cloud CLI).");
-
 // ── 2. Licence key and settings files ──
 console.log("\n2. Licence key and settings files");
 const keyFile = join(root, "licence-keys", "vendor-key.txt");
@@ -154,9 +136,4 @@ console.log(`  ${todo.length ? "Then deploy" : "Deploy"}: see every step first (
 console.log(`    pnpm release:deploy --target ${id} --dry-run`);
 console.log(`    pnpm release:deploy --target ${id}\n`);
 console.log("  The first deploy takes 5–10 minutes. Commit release/clients.json so the next update finds this client.\n");
-if (later.length) {
-  console.log("  Before the first UPDATE (not needed now):");
-  later.forEach((t, i) => console.log(`   ${i + 1}. ${t}`));
-  console.log("");
-}
 process.exit(todo.length ? 2 : 0);

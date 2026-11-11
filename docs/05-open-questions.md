@@ -43,6 +43,8 @@
 | D31 | Quality | Schema validation on every save, cross-module data-quality check, browser end-to-end tests in CI-style scripts. |
 | D32 | Editions | Two editions in one repository: this Cloud Restaurant Edition, and an Enterprise Hotel Edition (MariaDB POS + guest system + ERPNext, hotel servers + Google Cloud, Firebase console) on branch `enterprise/hotel-suite`. Shared packages change here first and are merged into the enterprise branch. |
 | D26 | Audit | Field-level audit trail of every business record, captured by a server trigger, sealed hourly in a hash chain. Plus integrity verification, segregation of duties, an auditor role, and SAF-T and auditor exports. |
+| D33 | Product and company | The product is **POS Suite by Polymath Tech**. The company name appears on the login, the About page, bills ("Powered by Polymath Tech", editable per client), exports and the manuals; one definition in `packages/core/src/brand.ts`. |
+| D34 | Updates without gcloud | The release tool talks to Google with the Firebase CLI's sign-in (backups, data updates, permissions), so a vendor PC needs only Node.js, Git and `firebase login`. GitHub Actions uses workload identity. |
 
 ## Remaining questions (as of 2026-10-30; items 1, 2, 4 and 6 are now covered by sample data or D16–D19)
 1. **VAT and SSCL status at opening:** is the restaurant VAT-registered and/or SSCL-liable from day 1? I need the registered name, address and TIN for the bill header.
@@ -50,4 +52,4 @@
 3. **Opening plan:** given next week's opening, will you use an interim arrangement for the first weeks (see [04](04-roadmap.md))?
 4. **Firebase ownership for future clients:** keep a separate project per client (each client pays Google directly), or run one platform project that you own and bill clients a subscription? The code supports both, but it affects pricing.
 5. **Bank:** which bank will provide the card terminal and the LankaQR merchant QR?
-6. **Product name:** do you have a name for the software product? It is used in the installer, the EMC login page and the receipt footer ("Powered by …").
+6. ~~**Product name**~~: decided, POS Suite by Polymath Tech (D33).

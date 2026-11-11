@@ -17,6 +17,7 @@ import {
   type WriteOp,
   COLLECTIONS as C,
   codeToId,
+  PRODUCT_FULL_NAME,
 } from "@pos/core";
 
 export interface FeederData {
@@ -158,7 +159,7 @@ function styleSheet(ws: ExcelJS.Worksheet, cols: Column[], rows: number): void {
 /** Builds the data feeder workbook (sample data for the template, or the live data for export). */
 export async function buildFeederWorkbook(data: FeederData, opts: { title?: string } = {}): Promise<ArrayBuffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "POS Suite";
+  wb.creator = PRODUCT_FULL_NAME;
   wb.created = new Date();
   const info = wb.addWorksheet("Instructions");
   info.columns = [{ width: 110 }];

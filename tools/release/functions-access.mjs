@@ -14,39 +14,8 @@
  *   4. they have the three roles Firebase needs (Cloud Run Invoker, Eventarc Event Receiver, Service
  *      Account Token Creator), granted here with Google's own error message if it refuses.
  */
-import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const require = createRequire(join(root, "package.json"));
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const status = (e) => e?.context?.response?.statusCode ?? e?.status ?? /HTTP Error: (\d+)/.exec(e?.message ?? "")?.[1];
-/** Google's own words, without the request URL. */
-const reason = (e) => String(e?.message ?? e).replace(/^Request to \S+ had /, "").replace(/^HTTP Error: \d+, /, "").replace(/\.+$/, "");
-
-async function signIn(projectId) {
-  const auth = require("firebase-tools/lib/auth");
-  const { requireAuth } = require("firebase-tools/lib/requireAuth");
-  const options = { project: projectId, projectRoot: root };
-  const account = auth.selectAccount(undefined, root);
-  if (!account) throw new Error("the Firebase CLI isn't signed in. Run `pnpm exec firebase login`, then deploy again.");
-  auth.setActiveAccount(options, account);
-  await requireAuth(options);
-  return account.user?.email ?? "your Google account";
-}
-
-function clients() {
-  const api = require("firebase-tools/lib/api");
-  const { Client } = require("firebase-tools/lib/apiv2");
-  return {
-    rm: new Client({ urlPrefix: api.resourceManagerOrigin(), apiVersion: "v1" }),
-    su: new Client({ urlPrefix: api.serviceUsageOrigin(), apiVersion: "v1" }),
-    suBeta: new Client({ urlPrefix: api.serviceUsageOrigin(), apiVersion: "v1beta1" }),
-    iam: new Client({ urlPrefix: api.iamOrigin(), apiVersion: "v1" }),
-  };
-}
+import { clients, httpStatus as status, reason, signIn, sleep } from "./google.mjs";
 
 /**
  * Returns { ok, problems }. `problems` are plain-language steps for the person deploying. Never

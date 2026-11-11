@@ -8,14 +8,14 @@
  *
  * For each project: backup (Firestore export) → indexes → data migrations → rules and functions →
  * hosting → check that /version.json reports the new version. Stops at the first failure.
- * Needs Google credentials with deploy rights on each project (CI: workload identity; laptop:
- * `gcloud auth login`, `gcloud auth application-default login` and `pnpm exec firebase login`).
+ * Needs Google credentials with deploy rights on each project: on a PC only `pnpm exec firebase login`
+ * (backups and data updates use that sign-in too, see google.mjs); on GitHub Actions, workload identity.
  * Works from Windows, macOS and Linux. Run by hand, it builds the web app first when needed.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { runCommand } from "./run-cmd.mjs";
 import { ensureFunctionsAccess } from "./functions-access.mjs";
+import { childCredentials, ensureBackupBucket, exportFirestore } from "./google.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -55,22 +55,21 @@ function targets() {
 }
 
 const HINT = {
-  gcloud: "Install the Google Cloud CLI (https://cloud.google.com/sdk/docs/install), then run `gcloud auth login` and `gcloud auth application-default login`. The first deploy of a new client doesn't need it.",
   pnpm: "Install pnpm (https://pnpm.io/installation) and run `pnpm install` in the project folder.",
 };
 
 /**
- * Runs a command; on Windows through the shell, so pnpm.cmd and gcloud.cmd are found. Stops the deploy
+ * Runs a command; on Windows through the shell, so pnpm.cmd is found. Stops the deploy
  * when it fails, unless `soft` (then returns false so the caller can try again).
  */
-function exec(cmd, args, { always = false, soft = false } = {}) {
+function exec(cmd, args, { always = false, soft = false, env = {} } = {}) {
   console.log(`  $ ${cmd} ${args.join(" ")}`);
   if (dryRun && !always) return true;
-  const r = runCommand(cmd, args, { cwd: root, stdio: "inherit", env: process.env });
+  const r = runCommand(cmd, args, { cwd: root, stdio: "inherit", env: { ...process.env, ...env } });
   if (r.error) fail(`${cmd} could not start (${r.error.message}). ${HINT[cmd] ?? ""}`);
   if (r.status === 0) return true;
   if (soft) return false;
-  fail(`${cmd} ${args[0]} failed (exit ${r.status})${cmd === "gcloud" ? `. ${HINT.gcloud}` : ""}`);
+  fail(`${cmd} ${args[0]} failed (exit ${r.status})`);
 }
 const run = (cmd, args) => exec(cmd, args);
 
@@ -158,20 +157,18 @@ async function liveState(projectId) {
   }
 }
 
-/** The backup bucket (90-day retention) in the client's project, created the first time it's needed. */
-function ensureBackupBucket(c) {
+/** Pre-release backup: a Firestore export into the client's backup bucket (created the first time, 90-day retention). */
+async function backup(c, stamp) {
+  const target = `${c.backupBucket.replace(/\/$/, "")}/pre-release/${version}-${stamp}`;
+  console.log(`  backup → ${target}`);
   if (dryRun) return;
-  const describe = runCommand("gcloud", ["storage", "buckets", "describe", c.backupBucket, "--project", c.projectId], { cwd: root, stdio: "ignore" });
-  if (describe.error) fail(`gcloud could not start (${describe.error.message}). ${HINT.gcloud}`);
-  if (describe.status === 0) return;
-  console.log(`  creating the backup bucket ${c.backupBucket} (old backups deleted after 90 days)`);
-  exec("gcloud", ["storage", "buckets", "create", c.backupBucket, "--project", c.projectId, "--location", c.region ?? "asia-south1", "--uniform-bucket-level-access"]);
-  const lifecycle = join(tmpdir(), "pos-backup-lifecycle.json");
-  writeFileSync(lifecycle, '{"rule":[{"action":{"type":"Delete"},"condition":{"age":90}}]}');
-  exec("gcloud", ["storage", "buckets", "update", c.backupBucket, `--lifecycle-file=${lifecycle}`]);
-  // Firestore's own service agent writes the export files.
-  const number = runCommand("gcloud", ["projects", "describe", c.projectId, "--format=value(projectNumber)"], { cwd: root, encoding: "utf8" }).stdout?.trim();
-  if (number) exec("gcloud", ["storage", "buckets", "add-iam-policy-binding", c.backupBucket, `--member=serviceAccount:service-${number}@gcp-sa-firestore.iam.gserviceaccount.com`, "--role=roles/storage.admin"]);
+  try {
+    await ensureBackupBucket({ projectId: c.projectId, bucket: c.backupBucket, region: c.region ?? "asia-south1", log: (m) => console.log(`  ${m}`) });
+    await exportFirestore({ projectId: c.projectId, outputUriPrefix: target, log: (m) => console.log(`  ${m}`) });
+    console.log("  ✓ backup finished");
+  } catch (e) {
+    fail(`the pre-release backup failed: ${e.message}. Nothing has been changed on ${c.projectId}. Run the deploy again; if it keeps failing, check the bucket ${c.backupBucket} in the Google Cloud console.`);
+  }
 }
 
 async function verify(projectId) {
@@ -207,14 +204,18 @@ for (const c of list) {
   if (flag("skip-backup")) console.warn("  ! --skip-backup: no pre-release backup");
   else if (first) console.log("  first deploy: nothing to back up yet");
   else if (c.backupBucket && !c.backupBucket.includes("REPLACE")) {
-    ensureBackupBucket(c);
-    run("gcloud", ["firestore", "export", `${c.backupBucket}/pre-release/${version}-${stamp}`, "--project", c.projectId, "--quiet"]);
+    await backup(c, stamp);
   } else console.warn("  ! no backupBucket in release/clients.json: skipping the pre-release backup (run pnpm deploy:setup)");
   if (parts.has("indexes")) firebase(c.projectId, "firestore:indexes");
-  // Data updates (migrations) need Google application default credentials (gcloud). A new project has
-  // no data yet: the first deploy skips them, and the next deploy runs them (each is safe to run later).
+  // A new project has no data yet: the first deploy skips the data updates, and the next deploy runs
+  // them (each is safe to run later). They use the Firebase CLI's sign-in (google.mjs).
   if (first) console.log("  first deploy: no data to update yet (data updates run from the next deploy on)");
-  else run("node", ["tools/release/migrate.mjs", "--project", c.projectId, ...(dryRun ? ["--dry-run"] : [])]);
+  else {
+    const creds = childCredentials();
+    const ok = exec("node", ["tools/release/migrate.mjs", "--project", c.projectId, ...(dryRun ? ["--dry-run"] : [])], { always: true, soft: true, env: creds.env });
+    creds.cleanup();
+    if (!ok) fail("the data updates (migrations) failed: read the error above. The backup taken before this deploy is in the client's backup bucket.");
+  }
   if (parts.has("functions")) {
     // Per-project function settings (Firebase reads .env.<projectId> next to the functions code). The
     // functions are built into dist/ by Firebase just before they upload; on a fresh copy of the

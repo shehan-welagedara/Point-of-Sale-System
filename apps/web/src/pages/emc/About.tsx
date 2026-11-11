@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { type Workstation, COLLECTIONS as C, MODULES, editionInfo } from "@pos/core";
+import { type Workstation, COLLECTIONS as C, COMPANY_NAME, MODULES, PRODUCT_NAME, editionInfo } from "@pos/core";
 import { PageHead } from "../../components/ui";
 import { firebaseConfig } from "../../lib/firebase";
 import { dateColombo, dateTimeColombo } from "../../lib/format";
@@ -67,7 +67,7 @@ export function AboutPage() {
       <PageHead title="About this system" subtitle="The version you are running, updates and what's new, your licence and where your data is kept." />
       <div className="grid cols-3 about-cards">
         <div className="card card-body stack tight">
-          <span className="small muted">POS Suite · Cloud Restaurant Edition</span>
+          <span className="small muted">{PRODUCT_NAME} · Cloud Restaurant Edition · by {COMPANY_NAME}</span>
           <strong style={{ fontSize: 28 }}>Version {APP_VERSION}</strong>
           <span className="small muted">Built {APP_BUILT_AT ? dateTimeColombo(APP_BUILT_AT) : "in development"} · {APP_COMMIT}</span>
           <div className="row wrap" style={{ gap: 8 }}>
@@ -151,9 +151,9 @@ export function AboutPage() {
         <div className="card card-body stack tight">
           <h3>Help and support</h3>
           <p className="small" style={{ margin: 0 }}>
-            The user manual, the configuration guide and the training manuals come with the system as PDFs from your supplier. For help, contact your system supplier{settings.branding.poweredBy ? ` (${settings.branding.poweredBy})` : ""}, quoting the version and business ID above.
+            The user manual, the configuration guide and the training manuals come with the system as PDFs from {COMPANY_NAME}. For help, contact {COMPANY_NAME}, quoting the version and business ID above.
           </p>
-          <p className="tiny muted" style={{ margin: 0 }}>Built with open-source software including React, Vite, Firebase, ExcelJS and Zod, used under their licences.</p>
+          <p className="tiny muted" style={{ margin: 0 }}>{PRODUCT_NAME} © {new Date().getFullYear()} {COMPANY_NAME}. Built with open-source software including React, Vite, Firebase, ExcelJS and Zod, used under their licences.</p>
         </div>
       </div>
     </div>

@@ -135,9 +135,7 @@ Audit readiness also depends on how the business operates it:
 - **Local demo:**
   1. Run `pnpm dev` and choose **Load the demo restaurant**. The books are created through the ledger itself: opening balances, assets and depreciation, rent and payroll, POS days, supplier invoices (one priced 5% above its PO, so it waits for approval), payments, a corporate invoice and receipt, budgets.
   2. Use the **Acting as** switch at the bottom of the sidebar (Owner, Accountant or External auditor) to see maker–checker and read-only audit access.
-- **Firebase:** deploy rules, indexes, hosting and functions with `pnpm firebase:deploy`. Cost settings are in [10-firebase-free-tier.md](10-firebase-free-tier.md). Before the first deploy:
-  - set `LOCATION` in `apps/functions/.env` to your Firestore location;
-  - set `VITE_FUNCTIONS_REGION` in `apps/web/.env.local` to the same value.
+- **Firebase:** deploy rules, indexes, hosting and functions with the release tool (`pnpm release:deploy --target CLIENT-ID`, see the [deployment manual](18-deployment-manual.md)). The functions run in the Firestore database's region (asia-south1). Cost settings are in [10-firebase-free-tier.md](10-firebase-free-tier.md).
 
 ## 7. Tests
 

@@ -8,6 +8,8 @@ Follow the [deployment manual](../18-deployment-manual.md) for the technical ste
 
 ## 1. Project and deployment (vendor)
 
+**Status (11 November 2026): deployed.** The system is live at `https://noura-kitchen-pos.web.app` (Firebase project `noura-kitchen-pos`, asia-south1). The steps below are how it was done, for reference and for the next client. Updates: `git pull`, `pnpm install`, `pnpm release:deploy --target noura-kitchen` (deployment manual S).
+
 The Firebase project exists and the Blaze plan is active (deployment manual B–D). The rest happens on your PC, in **Command Prompt** (Start → *cmd*) inside the project folder; the deployment manual E–G explains each step.
 
 1. **Budget alert** on the project (deployment manual C): USD 5, alerts to the client and to you.
@@ -17,7 +19,7 @@ The Firebase project exists and the Blaze plan is active (deployment manual B–
 pnpm exec firebase login
 ```
 
-   Before the first **update** (not needed now): install the Google Cloud CLI, open a new terminal, and run `gcloud auth login` and `gcloud auth application-default login`.
+   That sign-in is all the deploys and updates need (from 1.6.0, no Google Cloud CLI).
 
 3. **Set up Noura Kitchen** (deployment manual F). Answer *noura-kitchen*, *Noura Kitchen* and the Firebase project ID; the first time, let it create your licence key and back up `licence-keys/vendor-key.txt`:
 
@@ -25,7 +27,7 @@ pnpm exec firebase login
 pnpm deploy:setup
 ```
 
-4. **Deploy** (deployment manual G): look at the steps first, then deploy. The first deploy takes 5–10 minutes; there is nothing to back up yet, so it skips the backup by itself. It also creates the web address and, if Google is still setting up the new project, waits 3 minutes and tries the server functions again: leave the window open.
+4. **Deploy** (deployment manual G): look at the steps first, then deploy. The first deploy takes 5–10 minutes; there is nothing to back up yet, so it skips the backup by itself. It also checks the project's permissions for the server functions (switching on the Compute Engine API), creates the web address and, if Google is still setting up the new project, waits and tries the server functions again: leave the window open.
 
 ```bash
 pnpm release:deploy --target noura-kitchen --dry-run

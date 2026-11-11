@@ -24,15 +24,18 @@ Other run modes:
 - Then set `VITE_USE_EMULATORS=true` plus any demo config in `apps/web/.env.local`, and the app runs against the emulators.
 
 ## 2. Your demo environment (your Firebase project)
-1. Follow [10-firebase-free-tier.md](10-firebase-free-tier.md) §2 (budget alert, Firestore, Email/Password).
-2. Firebase console → Project settings → *Your apps* → add a **Web app** and copy its config into `apps/web/.env.local` (see `.env.example`).
-3. Run these:
+Your own Firebase project for demonstrations and for testing each release before clients get it (the **staging** project in [20](20-release-and-updates.md)).
+
+1. Create it like a client's project: [deployment manual](18-deployment-manual.md) B to D (Blaze plan with a budget alert, Firestore in asia-south1, Email/Password, web app registered).
+2. Put its project ID in `release/clients.json` under `staging`.
+3. Deploy, with the same tool as for clients (it builds the app first):
    ```bash
-   npx firebase login
-   npx firebase use --add      # choose the project; alias "demo"
-   pnpm firebase:deploy        # builds and deploys hosting + Firestore rules + indexes
+   pnpm exec firebase login
+   pnpm release:deploy --target staging
    ```
-4. Open the hosting URL, create your account, and choose **Load the demo restaurant**. To prepare a client's demo, choose **Create with sample data** under the client's name.
+4. Open `https://PROJECT-ID.web.app`, create your account, and choose **Load the demo restaurant** (or the Noura Kitchen demo). To prepare a client's demo, choose **Create with sample data** under the client's name.
+
+The web app reads the project's Firebase settings from Hosting at run time, so the same build works in every project: don't put a Firebase config in `apps/web/.env.local` for a build you deploy (the release tool refuses one). `.env.local` is only for running `pnpm dev` against a cloud project.
 
 Each business you create is a separate **tenant** with its own data, logins and modules. The business switcher (sidebar) appears when your login belongs to several.
 
@@ -54,7 +57,7 @@ Each business you create is a separate **tenant** with its own data, logins and 
   - Inclusive or exclusive pricing.
   - Confirm everything with the client's accountant ([06](06-sri-lanka-compliance.md)).
 - [ ] *Setup → Branding*: logo, colours, bill header and footer.
-- [ ] *Administration → Licence & modules*: activate the client's licence key (issued with `pnpm licence issue`, see [15](15-licensing-and-modules.md)), then switch on what they bought.
+- [ ] *Administration → Licence & modules*: activate the client's licence key (see [15](15-licensing-and-modules.md)), then switch on what they bought.
 - [ ] *People & Security*: sign-in policy (method, lockout, auto sign-out, clock in), roles with levels and limits, employees with properties and revenue centres.
 - [ ] *POS Configuration → POS themes*: choose Classic, Modern or Midnight and adjust colours; add item photos under Menu Management if wanted.
 - [ ] *Setup → Devices & printers*:
@@ -70,18 +73,16 @@ Each business you create is a separate **tenant** with its own data, logins and 
 - [ ] Do a test day: sell, void, discount, split payment, End of Day. Check the Z report, the stock, and the POS day in *Finance → All documents*. Then run *Audit Center → Integrity check*.
 
 ## 5. Deploying to a client's own Firebase project
-The code base stays in this repository and in your Firebase project. Each client gets their own Firebase project, owned and billed by them, built from the **same `main` branch**:
+Each client gets their own Firebase project, owned and billed by them, built from the **same `main` branch**. The [deployment manual](18-deployment-manual.md) takes you through it; in short:
 ```bash
-npx firebase use --add                  # add the client project, alias e.g. "client-spice"
-cp apps/web/.env.example apps/web/.env.client-spice   # the client's web config
-cp apps/web/.env.client-spice apps/web/.env.local
-cp apps/functions/.env.example apps/functions/.env    # LOCATION = the client's Firestore region
-npx firebase use client-spice
-pnpm firebase:deploy                    # hosting, rules, indexes and the accounting/audit functions
-npx firebase functions:artifacts:setpolicy --location asia-south1 --days 1   # after the first deploy, if it didn't ask
+pnpm exec firebase login                       # once per PC
+pnpm deploy:setup                              # registers the client in release/clients.json, licence public key
+pnpm release:deploy --target CLIENT-ID --dry-run
+pnpm release:deploy --target CLIENT-ID         # first deploy: permissions, web address, functions, hosting
 ```
 - Create the owner's account on the deployed site and create the business: empty, or import their Excel data feeder.
 - Configuration that differs per client lives in **their data**: settings, modules, branding and menus. Do not keep a separate code branch per client. Client-specific code (rare) goes behind a module flag or into an extension package on `main`, so every client keeps receiving fixes ([01 §4](01-architecture.md)).
+- Updates: [20 — Releases and updates](20-release-and-updates.md).
 
 ## 6. Repository map
 | Path | What |
@@ -91,7 +92,10 @@ npx firebase functions:artifacts:setpolicy --location asia-south1 --days 1   # a
 | `packages/engine` | Money, Sri Lanka service charge/SSCL/VAT, tenders, IRD invoice numbers |
 | `packages/core` | Domain model, modules, privileges, costing, FIFO inventory, checks, reports, POS day journal, integration templates |
 | `packages/ledger` | General ledger: posting, approvals, assets, bank matching, statements, audit trail, integrity checks, SAF-T |
-| `apps/functions` | Cloud Functions: ledger API, audit trail triggers, hourly sealing |
+| `apps/functions` | Cloud Functions: ledger API, licence activation, PIN checks, phone pairing, audit trail triggers, hourly sealing |
+| `tools/release` | Release tools: client setup, deploy, permissions check, backups, data migrations, network check |
+| `tools/licence` | Vendor licence keys (`pnpm licence`) |
+| `tools/manual` | User and training manuals as PDFs |
 | `packages/printing` | Bill, KOT and report layouts; ESC/POS and text renderers |
 | `packages/sample-data` | The Sri Lankan demo restaurant |
 | `packages/excel` | Excel data feeder (template, validated import, export) and report exports |
@@ -107,6 +111,7 @@ pnpm test:e2e        # browser end-to-end (needs Playwright + Chromium)
 pnpm test:pairing    # connecting phones with codes, against the Firebase emulators
 pnpm test:contrast   # text colour contrast (WCAG AA) on every screen, all sizes and styles
 pnpm test:golive     # go-live rehearsal from an empty business (phone, Bluetooth printer, books)
+pnpm test:migrations # data migrations on the Firestore emulator (needs Java)
 pnpm typecheck
 pnpm build
 ```
