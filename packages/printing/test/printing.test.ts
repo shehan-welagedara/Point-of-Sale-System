@@ -61,6 +61,29 @@ describe("bill", () => {
     expect(guest).toContain("not a tax invoice");
   });
 
+  it("prints a Sri Lanka standard bill when the business isn't VAT registered, or the tax invoice is switched off", () => {
+    // Not registered for VAT or SSCL: no VAT is charged, and the bill is a standard bill.
+    const plainTotals = calculateCheck({ orderType: "dine-in", pricing: "exclusive", rules: sriLankaChargeRules({ vatRegistered: false, ssclLiable: false }), lines: check.lines.map((l) => ({ id: l.id, name: l.name, quantity: l.qty, unitPrice: l.unitPrice, taxClass: "standard" })) });
+    const plainPaid: Check = { ...paid, payments: [{ ...paid.payments[0]!, applied: plainTotals.amountDue }], change: 400_000 - plainTotals.amountDue };
+    const notRegistered = { ...business, vatRegistered: false };
+    const std = toText(buildBill({ kind: "invoice", check: plainPaid, totals: plainTotals, business: notRegistered, branding, width: 48, staffName: "Nimali", orderTypeName: "Dine-in", tableName: "4", tenders, invoiceNo: "26NOV_P01_7", openDrawer: true }));
+    for (const s of ["INVOICE", "Bill No :", "26NOV_P01_7", "Date    :", "03-11-2026 20:41", "Service Charge 10%", "TOTAL (LKR)", "Cash", "Change", "Thank you!"]) expect(std).toContain(s);
+    for (const s of ["TAX INVOICE", "TIN:", "Invoice Dt", "Supply Dt", "VAT", "Purchaser"]) expect(std).not.toContain(s);
+    // Even with the switch on, a business that isn't registered can't print a tax invoice.
+    expect(toText(buildBill({ kind: "invoice", check: plainPaid, totals: plainTotals, business: notRegistered, branding: { ...branding, bill: { taxInvoice: true, invoiceTitle: "BILL" } }, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, invoiceNo: "X1" }))).toMatch(/^\s*BILL/m);
+
+    // VAT registered, tax invoice switched off: a standard bill showing the VAT charged…
+    const off = { ...branding, bill: { taxInvoice: false } };
+    const regStd = toText(buildBill({ kind: "invoice", check: paid, totals, business, branding: off, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, invoiceNo: "26NOV_W01_3" }));
+    expect(regStd).not.toContain("TAX INVOICE");
+    expect(regStd).toContain("Bill No :");
+    expect(regStd).toContain("VAT 18%");
+    expect(regStd).not.toContain("Supply Dt");
+    // …but a VAT-registered buyer always gets a tax invoice, with their particulars.
+    const b2b = toText(buildBill({ kind: "invoice", check: { ...paid, buyer: { name: "ABC Holdings", tin: "134567890", address: "Colombo 03" } }, totals, business, branding: off, width: 48, staffName: "N", orderTypeName: "Dine-in", tenders, invoiceNo: "26NOV_W01_4" }));
+    for (const s of ["TAX INVOICE", "Invoice No :", "Supply Dt", "TIN: 100000000", "Purchaser:", "TIN: 134567890"]) expect(b2b).toContain(s);
+  });
+
   it("follows the administrator's bill layout", () => {
     const layout = { titleSize: 1 as const, invoiceTitle: "BILL", guestCheckTitle: "PRE-BILL", showPhone: false, showServer: true, serverLabel: "Steward", showCovers: false, showModifiers: false, qtyStyle: "after" as const, showUnitPrice: true, showItemCount: true, guestCheckNote: "", showPoweredBy: false, totalLabel: "AMOUNT DUE", extraFeed: 3 };
     const plainBiz = { ...business, vatRegistered: false };

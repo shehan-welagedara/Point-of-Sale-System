@@ -27,9 +27,11 @@ import {
 import type { CheckTotals } from "@pos/engine";
 import { type ReceiptDoc, buildBill, widthForPaper } from "@pos/printing";
 import { minutesSince, money, moneyShort, timeColombo } from "../../../lib/format";
+import { paperWidthFor } from "../../../lib/printing";
 import { useApp, useCollection } from "../../../state/app";
 import { Icon, type IconName } from "./icons";
 import { MobilePay, PaySuccess } from "./MobilePay";
+import { BluetoothPrinterButton, BluetoothPrinterPanel } from "../BluetoothPrinter";
 import { MobileReports, SalesChart, StatTile, change, useSales } from "./MobileReports";
 import { greeting, initials, mobileVars } from "./ui";
 import "./mobile.css";
@@ -265,6 +267,7 @@ function Home({ api, style, go, onRvc }: { api: PosApi; style: MobileStyle; go: 
         </div>
         <button className="m-pill" onClick={api.myRvcs.length > 1 ? onRvc : undefined} aria-label="Revenue centre">{api.rvc?.name ?? api.rvcId}{api.myRvcs.length > 1 ? " ▾" : ""}</button>
       </div>
+      <BluetoothPrinterButton ws={api.ws} className="m-btn block bt-home" />
       {showSales && sales.scope !== "none" ? (
         style === "indigo" ? (
           <div className="m-gradient-card">
@@ -571,7 +574,7 @@ function OrderSheet({ api, c, onClose }: { api: PosApi; c: Check; onClose: () =>
   const printer = api.printers.find((p) => p.id === api.ws.receiptPrinterId);
   const doc = () =>
     c.totals && c.invoiceNo
-      ? buildBill({ kind: "invoice", check: c, totals: c.totals, business: settings.business, branding: settings.branding, width: widthForPaper(printer?.paperWidthMm ?? 80), staffName: api.staffName(c.staffId), orderTypeName: api.orderTypeName(c.orderTypeId), tableName: api.tableName(c.tableId), tenders: api.ctx.tenders, invoiceNo: c.invoiceNo, issuedAt: c.closedAt ?? c.openedAt, copy: true })
+      ? buildBill({ kind: "invoice", check: c, totals: c.totals, business: settings.business, branding: settings.branding, width: paperWidthFor(api.ws, printer), staffName: api.staffName(c.staffId), orderTypeName: api.orderTypeName(c.orderTypeId), tableName: api.tableName(c.tableId), tenders: api.ctx.tenders, invoiceNo: c.invoiceNo, issuedAt: c.closedAt ?? c.openedAt, copy: true })
       : null;
   return (
     <Sheet title={`#${c.checkNo} · ${c.invoiceNo ?? ""}`} onClose={onClose}>
@@ -590,6 +593,7 @@ function OrderSheet({ api, c, onClose }: { api: PosApi; c: Check; onClose: () =>
 
 function More({ api, go, onFunctions, onReports, onDetailed, onRvc }: { api: PosApi; go: (t: Tab) => void; onFunctions: () => void; onReports: () => void; onDetailed: () => void; onRvc: () => void }) {
   const { settings } = useApp();
+  const [printerOpen, setPrinterOpen] = useState(false);
   return (
     <>
       <MHead title="More" />
@@ -608,11 +612,13 @@ function More({ api, go, onFunctions, onReports, onDetailed, onRvc }: { api: Pos
           <button className="m-sheet-row" onClick={onReports}><Icon name="reports" /> <span className="grow">Sales dashboard</span><Icon name="chevron" size={18} /></button>
           <button className="m-sheet-row" onClick={onDetailed}><Icon name="orders" /> <span className="grow">Detailed reports</span><Icon name="chevron" size={18} /></button>
           <button className="m-sheet-row" onClick={() => go("orders")}><Icon name="clock" /> <span className="grow">Today's orders</span><Icon name="chevron" size={18} /></button>
+          {api.ws.printMode === "bluetooth" ? <button className="m-sheet-row" onClick={() => setPrinterOpen(true)}><span aria-hidden>🖨</span> <span className="grow">Bluetooth printer</span><Icon name="chevron" size={18} /></button> : null}
           <Link className="m-sheet-row" to="/emc/home"><Icon name="settings" /> <span className="grow">Back office</span><Icon name="chevron" size={18} /></Link>
         </div>
         <button className="m-btn danger block" onClick={api.onSignOut}><Icon name="logout" size={18} /> Sign out</button>
         <p className="m-muted tiny center">{settings.branding.displayName}{settings.branding.poweredBy ? ` · Powered by ${settings.branding.poweredBy}` : ""}</p>
       </div>
+      {printerOpen ? <BluetoothPrinterPanel ws={api.ws} onClose={() => setPrinterOpen(false)} /> : null}
     </>
   );
 }

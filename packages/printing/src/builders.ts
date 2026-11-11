@@ -1,6 +1,6 @@
 import { type CheckTotals, formatAmount } from "@pos/engine";
 import type { BillLayout, BrandingSettings, BusinessSettings, Check, CheckLine, DailyStats, MenuItem, TenderMedia } from "@pos/core";
-import { resolveBillLayout } from "./bill-layout.js";
+import { isTaxInvoice, resolveBillLayout } from "./bill-layout.js";
 import type { Block, ReceiptDoc } from "./doc.js";
 
 const amt = (c: number) => formatAmount(c);
@@ -90,13 +90,14 @@ function itemBlocks(rows: readonly ItemRow[], L: BillLayout): Block[] {
 
 /**
  * Guest check (before payment) or final bill, laid out as the administrator chose (Bill designer).
- * VAT-registered sellers get the IRD tax invoice layout, whose required elements always print.
+ * A final bill is either the IRD tax invoice (VAT-registered seller; its required elements always
+ * print) or a standard Sri Lankan bill (Bill No, date, items, charges, total; no TIN).
  */
 export function buildBill(a: BillArgs): ReceiptDoc {
   const { check, totals, business } = a;
   const L = resolveBillLayout(a.layout ?? a.branding.bill);
   const isInvoice = a.kind === "invoice";
-  const taxInvoice = isInvoice && business.vatRegistered;
+  const taxInvoice = isInvoice && isTaxInvoice(business.vatRegistered, L, Boolean(check.buyer));
   const align = L.headerAlign;
   const blocks: Block[] = [];
   if (a.printLogo && L.showLogo) blocks.push({ t: "nvLogo" });
@@ -104,7 +105,7 @@ export function buildBill(a: BillArgs): ReceiptDoc {
   if (a.copy) blocks.push({ t: "text", text: "*** COPY ***", align: "center", bold: true });
   blocks.push({ t: "text", text: business.legalName, align, bold: true });
   if (L.showAddress || taxInvoice) for (const l of business.addressLines) blocks.push({ t: "text", text: l, align });
-  const idLine = [business.vatRegistered ? `TIN: ${business.tin}` : "", L.showPhone && business.phone ? `Tel: ${business.phone}` : ""].filter(Boolean).join("   ");
+  const idLine = [taxInvoice || (business.vatRegistered && !isInvoice) ? `TIN: ${business.tin}` : "", L.showPhone && business.phone ? `Tel: ${business.phone}` : ""].filter(Boolean).join("   ");
   if (idLine) blocks.push({ t: "text", text: idLine, align });
   if (L.showEmail && business.email) blocks.push({ t: "text", text: business.email, align });
   if (L.showWebsite && business.website) blocks.push({ t: "text", text: business.website, align });
@@ -113,9 +114,15 @@ export function buildBill(a: BillArgs): ReceiptDoc {
   blocks.push({ t: "rule" });
   if (isInvoice) {
     if (!a.invoiceNo) throw new Error("invoice number required");
-    blocks.push({ t: "pair", left: "Invoice No :", right: a.invoiceNo, bold: true });
-    blocks.push({ t: "pair", left: "Invoice Dt :", right: colomboTime(a.issuedAt ?? check.closedAt ?? check.openedAt) });
-    blocks.push({ t: "pair", left: "Supply Dt  :", right: colomboDate(check.businessDate) });
+    const issued = colomboTime(a.issuedAt ?? check.closedAt ?? check.openedAt);
+    if (taxInvoice) {
+      blocks.push({ t: "pair", left: "Invoice No :", right: a.invoiceNo, bold: true });
+      blocks.push({ t: "pair", left: "Invoice Dt :", right: issued });
+      blocks.push({ t: "pair", left: "Supply Dt  :", right: colomboDate(check.businessDate) });
+    } else {
+      blocks.push({ t: "pair", left: "Bill No :", right: a.invoiceNo, bold: true });
+      blocks.push({ t: "pair", left: "Date    :", right: issued });
+    }
   } else if (L.showPrintedTime) {
     blocks.push({ t: "pair", left: "Printed    :", right: colomboTime(a.issuedAt ?? new Date().toISOString()) });
   }
@@ -139,10 +146,9 @@ export function buildBill(a: BillArgs): ReceiptDoc {
     if (c.kind === "vat") continue;
     if (c.amount || c.kind === "serviceCharge") blocks.push({ t: "pair", left: c.name, right: amt(c.amount) });
   }
-  if (business.vatRegistered) {
-    blocks.push({ t: "pair", left: "Value excl. VAT", right: amt(totals.valueExclVat) });
-    for (const c of totals.charges) if (c.kind === "vat") blocks.push({ t: "pair", left: c.name, right: amt(c.amount) });
-  }
+  if (taxInvoice || (business.vatRegistered && !isInvoice)) blocks.push({ t: "pair", left: "Value excl. VAT", right: amt(totals.valueExclVat) });
+  // A seller that isn't VAT registered charges no VAT, so a bill never shows a VAT line for one.
+  if (business.vatRegistered) for (const c of totals.charges) if (c.kind === "vat" && c.amount) blocks.push({ t: "pair", left: c.name, right: amt(c.amount) });
   if (totals.roundingAdjustment) blocks.push({ t: "pair", left: "Rounding", right: amt(totals.roundingAdjustment) });
   blocks.push({ t: "rule", char: "=" });
   blocks.push({ t: "pair", left: L.totalLabel || "TOTAL (LKR)", right: amt(totals.amountDue), bold: true, size: L.totalSize });
@@ -155,7 +161,7 @@ export function buildBill(a: BillArgs): ReceiptDoc {
         blocks.push({ t: "pair", left: `${label}${p.reference && L.showPaymentRefs ? ` (${p.reference})` : ""}`, right: amt(p.tendered) });
       }
     if (check.change && L.showChange) blocks.push({ t: "pair", left: "Change", right: amt(check.change), bold: true });
-    if (check.buyer) {
+    if (check.buyer && taxInvoice) {
       blocks.push({ t: "rule" });
       blocks.push({ t: "text", text: "Purchaser:", bold: true });
       blocks.push({ t: "text", text: `${check.buyer.name}  TIN: ${check.buyer.tin}` });

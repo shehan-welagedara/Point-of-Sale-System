@@ -43,7 +43,10 @@ export const SCHEMAS = {
       name,
       deviceProfile: z.enum(["dedicated", "mobile"]),
       receiptPrinterId: z.string(),
-      printMode: z.enum(["agent", "direct", "preview"]),
+      printMode: z.enum(["agent", "direct", "bluetooth", "preview"]),
+      bluetoothVia: z.enum(["browser", "rawbt"]).optional(),
+      paperWidthMm: z.union([z.literal(80), z.literal(58)]).optional(),
+      kitchenOnBluetooth: z.boolean().optional(),
       autoSignOutSeconds: z.number().int().min(0).max(3600).optional(),
       active: z.boolean(),
     })

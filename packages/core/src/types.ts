@@ -89,6 +89,13 @@ export interface BrandingSettings extends Entity {
  * purchaser's details when the buyer gives a TIN.
  */
 export interface BillLayout {
+  /**
+   * Print the final bill as an IRD TAX INVOICE. Only a VAT-registered business can (Business &
+   * tax); otherwise, or when switched off, the final bill is a standard Sri Lankan bill (Bill No,
+   * date, items, charges, total; no TIN or tax-invoice wording). A registered seller's bill for a
+   * VAT-registered buyer (purchaser TIN) is always a tax invoice.
+   */
+  taxInvoice: boolean;
   // Header
   showLogo: boolean;
   headerAlign: "center" | "left";
@@ -289,8 +296,21 @@ export interface Workstation extends Entity {
   name: string;
   deviceProfile: DeviceProfile;
   receiptPrinterId: string;
-  /** Print through a Print Agent (always for tablets) or directly from the POS Shell. */
-  printMode: "agent" | "direct" | "preview";
+  /**
+   * How this device prints: through the Print Agent (shop PCs and network printers), directly
+   * from the POS Shell (USB on this PC), to a Bluetooth printer next to this phone or tablet
+   * (no Print Agent needed), or on screen only.
+   */
+  printMode: "agent" | "direct" | "bluetooth" | "preview";
+  /**
+   * Bluetooth printing: from the browser (Chrome on Android, Bluetooth Low Energy printers) or
+   * through the RawBT app on Android (any Bluetooth printer, including classic Bluetooth).
+   */
+  bluetoothVia?: "browser" | "rawbt";
+  /** Paper width of the Bluetooth printer (default 80 mm). */
+  paperWidthMm?: 80 | 58;
+  /** Kitchen and bar tickets also print on the Bluetooth printer (default yes: one printer for everything). */
+  kitchenOnBluetooth?: boolean;
   /** Screen style on this device: the business setting, the terminal layout, or one of the app styles. */
   uiStyle?: "default" | "terminal" | MobileStyle;
   active: boolean;

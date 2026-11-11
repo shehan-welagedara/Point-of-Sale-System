@@ -51,7 +51,9 @@ import { type ReceiptDoc, buildBill, buildDaySummary, buildKot, feedbackLink, re
 import { Empty, Modal, Seg } from "../../components/ui";
 import { ReceiptView } from "../../components/Receipt";
 import { minutesSince, money, timeColombo } from "../../lib/format";
-import { queuePrint, routePrinter } from "../../lib/printing";
+import { paperWidthFor, queuePrint, routePrinter } from "../../lib/printing";
+import { printBluetooth } from "../../lib/bluetooth-printer";
+import { BluetoothPrinterButton } from "./BluetoothPrinter";
 import { useApp, useCollection, useStore } from "../../state/app";
 import { AmountDialog, CustomerDialog, DiscountDialog, ManagerAuth, ModifierDialog, ReasonDialog } from "./dialogs";
 import { PayDialog } from "./PayDialog";
@@ -137,7 +139,7 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
 
   const totals = useMemo(() => (check && activeLines(check).length ? computeCheckTotals(check, ctx) : null), [check, ctx]);
   const bd = businessDateNow(settings.pos);
-  const paperWidth = (p?: Printer) => widthForPaper(p?.paperWidthMm ?? 80);
+  const paperWidth = (p?: Printer) => paperWidthFor(ws, p);
   const staffName = (id: string) => staff.find((s) => s.id === id)?.name ?? id;
   const orderTypeName = (id: string) => orderTypes.find((o) => o.id === id)?.name ?? id;
   const tableName = (id?: string) => tables.find((t) => t.id === id)?.name;
@@ -160,6 +162,13 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
   const lineValue = (l: CheckLine) => l.qty * (l.unitPrice + l.modifiers.reduce((a, m) => a + m.price, 0));
 
   async function print(kind: "kot" | "bill" | "receipt" | "report", doc: ReceiptDoc, printer: Printer | undefined) {
+    // A phone or tablet with its own Bluetooth printer prints everything there (kitchen tickets
+    // too, unless the kitchen has its own printer through the Print Agent).
+    if (ws.printMode === "bluetooth" && (kind !== "kot" || ws.kitchenOnBluetooth !== false)) {
+      const printed = await printBluetooth(doc, ws.bluetoothVia ?? "browser");
+      if (!printed) toast(`${kind === "kot" ? "Kitchen ticket" : "Print"} waiting for the printer: tap the printer button to connect it.`, true);
+      return;
+    }
     if (ws.printMode === "preview" || !printer) {
       setDialog({ t: "receipt", doc, title: kind === "kot" ? "Kitchen ticket" : "Preview" });
       return;
@@ -250,7 +259,7 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
       const drawer = closed.payments.some((p) => ctx.tenders.get(p.tenderId)?.opensDrawer);
       const feedback = feedbackLink(resolveBillLayout(settings.branding.bill), invoice.id, settings.business.website);
       const doc = buildBill({ kind: "invoice", check: closed, totals: invoice.totals, business: settings.business, branding: settings.branding, width: paperWidth(printer), staffName: staffName(closed.staffId), orderTypeName: orderTypeName(closed.orderTypeId), tableName: tableName(closed.tableId), tenders: ctx.tenders, invoiceNo: invoice.id, issuedAt: invoice.issuedAt, openDrawer: drawer, printLogo: Boolean(settings.branding.logoDataUrl), ...customerOnBill(closed), ...(feedback ? { qr: { data: feedback, caption: resolveBillLayout(settings.branding.bill).feedbackCaption } } : {}) });
-      const printed = settings.pos.autoPrintBillOnClose && ws.printMode !== "preview" && Boolean(printer);
+      const printed = settings.pos.autoPrintBillOnClose && ws.printMode !== "preview" && (ws.printMode === "bluetooth" || Boolean(printer));
       if (printed) await print("receipt", doc, printer);
       setLastInvoice(doc);
       setCheck(null);
@@ -561,6 +570,7 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
           <span className="pos-rvc">{rvc?.name ?? rvcId}</span>
         )}
         <span className="grow" />
+        <BluetoothPrinterButton ws={ws} className="btn ghost sm" />
         <Seg<View> value={view} onChange={setView} options={[{ value: "order", label: "Order" }, ...(on("tables") ? [{ value: "tables" as View, label: "Tables" }] : []), { value: "checks", label: `Open (${openChecks.length})` }, { value: "reports", label: "Reports" }, { value: "functions", label: "Functions" }]} />
         <button className="btn ghost sm" onClick={onSignOut}>Sign out</button>
       </header>
@@ -762,12 +772,12 @@ function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, m
   const receiptPrinter = printers.find((p) => p.id === ws.receiptPrinterId);
   const tenders = [...ctx.tenders.values()];
   const authBy = (by: Staff) => (by.id !== user.id ? { authorizedBy: by.id } : {});
-  const drawer = () => print("receipt", { width: 48, blocks: [{ t: "drawer" }] }, receiptPrinter);
+  const drawer = () => print("receipt", { width: paperWidthFor(ws, receiptPrinter), blocks: [{ t: "drawer" }] }, receiptPrinter);
 
   async function report(kind: "X" | "Z") {
     const stats = (await store.get<DailyStats>(C.dailyStats, statsId(ws.propertyId, bd))) ?? null;
     if (!stats) return toast("No sales yet today", true);
-    const doc = buildDaySummary({ stats, kind, width: widthForPaper(receiptPrinter?.paperWidthMm ?? 80), businessName: settings.business.tradingName, propertyName: ws.propertyId, tenders, printedAt: new Date().toISOString() });
+    const doc = buildDaySummary({ stats, kind, width: paperWidthFor(ws, receiptPrinter), businessName: settings.business.tradingName, propertyName: ws.propertyId, tenders, printedAt: new Date().toISOString() });
     await print("report", doc, receiptPrinter);
     void journal.log({ type: "report", employeeId: user.id, detail: `${kind} report` });
     onPreview(doc, `${kind} report`);
@@ -795,7 +805,7 @@ function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, m
       }
     }
     if (stats) {
-      const doc = buildDaySummary({ stats, kind: "Z", width: widthForPaper(receiptPrinter?.paperWidthMm ?? 80), businessName: settings.business.tradingName, propertyName: ws.propertyId, tenders, printedAt: new Date().toISOString() });
+      const doc = buildDaySummary({ stats, kind: "Z", width: paperWidthFor(ws, receiptPrinter), businessName: settings.business.tradingName, propertyName: ws.propertyId, tenders, printedAt: new Date().toISOString() });
       await print("report", doc, receiptPrinter);
       steps.push(`Z report printed: net sales ${money(stats.netSales)}, ${stats.checks} checks.`);
       if (on("whatsapp")) {
