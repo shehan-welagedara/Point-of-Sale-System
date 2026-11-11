@@ -2,6 +2,19 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.5.2 — 2026-11-11
+
+**Type:** Patch (deployment tools and documentation) · **Deploy:** hosting only (version number)
+
+### For clients
+
+- No change in the system itself.
+
+### Changes
+
+- `pnpm deploy:check`: tests, from Node.js, each Google and Firebase service the deploy needs, and prints the fix for this PC. When `firebase login` fails although the browser works, the cause is usually antivirus HTTPS scanning, a company proxy or a firewall. For a certificate problem it tests whether trusting the Windows certificate store fixes it (`NODE_OPTIONS=--use-system-ca`) and prints the command for Command Prompt and PowerShell. Otherwise it explains `NODE_EXTRA_CA_CERTS`, proxies (it reads the Windows proxy setting), firewalls and DNS. `pnpm deploy:setup` runs the same check first.
+- Deployment manual: what to do when `firebase login` fails (E.3 and troubleshooting), and deploying from **Google Cloud Shell** in the browser when the PC can't connect.
+
 ## 1.5.1 — 2026-11-11
 
 **Type:** Patch (deployment tools and documentation) · **Deploy:** hosting only (no rule, function or data changes)
