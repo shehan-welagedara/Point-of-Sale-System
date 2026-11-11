@@ -2,6 +2,21 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.5.1 — 2026-11-11
+
+**Type:** Patch (deployment tools and documentation) · **Deploy:** hosting only (no rule, function or data changes)
+
+### For clients
+
+- No change in the system itself. Installations are simpler for your supplier.
+
+### Changes
+
+- `pnpm deploy:setup`: one command prepares a PC to deploy a client. It checks the tools and sign-ins (and says what to do for each that's missing), creates or reuses the licence signing key, writes `apps/web/.env.production` and `apps/functions/.env`, and registers the client in `release/clients.json`.
+- `pnpm release:deploy`: on the first deploy (nothing live yet) it skips the pre-release backup by itself; later it creates the backup bucket (90-day retention) when it is missing, so the access script is only needed for automatic updates from GitHub. Arguments with spaces are quoted on Windows; the licence-key warning only shows when the key is really missing.
+- Deployment manual: an overview of the three parts, and sections E (your computer), F (set up the client with one command) and G (deploy) rewritten in plain steps with Windows details. Noura Kitchen plan, licensing and release docs updated to match.
+- Branches: `main` is the Cloud Restaurant Edition (deploy from it), `develop` holds work in progress, `enterprise/hotel-suite` the hotel edition; the README explains them.
+
 ## 1.5.0 — 2026-11-11
 
 **Type:** Minor (new features and fixes) · **Deploy:** hosting only (no rule, function or data changes)

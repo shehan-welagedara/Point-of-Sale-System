@@ -25,6 +25,7 @@
     "manual:screenshots": "node apps/web/e2e/manual-shots.mjs",
     "manual:pdf": "node tools/manual/build-pdf.mjs",
     "test:migrations": "firebase emulators:exec --only firestore --project demo-migrations \"node tools/release/test-migrations.mjs\"",
+    "deploy:setup": "node tools/release/setup.mjs",
     "release:deploy": "node tools/release/deploy.mjs",
     "release:migrate": "node tools/release/migrate.mjs",
     "release:version": "node tools/release/version.mjs"
@@ -47,5 +48,5 @@
       "@grpc/grpc-js": "^1.13.6"
     }
   },
-  "version": "1.5.0"
+  "version": "1.5.1"
 }

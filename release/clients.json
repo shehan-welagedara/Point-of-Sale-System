@@ -17,7 +17,7 @@
       "maintenanceWindow": "23:30-05:00 Asia/Colombo",
       "backupBucket": "gs://REPLACE-with-noura-kitchen-firebase-project-id-backups",
       "enabled": false,
-      "notes": "First client. Starts with Accounting, Inventory and Purchasing (books and stores); POS later. Onboarding: docs/clients/noura-kitchen.md. Set projectId and backupBucket, run tools/release/grant-access.sh, then set enabled to true."
+      "notes": "First client. Set up with `pnpm deploy:setup` (fills in projectId, backupBucket and enabled). Onboarding: docs/clients/noura-kitchen.md."
     }
   ]
 }
