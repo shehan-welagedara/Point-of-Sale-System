@@ -535,6 +535,90 @@ try {
     }
   }
 
+  // ── The Noura Kitchen demo: their set-up with sample data to explore; the About page.
+  {
+    const version = JSON.parse((await import("node:fs")).readFileSync(resolve(web, "package.json"), "utf8")).version;
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errors.push(`noura demo: ${e.message}`));
+    await p.goto(`${B}/?mode=local`);
+    await p.getByText("Load the Noura Kitchen demo").click();
+    await p.waitForURL(/emc\/home/, { timeout: 90_000 });
+    await p.waitForFunction(() => document.querySelectorAll(".tile-name").length >= 8, null, { timeout: 15_000 }).catch(() => {});
+    const nTiles = await p.locator(".tile-name").allTextContents();
+    check("Noura Kitchen demo loads with its modules and the About tile", ["Point of Sale", "Inventory & Purchasing", "Finance", "About"].every((t) => nTiles.includes(t)), nTiles.join(", "));
+    await p.goto(`${B}/emc/setup/business?mode=local`);
+    await p.waitForTimeout(800);
+    const vatOn = await p.locator(".row.between", { hasText: "VAT-registered" }).getByRole("switch").getAttribute("aria-checked");
+    const ssclOn = await p.locator(".row.between", { hasText: "SSCL-liable" }).getByRole("switch").getAttribute("aria-checked");
+    check("Noura Kitchen demo is not VAT or SSCL registered", vatOn === "false" && ssclOn === "false");
+    await p.goto(`${B}/emc/finance/statements?mode=local`);
+    await p.getByRole("tab", { name: "Trial balance" }).click();
+    await p.waitForTimeout(600);
+    check("Noura Kitchen demo books balance", (await p.locator(".card-head .badge").first().textContent()) === "Balanced");
+    await p.goto(`${B}/emc/about?mode=local`);
+    await p.waitForTimeout(900);
+    const about = await p.locator(".page").innerText();
+    check("About shows the running version, licence, environment and what's new", about.includes(`Version ${version}`) && about.includes("Demo edition") && about.includes("Local demo (this browser)") && (await p.locator(".release-note").count()) >= 2, about.replace(/\s+/g, " ").slice(0, 120));
+    // Exploring on the office PC: the app style, bills shown on screen, a standard bill.
+    await p.goto(`${B}/pos?mode=local`);
+    await p.waitForTimeout(900);
+    await p.locator(".device-btn", { hasText: "Office PC" }).click();
+    await p.waitForTimeout(600);
+    await p.getByLabel("Employee number or card").fill("1002");
+    await p.getByLabel("PIN", { exact: true }).fill("2222");
+    await p.getByRole("button", { name: "Sign In" }).click();
+    await p.waitForTimeout(800);
+    if (await p.locator(".mauth-list button").count()) await p.locator(".mauth-list button", { hasText: "Takeaway" }).first().click();
+    await p.waitForTimeout(700);
+    await p.locator(".w-nav button", { hasText: "Menu" }).click();
+    await p.waitForTimeout(400);
+    await p.locator(".m-product:not(.out) .m-add").first().click();
+    await p.waitForTimeout(300);
+    if (await p.locator(".modal").count()) await p.locator(".modal .btn.primary").last().click();
+    await p.locator(".w-order .m-btn.cta").click();
+    await p.waitForTimeout(500);
+    await p.getByRole("button", { name: /Pay Now|Complete Payment/ }).click();
+    await p.waitForTimeout(1500);
+    // On screen, each print opens in turn: the kitchen ticket for the new items, then the bill.
+    let receipt = "";
+    for (let i = 0; i < 4; i++) {
+      if (!(await p.locator(".modal").count())) {
+        if (await p.getByRole("button", { name: "View receipt" }).count()) await p.getByRole("button", { name: "View receipt" }).click();
+        await p.waitForTimeout(400);
+      }
+      receipt = await p.locator(".modal").last().innerText().catch(() => "");
+      if (receipt.includes("Bill No")) break;
+      await p.locator(".modal").last().getByRole("button", { name: /Close|✕/ }).first().click().catch(() => p.keyboard.press("Escape"));
+      await p.waitForTimeout(400);
+    }
+    check("the office PC shows a standard bill on screen (Bill No, no tax invoice, no VAT)", receipt.includes("Bill No") && !receipt.includes("TAX INVOICE") && !/VAT\s/.test(receipt), receipt.split("\n").slice(0, 3).join(" / "));
+    await ctx.close();
+  }
+
+  // ── Accounting switched on after the business was created: Finance asks to open the fiscal year.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errors.push(`late books: ${e.message}`));
+    await p.goto(`${B}/?mode=local`);
+    await p.locator("#bname").fill("Late Books Cafe");
+    await p.getByRole("button", { name: "Create business" }).click();
+    await p.waitForURL(/emc\/home/, { timeout: 60_000 });
+    await p.goto(`${B}/emc/setup/licence?mode=local`);
+    await p.waitForTimeout(800);
+    await p.getByRole("tab", { name: "Modules" }).click();
+    await p.getByRole("switch", { name: "Accounting" }).click();
+    await p.waitForTimeout(800);
+    await p.goto(`${B}/emc/finance?mode=local`);
+    await p.waitForTimeout(1000);
+    const ask = await p.locator(".callout", { hasText: "Open the fiscal year first" }).count();
+    await p.getByRole("button", { name: "Open fiscal year" }).click();
+    await p.waitForTimeout(1200);
+    check("Finance asks to open the fiscal year, and opens it", ask === 1 && /Fiscal year \d{4}-\d{2}/.test(await p.locator(".page-head").first().innerText()));
+    await ctx.close();
+  }
+
   check("no browser errors", errors.length === 0, errors.slice(0, 5).join(" | "));
 } catch (e) {
   for (const c of browser.contexts()) for (const pg of c.pages()) await pg.screenshot({ path: resolve(root, `e2e-failure-${browser.contexts().indexOf(c)}.png`) }).catch(() => {});

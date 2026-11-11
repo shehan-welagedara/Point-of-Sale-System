@@ -9,7 +9,8 @@
  * For each project: backup (Firestore export) → indexes → data migrations → rules and functions →
  * hosting → check that /version.json reports the new version. Stops at the first failure.
  * Needs Google credentials with deploy rights on each project (CI: workload identity; laptop:
- * `gcloud auth application-default login` and `firebase login`).
+ * `gcloud auth login`, `gcloud auth application-default login` and `pnpm exec firebase login`).
+ * Works from Windows, macOS and Linux. Run by hand, it builds the web app first when needed.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
@@ -24,6 +25,8 @@ const opt = (n) => {
   return i >= 0 ? argv[i + 1] : undefined;
 };
 const dryRun = flag("dry-run");
+const win = process.platform === "win32";
+const ci = Boolean(process.env.CI || process.env.GITHUB_ACTIONS);
 const parts = new Set((opt("only") ?? "indexes,rules,functions,hosting").split(","));
 const target = opt("target");
 if (!target) fail("--target is required (staging, wave:N or client ids)");
@@ -46,20 +49,34 @@ function targets() {
   return target.split(",").map((id) => registry.clients.find((c) => c.id === id) ?? fail(`unknown client "${id}" (release/clients.json)`));
 }
 
-function run(cmd, args, opts = {}) {
+const HINT = {
+  gcloud: "Install the Google Cloud CLI (https://cloud.google.com/sdk/docs/install), then run `gcloud auth login` and `gcloud auth application-default login`. For the very first deploy (nothing to back up yet) you can add --skip-backup.",
+  pnpm: "Install pnpm (https://pnpm.io/installation) and run `pnpm install` in the project folder.",
+};
+
+/** Runs a command; on Windows through the shell, so pnpm.cmd and gcloud.cmd are found. */
+function exec(cmd, args, { always = false } = {}) {
   console.log(`  $ ${cmd} ${args.join(" ")}`);
-  if (dryRun) return;
-  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", env: process.env, ...opts });
-  if (r.status !== 0) fail(`${cmd} ${args[0]} failed (exit ${r.status})`);
+  if (dryRun && !always) return;
+  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", env: process.env, shell: win });
+  if (r.error) fail(`${cmd} could not start (${r.error.message}). ${HINT[cmd] ?? ""}`);
+  if (r.status !== 0) fail(`${cmd} ${args[0]} failed (exit ${r.status})${cmd === "gcloud" ? `. ${HINT.gcloud}` : ""}`);
 }
+const run = (cmd, args) => exec(cmd, args);
 
 const firebase = (project, only) => run("pnpm", ["exec", "firebase", "deploy", "--only", only, "--project", project, "--non-interactive"]);
 
 function preflight() {
   const live = join(root, "apps/web/dist/version.json");
-  if (!existsSync(live)) fail("no web build: run `pnpm build` first (CI builds once and deploys that build everywhere)");
+  const stale = () => !existsSync(live) || JSON.parse(readFileSync(live, "utf8")).version !== version;
+  if (stale()) {
+    // CI builds once and deploys that same build everywhere; by hand, build it now.
+    if (ci) fail("no web build of this version: run `pnpm build` first");
+    console.log(`Building the web app (version ${version}) first…`);
+    exec("pnpm", ["build"], { always: true });
+    if (stale()) fail("the build did not produce apps/web/dist/version.json for this version");
+  }
   const built = JSON.parse(readFileSync(live, "utf8"));
-  if (built.version !== version) fail(`the build is version ${built.version} but apps/web/package.json says ${version}: rebuild`);
   // A build made with apps/web/.env.local would point every client at that one project.
   const assets = join(root, "apps/web/dist/assets");
   for (const f of readdirSync(assets).filter((n) => n.endsWith(".js"))) {

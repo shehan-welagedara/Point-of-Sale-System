@@ -9,6 +9,33 @@ const policy = JSON.parse(readFileSync(new URL("../../release/policy.json", impo
 const commit = process.env.GITHUB_SHA ?? (() => { try { return execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return "unknown"; } })();
 const builtAt = new Date().toISOString();
 
+/** The latest releases' notes for clients (CHANGELOG.md "For clients"), shown on the About page. */
+interface ReleaseNote {
+  version: string;
+  date: string;
+  type: string;
+  notes: string[];
+}
+function releaseNotes(limit = 8): ReleaseNote[] {
+  let md = "";
+  try {
+    md = readFileSync(new URL("../../CHANGELOG.md", import.meta.url), "utf8");
+  } catch {
+    return [];
+  }
+  const out: ReleaseNote[] = [];
+  for (const block of md.split(/^## /m).slice(1)) {
+    const head = /^(\d+\.\d+\.\d+)\s+[—-]\s+(\S+)/.exec(block);
+    if (!head) continue;
+    const type = /\*\*Type:\*\*\s*([^·\n]+)/.exec(block)?.[1]?.trim() ?? "";
+    const forClients = /### For clients\n([\s\S]*?)(?=\n### |$)/.exec(block)?.[1] ?? "";
+    const notes = forClients.split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim());
+    out.push({ version: head[1]!, date: head[2]!, type, notes });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 /** Publishes /version.json next to the app, so open screens can see that a newer release is live. */
 function versionFile(): Plugin {
   return {
@@ -32,6 +59,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(commit.slice(0, 12)),
     __APP_BUILT_AT__: JSON.stringify(builtAt),
+    __APP_RELEASE_NOTES__: JSON.stringify(releaseNotes()),
   },
   build: {
     target: "es2022",

@@ -56,7 +56,19 @@ export function FinanceOverview() {
 
   return (
     <div className="page">
-      <PageHead title="Finance" subtitle={`Fiscal year ${fiscal.current?.id ?? "—"} · figures update as documents post`} actions={<Link className="btn" to="/emc/finance/statements">Financial statements</Link>} />
+      <PageHead title="Finance" subtitle={fiscal.current ? `Fiscal year ${fiscal.current.id} · figures update as documents post` : "No fiscal year is open yet"} actions={<Link className="btn" to="/emc/finance/statements">Financial statements</Link>} />
+      {fiscal.loaded && !fiscal.current ? (
+        <div className="callout warn row between wrap" role="status">
+          <span>
+            <strong>Open the fiscal year first.</strong> The books need a fiscal year (1 April to 31 March) before anything can post. This happens when Accounting is switched on after the business was created.
+          </span>
+          {canBooks(role) || role === "manager" ? (
+            <button className="btn primary sm" disabled={busy} onClick={() => run({ action: "ensureFiscalYear", date: today }, () => "Fiscal year opened")}>Open fiscal year</button>
+          ) : (
+            <span className="small">Ask the owner or the accountant to open it.</span>
+          )}
+        </div>
+      ) : null}
       <div className="stats">
         <Stat label="Cash and bank" value={money(cash)} />
         <Stat label="Receivables" value={money(receivable)} {...(overdueAr ? { sub: `${money(overdueAr)} overdue`, tone: "bad" as const } : {})} />

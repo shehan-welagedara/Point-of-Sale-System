@@ -8,17 +8,31 @@ Follow the [deployment manual](../18-deployment-manual.md) for the technical ste
 
 ## 1. Project and deployment (vendor)
 
-The Firebase project exists and the Blaze plan is active.
+The Firebase project exists and the Blaze plan is active. These steps run on the vendor's PC (Windows, macOS or Linux) in the project folder.
 
 1. Budget alert on the project (deployment manual C): USD 5, alerts to the client and to you. Bill photos add a little storage; a restaurant still normally stays within the free quotas.
 2. In `release/clients.json`, entry `noura-kitchen`: set `projectId` to the project ID and `backupBucket` to `gs://<project-id>-backups`.
-3. With the client's owner, run the access script once:
+3. **Tools on this PC, once:** Node.js 22 and pnpm (`pnpm install` in the project folder), and the **Google Cloud CLI** (on Windows, the installer from cloud.google.com/sdk). Then sign in with the Google account that owns or can deploy the project:
+
+```bash
+pnpm exec firebase login
+```
+
+```bash
+gcloud auth login
+```
+
+```bash
+gcloud auth application-default login
+```
+
+4. With the client's owner, run the access script once. On Windows run it in **Git Bash** (installed with Git for Windows) or in **Google Cloud Shell** (Google Cloud console → *Activate Cloud Shell*):
 
 ```bash
 bash tools/release/grant-access.sh <project-id> pos-release@YOUR-VENDOR-PROJECT.iam.gserviceaccount.com asia-south1
 ```
 
-4. Set `"enabled": true` for `noura-kitchen`, then deploy (dry run first):
+5. Set `"enabled": true` for `noura-kitchen`, then deploy. The release tool builds the web app first when needed (or run `pnpm build` yourself), so a dry run shows every step before anything changes:
 
 ```bash
 pnpm release:deploy --target noura-kitchen --dry-run
@@ -28,13 +42,14 @@ pnpm release:deploy --target noura-kitchen --dry-run
 pnpm release:deploy --target noura-kitchen
 ```
 
-5. Check `https://<project-id>.web.app/version.json` shows the release.
+   For the very first deploy there is nothing to back up yet: if the backup step fails because the bucket isn't ready, add `--skip-backup`. The first deploy switches on Cloud Functions and other Google services and can take 5–10 minutes; if it stops with a permissions or "service agent" error, wait 5 minutes and run it again.
+6. Check `https://<project-id>.web.app/version.json` shows the release, and that the back office's **About** page (launchpad → About) reports the same version.
 
 ## 2. Owner account and business
 
 1. The owner creates their account on `https://<project-id>.web.app` and verifies the email.
 2. **Create business** "Noura Kitchen" with the modules **Accounting**, **Inventory**, **Purchasing** (and **Recipes** if the menu will be costed). The starter set-up is added automatically: outlet MAIN, main store, roles, payment methods, reason codes, chart of accounts and cost centre.
-3. **+ Business → Load the demo restaurant** as a training copy.
+3. **+ Business → Load the Noura Kitchen demo** as a training copy: the same set-up as theirs (not VAT registered, one counter phone with the Bluetooth printer) with a Sri Lankan menu, stock, suppliers, a month of sales and books, to explore and train on before their own data goes in. Staff sign in to the POS with 1001/1111 (manager), 1002/2222 (cashier) or 1003/3333 (steward).
 4. Licence (deployment manual I). Noura Kitchen starts with **one phone** as its only POS device, so **Starter + Inventory, Purchasing, Recipes and Accounting add-ons** is enough (3 workstations: the phone plus spares). Choose **Professional + Accounting** (12 workstations) instead if they expect more staff phones soon; moving up later is a new licence key, nothing else changes. Issue against the project and business IDs shown on Licence & modules.
 
 ## 3. Configuration with the client (2–3 hours)

@@ -154,8 +154,18 @@ export const WORKSPACES: Workspace[] = [
     tone: "#475569",
     group: "Administration",
     sections: [
-      { items: [{ to: "/emc/setup/checklist", label: "Setup checklist", ico: "☑" }, { to: "/emc/setup/business", label: "Business & tax", ico: "⚙" }, { to: "/emc/setup/branding", label: "Branding", ico: "✦" }, { to: "/emc/setup/licence", label: "Licence & modules", ico: "⧉" }, { to: "/emc/setup/integrations", label: "Integrations", ico: "⟲" }, { to: "/emc/setup/data", label: "Excel import & export", ico: "⇪" }, { to: "/emc/setup/status", label: "System status", ico: "◉" }] },
+      { items: [{ to: "/emc/setup/checklist", label: "Setup checklist", ico: "☑" }, { to: "/emc/setup/business", label: "Business & tax", ico: "⚙" }, { to: "/emc/setup/branding", label: "Branding", ico: "✦" }, { to: "/emc/setup/licence", label: "Licence & modules", ico: "⧉" }, { to: "/emc/setup/integrations", label: "Integrations", ico: "⟲" }, { to: "/emc/setup/data", label: "Excel import & export", ico: "⇪" }, { to: "/emc/setup/status", label: "System status", ico: "◉" }, { to: "/emc/about", label: "About this system", ico: "ⓘ", roles: ADMINS }] },
     ],
+  },
+  {
+    key: "about",
+    name: "About",
+    tagline: "Version, updates, what's new and software information",
+    ico: "ⓘ",
+    tone: "#0a64c9",
+    group: "Administration",
+    roles: ADMINS,
+    sections: [{ items: [{ to: "/emc/about", label: "About this system", ico: "ⓘ" }, { to: "/emc/setup/status", label: "System status", ico: "◉" }] }],
   },
 ];
 

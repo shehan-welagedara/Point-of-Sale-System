@@ -1,4 +1,5 @@
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { deepenForWhite, readableTextOn } from "../lib/contrast";
 import {
   type AccountingSettings,
   type BrandingSettings,
@@ -31,7 +32,7 @@ import {
   withStaffSecrets,
 } from "@pos/core";
 import { type Actor, type LedgerRequest, type LedgerSettings, UNAUDITED, makeAuditEvent, runLedgerRequest, storeRunner } from "@pos/ledger";
-import { DEMO_PEOPLE, STARTER_PROPERTY_ID, buildSampleStore, sampleSettings, starterConfig } from "@pos/sample-data";
+import { DEMO_PEOPLE, STARTER_PROPERTY_ID, type SampleKind, buildSampleStore, sampleSettings, starterConfig } from "@pos/sample-data";
 import { httpsCallable } from "firebase/functions";
 import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from "firebase/auth";
 import { collectionGroup, doc, getDoc, getDocs, onSnapshot, query, setDoc, where, writeBatch } from "firebase/firestore";
@@ -95,7 +96,8 @@ interface AppState {
   /** Emails a password-reset link (silently does nothing for unknown addresses). */
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
-  createTenant: (name: string, withSample: boolean, modules?: MK[]) => Promise<void>;
+  /** A new business: empty (with the chosen modules) or one of the demo businesses. */
+  createTenant: (name: string, sample: false | SampleKind, modules?: MK[]) => Promise<void>;
   switchTenant: (id: string) => void;
   updateTenant: (patch: Partial<Tenant>) => Promise<void>;
   saveSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => Promise<void>;
@@ -192,13 +194,18 @@ interface LocalSave {
 
 function applyBrand(branding: BrandingSettings | undefined): void {
   const root = document.documentElement;
-  if (branding?.primaryColor) root.style.setProperty("--brand", branding.primaryColor);
+  if (branding?.primaryColor) {
+    root.style.setProperty("--brand", branding.primaryColor);
+    root.style.setProperty("--on-brand", readableTextOn(branding.primaryColor));
+    // Readable on white and on the brand's own light tints (badges, the selected menu item).
+    root.style.setProperty("--brand-ink", deepenForWhite(branding.primaryColor, 6) ?? branding.primaryColor);
+  }
   if (branding?.accentColor) root.style.setProperty("--accent", branding.accentColor);
   document.title = branding?.displayName ? `${branding.displayName} · POS Suite` : "POS Suite";
 }
 
-async function sampleOps(): Promise<{ ops: WriteOp[]; modules: Tenant["modules"] }> {
-  const { store, tenant } = await buildSampleStore({ today: todayColombo(), historyDays: 7, checksPerDay: 18 });
+async function sampleOps(kind: SampleKind): Promise<{ ops: WriteOp[]; modules: Tenant["modules"] }> {
+  const { store, tenant } = await buildSampleStore(kind === "noura-kitchen" ? { today: todayColombo(), historyDays: 30, checksPerDay: 12, kind } : { today: todayColombo(), historyDays: 7, checksPerDay: 18 });
   const snap = store.snapshot();
   const ops: WriteOp[] = Object.entries(snap).flatMap(([col, docs]) => docs.map((data): WriteOp => ({ op: "set", col, data: data as { id: string } })));
   return { ops, modules: tenant.modules };
@@ -451,8 +458,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const createTenant = useCallback(
-    async (name: string, withSample: boolean, chosen?: MK[]) => {
-      const sample = withSample ? await sampleOps() : null;
+    async (name: string, withSample: false | SampleKind, chosen?: MK[]) => {
+      const sample = withSample ? await sampleOps(withSample) : null;
       // Demo data runs on the demo edition; a new client business starts a trial with the
       // modules chosen at installation (always within the edition's entitlement).
       const plan: Tenant["plan"] = withSample ? "demo" : "trial";
@@ -479,7 +486,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await withStaffSecrets(m).batch(configOps);
         if (openYear) await runLedgerRequest({ runner: storeRunner(m), store: m, now: () => new Date(), sealDelayMs: 0 }, { uid: "local-owner", name, role: "owner" }, { action: "ensureFiscalYear", date: todayColombo() });
         if (withSample) {
-          await m.merge(C.settings, "branding", { displayName: name === "Spice Lagoon (demo)" ? "Spice Lagoon" : name });
+          await m.merge(C.settings, "branding", { displayName: name.replace(/ \(demo\)$/, "") });
         }
         localStorage.setItem(LOCAL_KEY, JSON.stringify({ tenant: t, data: m.snapshot() }));
         openLocal({ tenant: t, data: m.snapshot() });

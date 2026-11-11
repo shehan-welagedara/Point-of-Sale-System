@@ -232,7 +232,7 @@ bash tools/release/grant-access.sh PROJECT-ID pos-release@YOUR-VENDOR-PROJECT.ia
 
 ## G. Deploy
 
-1. **Build and deploy** the web app, security rules, database indexes and the Cloud Functions. The release tool backs up, runs any data migrations, deploys in the safe order and checks the live version:
+1. **Build and deploy** the web app, security rules, database indexes and the Cloud Functions. The release tool backs up, runs any data migrations, deploys in the safe order and checks the live version. It works from Windows, macOS and Linux; run by hand, it builds the web app itself when the build is missing or out of date. It needs the Firebase CLI login (`pnpm exec firebase login`) and the Google Cloud CLI with `gcloud auth login` and `gcloud auth application-default login`:
 
 ```bash
 pnpm build

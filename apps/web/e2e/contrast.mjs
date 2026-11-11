@@ -204,12 +204,15 @@ try {
   }
 
   // ── The POS app at every size ──
+  // The app styles are always light; the phone and PC are also checked with the device set to dark mode.
   const sizes = [
     ["phone", { ...devices["Pixel 7"] }],
     ["tablet portrait", { ...devices["iPad (gen 7)"] }],
     ["tablet landscape", { ...devices["iPad (gen 7) landscape"] }],
     ["PC 1366", { viewport: { width: 1366, height: 768 } }],
     ["PC 1920", { viewport: { width: 1920, height: 1080 } }],
+    ["phone, device in dark mode", { ...devices["Pixel 7"], colorScheme: "dark" }],
+    ["PC 1366, device in dark mode", { viewport: { width: 1366, height: 768 }, colorScheme: "dark" }],
   ];
   for (const style of ["bright", "indigo"]) {
     if (only.length && !only.includes(style)) continue;
@@ -224,6 +227,10 @@ try {
       await p.waitForTimeout(800);
       await audit(p, `${tag} · sign-in`);
       await p.getByLabel("Employee number or card").fill("1001");
+      await p.getByLabel("PIN", { exact: true }).fill("9999");
+      await p.getByRole("button", { name: "Sign In" }).click();
+      await p.waitForTimeout(700);
+      await audit(p, `${tag} · wrong PIN`);
       await p.getByLabel("PIN", { exact: true }).fill("1111");
       await p.getByRole("button", { name: "Sign In" }).click();
       await p.waitForTimeout(900);
@@ -282,6 +289,87 @@ try {
       await audit(p, `${tag} · reports`);
       await ctx.close();
     }
+  }
+
+  // ── The terminal layout: its three themes, with the device in light and in dark mode ──
+  if (!only.length || only.includes("terminal")) {
+    for (const template of ["Modern", "Classic", "Midnight"]) {
+      await setup.goto(`${B}/emc/pos/appearance?mode=local`);
+      await setup.waitForTimeout(700);
+      await setup.locator("button.card", { hasText: template }).first().click();
+      await setup.getByRole("button", { name: "Save" }).first().click();
+      await setup.waitForTimeout(700);
+      const st = await setup.context().storageState();
+      for (const scheme of ["light", "dark"]) {
+        const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, storageState: st, colorScheme: scheme });
+        await ctx.addInitScript(() => localStorage.setItem("pos-suite.workstation", "W01"));
+        ctx.setDefaultTimeout(8000);
+        const p = await ctx.newPage();
+        const tag = `terminal ${template} · device ${scheme}`;
+        const keypad = async (digits) => {
+          for (const d of digits) await p.locator(".keypad button", { hasText: new RegExp(`^${d}$`) }).first().click();
+        };
+        await p.goto(`${B}/pos?mode=local`);
+        await p.waitForTimeout(900);
+        await audit(p, `${tag} · sign-in`);
+        await p.getByLabel("Employee number or card").fill("4321");
+        await p.keyboard.press("Enter");
+        await p.waitForTimeout(600);
+        await audit(p, `${tag} · unknown employee`);
+        await p.getByLabel("Employee number or card").fill("1002");
+        await p.keyboard.press("Enter");
+        await p.waitForTimeout(400);
+        await audit(p, `${tag} · PIN`);
+        await keypad("9999");
+        await p.waitForTimeout(600);
+        await audit(p, `${tag} · wrong PIN`);
+        await keypad("2222");
+        await p.waitForTimeout(700);
+        if (await p.locator(".rvc-btn").count()) {
+          await audit(p, `${tag} · revenue centres`);
+          await p.locator(".rvc-btn", { hasText: "Restaurant" }).first().click();
+          await p.waitForTimeout(700);
+        }
+        await audit(p, `${tag} · order screen`);
+        for (let i = 0; i < 3; i++) {
+          await p.locator(".pos-item:not(.out)").nth(i).click();
+          await p.waitForTimeout(300);
+          if (await p.locator(".modal").count()) {
+            if (i === 0) await audit(p, `${tag} · dish choices`, ".modal");
+            await p.locator(".modal .btn.primary").last().click();
+            await p.waitForTimeout(200);
+          }
+        }
+        await audit(p, `${tag} · order with items`);
+        await p.locator(".pos-actions").getByRole("button", { name: "Discount", exact: true }).click();
+        await p.waitForTimeout(400);
+        if (await p.locator(".modal").count()) {
+          await audit(p, `${tag} · discount`, ".modal");
+          await p.keyboard.press("Escape");
+          await p.waitForTimeout(300);
+        }
+        await p.locator(".pos-actions .pay").click();
+        await p.waitForTimeout(500);
+        if (await p.locator(".modal").count()) {
+          await audit(p, `${tag} · payment`, ".modal");
+          await p.keyboard.press("Escape");
+          await p.waitForTimeout(300);
+        }
+        for (const tab of ["Tables", "Open", "Reports", "Functions"]) {
+          const t = p.getByRole("tab", { name: new RegExp(tab) });
+          if (!(await t.count())) continue;
+          await t.first().click();
+          await p.waitForTimeout(600);
+          await audit(p, `${tag} · ${tab.toLowerCase()}`);
+        }
+        await ctx.close();
+      }
+    }
+    await setup.goto(`${B}/emc/pos/appearance?mode=local`);
+    await setup.waitForTimeout(700);
+    await setup.locator("button.card", { hasText: "Modern" }).first().click();
+    await setup.getByRole("button", { name: "Save" }).first().click();
+    await setup.waitForTimeout(500);
   }
 
   // ── Classic terminal and the back office, light and dark ──

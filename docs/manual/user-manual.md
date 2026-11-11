@@ -763,7 +763,14 @@ Invite people by email and give them a back-office role (see [section 2](#2-sign
 
 ![New business](img/bo-new-business.jpg)
 
-**+ Business** in the top bar (owners and administrators) creates another business in the same system: give it a name and choose its modules, or **Load the demo restaurant** for a training copy with a full sample menu, staff and a week of sales. Each business has its own menu, staff, bills and books. Switch between businesses with the business list in the top bar (shown once you have more than one).
+**+ Business** in the top bar (owners and administrators) creates another business in the same system: give it a name and choose its modules, or load a demo business as a training copy:
+
+- **Load the Noura Kitchen demo:** a small restaurant set up like Noura Kitchen. It is not VAT or SSCL registered (standard bills), has a restaurant and a takeaway counter, one counter phone printing kitchen tickets and bills to a Bluetooth printer, and an office PC that shows bills on screen for exploring. It comes with a Sri Lankan menu with recipes and costs, stock, suppliers, a month of sales and books (opening balances, supplier bills, payroll, fixed assets, a few items waiting for approval). Sign in to the POS with 1001/1111 (manager), 1002/2222 (cashier) or 1003/3333 (steward).
+- **Load the demo restaurant:** Spice Lagoon, a larger VAT-registered restaurant with network printers and a Print Agent, a full sample menu, staff and a week of sales.
+
+Each business has its own menu, staff, bills and books. Switch between businesses with the business list in the top bar (shown once you have more than one).
+
+> In the **local demo** (the system running on your own PC without the cloud), the browser keeps one business at a time: loading a demo replaces the business stored in that browser. The page warns you first.
 
 ### 14.3 Branding
 
@@ -807,6 +814,17 @@ Mock mode works with sample data until your accounts with the bank or gateway ar
 - each POS device: version, last contact, who is signed in (a device on an older version shows *update pending*);
 - recent errors seen on screens, for support;
 - **Employee PINs: Secure** when every PIN and card is stored where only the server can read it. Owners and administrators can secure older records with one click.
+
+### 14.8 About this system
+
+![About this system](img/admin-about.jpg)
+
+The **About** tile on the launchpad (owners and administrators; also Administration → About this system) shows:
+
+- **The version you are running**, when it was built, and whether it is up to date. **Check for updates** asks the server; when a newer version is live, **Update now** loads it. (Screens that nobody is using update by themselves within a few minutes.)
+- **What's new:** the release notes of the latest versions, with the one you are on marked.
+- **Licence:** the edition, its status and days left, the limits (workstations, employees, back-office users, outlets) and the modules switched on.
+- **Where it runs:** cloud or local demo, the Firebase project and data region, the business ID, and how many devices are not yet updated. Quote the version and business ID when you contact support.
 
 ---
 

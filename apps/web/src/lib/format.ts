@@ -31,6 +31,12 @@ export function dateTimeColombo(iso: string | undefined): string {
   return `${d.toISOString().slice(0, 10)} ${d.toISOString().slice(11, 16)}`;
 }
 
+/** A business date (YYYY-MM-DD) as "11 Nov 2026". */
+export function dateColombo(date: string | undefined): string {
+  if (!date || !/^\d{4}-\d{2}-\d{2}/.test(date)) return date ?? "";
+  return new Date(`${date.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
 export function minutesSince(iso: string): number {
   return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
 }
