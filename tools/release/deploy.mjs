@@ -28,6 +28,9 @@ const opt = (n) => {
 const dryRun = flag("dry-run");
 const win = process.platform === "win32";
 const ci = Boolean(process.env.CI || process.env.GITHUB_ACTIONS);
+// Firebase gives the functions code 10 seconds to load before it deploys them ("User code failed to
+// load … Timeout after 10000"). A Windows PC with antivirus scanning can take longer the first time.
+process.env.FUNCTIONS_DISCOVERY_TIMEOUT ||= "60";
 const parts = new Set((opt("only") ?? "indexes,rules,functions,hosting").split(","));
 const target = opt("target");
 if (!target) fail("--target is required (staging, wave:N or client ids)");
@@ -226,17 +229,20 @@ for (const c of list) {
     // First deploy: --force lets Firebase set the clean-up policy for old function images (it otherwise
     // stops to ask, which a scripted deploy can't answer). A new project has no functions to replace.
     const extra = first && parts.has("functions") ? ["--force"] : [];
-    const done = firebase(c.projectId, rulesAndFunctions.join(","), extra, { soft: first });
-    if (!done) {
-      // On a new project, Google takes a few minutes to give its own services the permissions that
-      // database-triggered functions need ("Eventarc Service Agent"). Waiting and trying again fixes it.
-      const minutes = Number(process.env.POS_DEPLOY_RETRY_MINUTES ?? 3);
-      console.log(`\n  The server functions didn't finish (see the Error line above). On a brand-new project that is often because Google is still setting up permissions.`);
-      console.log(`  Waiting ${minutes} minutes, then trying once more (nothing is lost; you can leave this window open)…\n`);
+    let done = firebase(c.projectId, rulesAndFunctions.join(","), extra, { soft: first });
+    // A new project: Google switches on the services the functions need during this deploy and creates
+    // their service accounts a few minutes later. Until then, granting them their roles fails ("We failed
+    // to modify the IAM policy", "Eventarc Service Agent"). Waiting and trying again fixes it.
+    const waits = first ? [3, 5] : [];
+    for (let i = 0; !done && i < waits.length; i++) {
+      const minutes = Number(process.env.POS_DEPLOY_RETRY_MINUTES ?? waits[i]);
+      console.log(`\n  The server functions didn't finish (see the Error line above). On a brand-new project that is usual: Google is still creating the accounts and permissions they need.`);
+      console.log(`  Waiting ${minutes} minutes, then trying again (attempt ${i + 2} of ${waits.length + 1}; nothing is lost, leave this window open)…\n`);
       await new Promise((r) => setTimeout(r, minutes * 60_000));
-      if (!firebase(c.projectId, rulesAndFunctions.join(","), extra, { soft: true })) {
-        fail("the server functions failed again. Read the Error line above; deployment manual U lists the usual ones. If it mentions permissions or a service agent, Google needs a few more minutes: run the same deploy command again in 5 minutes (it continues where it stopped).");
-      }
+      done = firebase(c.projectId, rulesAndFunctions.join(","), extra, { soft: true });
+    }
+    if (!done) {
+      fail("the server functions didn't deploy. Read the Error line above; deployment manual U lists the usual ones and what to do. Firebase's full log is in firebase-debug.log in this folder (send it to your supplier if you need help). Running the same deploy command again is safe: it continues where it stopped.");
     }
   }
   if (parts.has("hosting")) {
