@@ -19,6 +19,7 @@ import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { checkNetwork } from "./netcheck.mjs";
+import { runCommand } from "./run-cmd.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const argv = process.argv.slice(2);
@@ -44,7 +45,7 @@ const missing = (m, fix) => {
 };
 
 function quiet(cmd, args) {
-  const r = spawnSync(cmd, args, { cwd: root, encoding: "utf8", shell: win, timeout: 60_000 });
+  const r = runCommand(cmd, args, { cwd: root, encoding: "utf8", timeout: 60_000 });
   return { ok: !r.error && r.status === 0, out: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 }
 

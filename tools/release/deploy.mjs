@@ -4,7 +4,7 @@
  *   node tools/release/deploy.mjs --target staging
  *   node tools/release/deploy.mjs --target wave:1            (pilot clients)
  *   node tools/release/deploy.mjs --target kandy-myst         (one client; comma-separate several)
- *   options: --dry-run  --skip-backup  --only hosting|functions|rules|indexes (comma list)
+ *   options: --dry-run  --skip-backup  --first-deploy  --only hosting|functions|rules|indexes (comma list)
  *
  * For each project: backup (Firestore export) → indexes → data migrations → rules and functions →
  * hosting → check that /version.json reports the new version. Stops at the first failure.
@@ -12,9 +12,9 @@
  * `gcloud auth login`, `gcloud auth application-default login` and `pnpm exec firebase login`).
  * Works from Windows, macOS and Linux. Run by hand, it builds the web app first when needed.
  */
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { runCommand } from "./run-cmd.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -59,8 +59,7 @@ const HINT = {
 function exec(cmd, args, { always = false } = {}) {
   console.log(`  $ ${cmd} ${args.join(" ")}`);
   if (dryRun && !always) return;
-  // Through the Windows shell, an argument with a space (a path under C:\Users\Some Name) needs quotes.
-  const r = spawnSync(cmd, win ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args, { cwd: root, stdio: "inherit", env: process.env, shell: win });
+  const r = runCommand(cmd, args, { cwd: root, stdio: "inherit", env: process.env });
   if (r.error) fail(`${cmd} could not start (${r.error.message}). ${HINT[cmd] ?? ""}`);
   if (r.status !== 0) fail(`${cmd} ${args[0]} failed (exit ${r.status})${cmd === "gcloud" ? `. ${HINT.gcloud}` : ""}`);
 }
@@ -110,7 +109,7 @@ async function liveState(projectId) {
 /** The backup bucket (90-day retention) in the client's project, created the first time it's needed. */
 function ensureBackupBucket(c) {
   if (dryRun) return;
-  const describe = spawnSync("gcloud", ["storage", "buckets", "describe", c.backupBucket, "--project", c.projectId], { cwd: root, stdio: "ignore", shell: win });
+  const describe = runCommand("gcloud", ["storage", "buckets", "describe", c.backupBucket, "--project", c.projectId], { cwd: root, stdio: "ignore" });
   if (describe.error) fail(`gcloud could not start (${describe.error.message}). ${HINT.gcloud}`);
   if (describe.status === 0) return;
   console.log(`  creating the backup bucket ${c.backupBucket} (old backups deleted after 90 days)`);
@@ -119,7 +118,7 @@ function ensureBackupBucket(c) {
   writeFileSync(lifecycle, '{"rule":[{"action":{"type":"Delete"},"condition":{"age":90}}]}');
   exec("gcloud", ["storage", "buckets", "update", c.backupBucket, `--lifecycle-file=${lifecycle}`]);
   // Firestore's own service agent writes the export files.
-  const number = spawnSync("gcloud", ["projects", "describe", c.projectId, "--format=value(projectNumber)"], { cwd: root, encoding: "utf8", shell: win }).stdout?.trim();
+  const number = runCommand("gcloud", ["projects", "describe", c.projectId, "--format=value(projectNumber)"], { cwd: root, encoding: "utf8" }).stdout?.trim();
   if (number) exec("gcloud", ["storage", "buckets", "add-iam-policy-binding", c.backupBucket, `--member=serviceAccount:service-${number}@gcp-sa-firestore.iam.gserviceaccount.com`, "--role=roles/storage.admin"]);
 }
 
@@ -147,8 +146,9 @@ for (const c of list) {
   if (!c.projectId || c.projectId.startsWith("REPLACE")) fail(`${c.id}: set its projectId in release/clients.json`);
   console.log(`\n▶ ${c.name} (${c.projectId})`);
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const state = await liveState(c.projectId);
-  if (state.unknown && !dryRun) fail(`can't tell what is live on https://${c.projectId}.web.app (${state.unknown}). Check the internet connection (\`pnpm deploy:check\`) and run the deploy again.`);
+  // --first-deploy: the person deploying says this client has never been deployed (when the check can't tell).
+  const state = flag("first-deploy") ? { none: true } : await liveState(c.projectId);
+  if (state.unknown && !dryRun) fail(`can't tell what is live on https://${c.projectId}.web.app (${state.unknown}). Check the internet connection (\`pnpm deploy:check\`) and run the deploy again. If this client has never been deployed, add --first-deploy.`);
   const first = Boolean(state.none);
   const before = state.version;
   console.log(before ? `  live now: ${before}` : first ? "  nothing deployed yet: this is the first deploy" : `  ! couldn't check what is live (${state.unknown})`);

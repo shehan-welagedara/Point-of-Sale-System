@@ -2,6 +2,19 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.5.4 — 2026-11-11
+
+**Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
+
+### For clients
+
+- No change in the system itself.
+
+### Changes
+
+- `deploy:setup` and `release:deploy` start pnpm and gcloud on Windows through one quoted command line (`tools/release/run-cmd.mjs`). Newer Node.js versions (24 and later) printed a `DEP0190` warning that landed on top of the "Create the licence key?" question and hid it.
+- `release:deploy --first-deploy`: for a client that has never been deployed, when the PC can't reach `PROJECT-ID.web.app` to check (the deploy says so and suggests it).
+
 ## 1.5.3 — 2026-11-11
 
 **Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
