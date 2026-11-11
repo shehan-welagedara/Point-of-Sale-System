@@ -115,7 +115,7 @@ export function sampleSettings(): {
       requireClockIn: false,
       pinMinLength: 4,
       theme: { template: "modern", colors: {}, fontScale: 1, buttonSize: "regular", radius: 14, checkSide: "right", categoryStyle: "tabs", columns: 0, showImages: true, colorByCategory: true },
-      mobile: { style: "bright", useOn: "phones", showSalesOnHome: true },
+      mobile: { style: "bright", useOn: "all", showSalesOnHome: true },
     },
     accounting: {
       id: "accounting",
@@ -215,7 +215,7 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
   put(C.printers, { id: "PRN-RECEIPT", propertyId: SAMPLE_PROPERTY_ID, name: "Counter bill printer", role: "receipt", model: "Epson TM-T82III", connection: "network", address: "192.168.1.100", port: 9100, paperWidthMm: 80, agentId: "AGENT-1", active: true });
   put(C.printers, { id: "PRN-KITCHEN", propertyId: SAMPLE_PROPERTY_ID, name: "Kitchen KOT printer", role: "kitchen", model: "Xprinter XP-Q80", connection: "network", address: "192.168.1.101", port: 9100, paperWidthMm: 80, agentId: "AGENT-1", backupPrinterId: "PRN-RECEIPT", active: true });
   put(C.printers, { id: "PRN-BAR", propertyId: SAMPLE_PROPERTY_ID, name: "Bar KOT printer", role: "bar", model: "Rongta RP326", connection: "network", address: "192.168.1.102", port: 9100, paperWidthMm: 80, agentId: "AGENT-1", backupPrinterId: "PRN-KITCHEN", active: true });
-  put(C.workstations, { id: "W01", propertyId: SAMPLE_PROPERTY_ID, rvcId: "DINING", allowedRvcIds: ["DINING", "TAKEAWAY", "BAR"], code: "W01", name: "Counter POS (Windows touch terminal)", deviceProfile: "dedicated", receiptPrinterId: "PRN-RECEIPT", printMode: "agent", active: true });
+  put(C.workstations, { id: "W01", propertyId: SAMPLE_PROPERTY_ID, rvcId: "DINING", allowedRvcIds: ["DINING", "TAKEAWAY", "BAR"], code: "W01", name: "Counter POS (Windows touch terminal)", deviceProfile: "dedicated", receiptPrinterId: "PRN-RECEIPT", printMode: "agent", uiStyle: "terminal", active: true });
   put(C.workstations, { id: "T01", propertyId: SAMPLE_PROPERTY_ID, rvcId: "DINING", allowedRvcIds: ["DINING", "BAR"], code: "T01", name: "Floor tablet 1 (Android / iPad)", deviceProfile: "mobile", receiptPrinterId: "PRN-RECEIPT", printMode: "agent", active: true });
   put(C.workstations, { id: "W02", propertyId: SAMPLE_PROPERTY_ID, rvcId: "TAKEAWAY", code: "W02", name: "Takeaway counter (Windows PC)", deviceProfile: "dedicated", receiptPrinterId: "PRN-RECEIPT", printMode: "agent", active: true });
   const areas: [string, number, number][] = [["Indoor", 8, 4], ["Garden", 3, 6], ["Bar", 1, 2]];

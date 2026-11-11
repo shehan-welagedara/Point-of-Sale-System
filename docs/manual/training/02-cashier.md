@@ -26,7 +26,7 @@
 1. On the order screen, tap the **Takeaway** chip.
 2. Tap items (categories on top, search box below).
 3. Check the order panel on the right. Tap a line to change its quantity, discount it or remove it.
-4. **Send** if the kitchen must prepare it, or go straight to **Pay**.
+4. **Send KOT** if the kitchen must prepare it (the kitchen ticket prints at once), or go straight to **Pay**.
 
 **Exercise 1.** Takeaway: one Chicken Fried Rice, one Egg Hopper ×3, two Soft Drinks. Send, then pay.
 

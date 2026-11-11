@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Check, type DailyStats, type MenuItem, COLLECTIONS as C, aggregateChecks, hasPrivilege, mergeStats } from "@pos/core";
 import { money, moneyShort } from "../../../lib/format";
 import { useCollection } from "../../../state/app";
@@ -51,9 +51,25 @@ export function change(now: number, before: number | undefined): { text: string;
   return { text: `${p >= 0 ? "+" : ""}${p.toFixed(1)}%`, up: p >= 0 };
 }
 
-/** Line (Bright) or bar (Indigo) chart of daily sales, drawn as SVG. */
-export function SalesChart({ data, kind, height = 150 }: { data: { label: string; value: number }[]; kind: "line" | "bars"; height?: number }) {
-  const w = 320;
+/**
+ * Line (Bright) or bar (Indigo) chart of daily sales, drawn as SVG.
+ * The drawing is sized to the space it really has, so on a PC or tablet the chart gets wider and a
+ * little taller while the day labels and dots stay at their phone size instead of being scaled up.
+ */
+export function SalesChart({ data, kind, height: baseHeight = 150 }: { data: { label: string; value: number }[]; kind: "line" | "bars"; height?: number }) {
+  const ref = useRef<SVGSVGElement>(null);
+  const [w, setW] = useState(320);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const cw = Math.round(entries[0]?.contentRect.width ?? 0);
+      if (cw > 0) setW((prev) => (Math.abs(prev - cw) > 1 ? cw : prev));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const height = Math.round(Math.min(baseHeight * 1.6, Math.max(baseHeight, w * 0.2)));
   const pad = 22;
   const max = Math.max(1, ...data.map((d) => d.value));
   const step = data.length > 1 ? (w - pad * 2) / (data.length - 1) : 0;
@@ -61,7 +77,7 @@ export function SalesChart({ data, kind, height = 150 }: { data: { label: string
   const pts = data.map((d, i) => [pad + i * step, y(d.value)] as const);
   const showLabels = data.length <= 10;
   return (
-    <svg className="m-chart" viewBox={`0 0 ${w} ${height}`} role="img" aria-label="Sales chart">
+    <svg ref={ref} className="m-chart" viewBox={`0 0 ${w} ${height}`} role="img" aria-label="Sales chart">
       <defs>
         <linearGradient id="m-area" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0" stopColor="var(--m-accent)" stopOpacity="0.28" />
@@ -81,9 +97,9 @@ export function SalesChart({ data, kind, height = 150 }: { data: { label: string
         </>
       ) : (
         data.map((d, i) => {
-          const bw = Math.min(26, ((w - pad * 2) / data.length) * 0.6);
+          const bw = Math.min(w > 600 ? 44 : 26, ((w - pad * 2) / data.length) * 0.6);
           const x = pad + (data.length > 1 ? i * step : (w - pad * 2) / 2) - bw / 2;
-          return <rect key={i} x={x} y={y(d.value)} width={bw} height={Math.max(2, height - 26 - y(d.value))} rx={6} fill={i === data.length - 1 ? "url(#m-bar)" : "var(--m-accent-soft)"} />;
+          return <rect key={i} x={x} y={y(d.value)} width={bw} height={Math.max(2, height - 26 - y(d.value))} rx={6} fill={i === data.length - 1 ? "url(#m-bar)" : "var(--m-bar-past)"} />;
         })
       )}
       {showLabels ? data.map((d, i) => <text key={i} x={pad + (data.length > 1 ? i * step : (w - pad * 2) / 2)} y={height - 6} textAnchor="middle" className="m-axis">{d.label}</text>) : null}
@@ -133,7 +149,7 @@ export function MobileReports({ api, style, onDetailed }: { api: PosApi; style: 
   const tenders = Object.entries(r?.tenders ?? {}).map(([id, v]) => ({ id, name: api.tenders.find((t) => t.id === id)?.name ?? id, ...v })).sort((a, b) => b.amount - a.amount);
   const tenderTotal = tenders.reduce((s, t) => s + t.amount, 0) || 1;
   return (
-    <div className="m-screen">
+    <div className="m-screen m-reports">
       {sales.scope === "property" ? (
         <div className="m-seg">
           {([1, 7, 30] as const).map((d) => <button key={d} className={days === d ? "on" : ""} onClick={() => setDays(d)}>{d === 1 ? "Today" : d === 7 ? "7 days" : "30 days"}</button>)}
@@ -153,7 +169,7 @@ export function MobileReports({ api, style, onDetailed }: { api: PosApi; style: 
         <StatTile icon="trend" tone="#16a34a" label="Avg order" value={moneyShort(r?.checks ? Math.round(net / r.checks) : 0)} />
         <StatTile icon="percent" tone="#ea580c" label="Discounts" value={moneyShort(r?.discounts ?? 0)} />
       </div>
-      <div className="m-card">
+      <div className={`m-card${tenders.length ? " m-rep-half" : ""}`}>
         <div className="m-card-head"><strong>Top dishes</strong><span className="m-muted small">by sales</span></div>
         {top.length ? top.map((t) => (
           <div key={t.id} className="m-bar-row">
@@ -163,7 +179,7 @@ export function MobileReports({ api, style, onDetailed }: { api: PosApi; style: 
         )) : <p className="m-muted small">No sales yet.</p>}
       </div>
       {tenders.length ? (
-        <div className="m-card">
+        <div className="m-card m-rep-half">
           <div className="m-card-head"><strong>Payment methods</strong></div>
           {tenders.map((t) => (
             <div key={t.id} className="m-bar-row">

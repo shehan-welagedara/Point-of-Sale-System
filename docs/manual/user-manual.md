@@ -198,7 +198,8 @@ If you work in more than one revenue centre on this workstation (for example *Re
 | **Transfer** | Give the check to another employee or move it to another table. |
 | **n pax** | Change the number of guests. |
 | **+ Customer / allergies** | Attach a guest profile, record allergies, or enter a **VAT-registered buyer** (name, TIN, address) for a tax invoice in their name. |
-| **Send** | Send new items to the kitchen and bar (KOT/BOT print at the right printer). The check is saved and the screen clears for the next order. |
+| **Send KOT** | Send new items to the kitchen and bar and print the kitchen ticket (KOT/BOT) at once: on the kitchen or bar printer, or on this device's bill printer when the restaurant has one printer for everything (see [6.2](#62-workstations--printers)). The check is saved and the screen clears for the next order. |
+| **Reprint KOT** | Print the kitchen tickets of what was already sent on this check again, marked **REPRINT** (for a lost or torn ticket). Recorded in the transaction journal. |
 | **Print bill** | Prints the guest check (a pre-bill, not a tax invoice). It can carry a LankaQR code for payment. |
 | **Discount** | Discount the whole check. |
 | **Cancel / Close** | *Cancel* drops unsent items (needs the privilege if items are on it); *Close* leaves a check that has nothing unsent. |
@@ -266,7 +267,16 @@ Buttons marked **Needs approval** ask for a senior employee (see [section 5](#5-
 
 ## 4. The POS app on phones and tablets
 
-On phones (and on tablets if the administrator chooses), the POS opens as an app. Staff can use their own phones: a manager connects each one once with a code ([3.1](#31-setting-up-the-device-once)), and it works on the restaurant Wi-Fi or mobile data. Bills and kitchen tickets print on the restaurant's printers through the Print Agent; if the connection drops for a moment, orders carry on and are sent when it returns. There are two styles, chosen by the administrator in [POS Configuration → Mobile app style](#67-mobile-app-style):
+The POS opens as an app on phones, tablets and PCs (the administrator can keep the terminal layout on some screens, [6.7](#67-mobile-app-style)). Each screen gets a layout made for it:
+
+- **Phones and portrait tablets:** one screen at a time with the bottom bar (Home · Tables · Menu · Orders · More).
+- **PCs and landscape tablets:** a **navigation rail** on the left, the **menu in the middle and the order beside it** (always visible, with *Send KOT* and *Pay*), more dishes per row, payment with the order on the left and the methods next to the amount, and option sheets shown as dialogs in the middle of the screen.
+
+The buttons, colours and steps are the same everywhere, so staff who know the phone know the PC.
+
+![The app on a PC: the menu with the order beside it](img/app-pc-menu.jpg)
+
+![Payment on a PC: the order, the payment methods and the amount side by side](img/app-pc-pay.jpg) Staff can use their own phones: a manager connects each one once with a code ([3.1](#31-setting-up-the-device-once)), and it works on the restaurant Wi-Fi or mobile data. Bills and kitchen tickets print on the restaurant's printers through the Print Agent; if the connection drops for a moment, orders carry on and are sent when it returns. There are two styles, chosen by the administrator in [POS Configuration → Mobile app style](#67-mobile-app-style):
 
 | Bright | Indigo |
 |---|---|
@@ -324,8 +334,8 @@ The **bottom bar** is on every screen: **Home · Tables · Menu · Orders · Mor
 
   ![Line actions](img/app-bright-line-actions.jpg)
 
-- **⋮** (top right) opens the order options: *Print bill*, *Discount the whole bill*, *Number of guests*, *Guest, allergies, VAT buyer*, *Transfer to a table or employee*, *Send and hold*, *Cancel unsent items*.
-- **Send** sends new items to the kitchen and bar and returns to the tables. **Proceed to Payment** takes payment.
+- **⋮** (top right) opens the order options: *Print bill*, *Discount the whole bill*, *Number of guests*, *Guest, allergies, VAT buyer*, *Transfer to a table or employee*, *Send, print the KOT and hold*, *Print kitchen ticket again (KOT)* (once something has been sent; marked REPRINT), *Cancel unsent items*.
+- **Send KOT (n)** sends the n new items to the kitchen and bar, prints the kitchen ticket straight away and returns to the tables. With one printer for everything, the ticket comes out of the same printer as the bills: tear it off and hand it to the kitchen. **Proceed to Payment** (on a PC: **Pay**) takes payment.
 
 ### 4.6 Payment
 
@@ -433,6 +443,8 @@ Some roles have privileges marked **approval** (for example a cashier's paid-out
 
 **Printers:** name, role (receipt, kitchen, bar, report), model, connection (network/USB/Bluetooth), address and port, paper width (80 or 58 mm), the Print Agent that drives it, and a backup printer.
 
+**One printer for bills and kitchen tickets.** Where kitchen tickets print: the bar or kitchen printer of the dish's route; if there is none, the kitchen printer; if there is no kitchen printer either, **the bill printer of the workstation that sent the order**. So a restaurant with a single printer needs no kitchen printer record: *Send KOT* prints the ticket on the bill printer, and the bill prints there at payment. With a Bluetooth printer, keep *Kitchen and bar tickets* set to print on the same printer.
+
 **Print queue** (separate page) shows bills and tickets waiting for the Print Agent. Preview a job, print it from the browser, or mark it printed if it came out.
 
 **One phone and a Bluetooth printer.** A small business can run with one phone and one Bluetooth receipt printer beside it (for example an Xprinter XP-T80Q), without a PC: set the phone's workstation to *Bluetooth printer next to this phone or tablet*. On the phone, the **printer button** (home screen, or More → Bluetooth printer) shows whether the printer is connected:
@@ -449,7 +461,7 @@ The phone remembers the printer and reconnects by itself. Bills, kitchen tickets
 - **Tables:** name or number, area (Indoor, Garden, Bar…), seats, order on screen.
 - **Order types:** Dine-in, Takeaway, Delivery and your own; whether a table is required; order on screen. Service charge applies to the order types set under Business & tax.
 
-**POS options:** when the business day starts (sales before this hour count for the previous day, for late-night service), whether the bill prints automatically when a check is paid, the default outlet for back-office reports, and the loyalty points earned per Rs 100.
+**POS options:** when the business day starts (sales before this hour count for the previous day, for late-night service), whether the bill prints automatically when a check is paid, whether a **kitchen ticket (KOT) prints when an order is sent** (on by default; switch off only if the kitchen reads orders from a screen), the default outlet for back-office reports, and the loyalty points earned per Rs 100.
 
 ### 6.4 Tender media (payment methods)
 
@@ -476,11 +488,11 @@ The look of the terminal layout. Pick **Classic**, **Modern** or **Midnight**, t
 
 1. Choose **Bright**, **Indigo** or **Terminal** (the till layout everywhere).
 2. **Where to use it:**
-   - **Phones** (screens narrower than 600 px);
+   - **Every screen** (recommended, the default): phones, tablets and PCs all use the app, each with its own layout ([section 4](#4-the-pos-app-on-phones-and-tablets));
    - **Phones and tablets** (also touch screens up to 1,100 px on the short side);
-   - **Every screen**.
+   - **Phones** (screens narrower than 600 px).
 
-   Other screens keep the terminal layout.
+   With the last two, other screens keep the terminal layout.
 3. **Show today's sales on the home screen:** switch off to hide figures from everyone.
 4. **Accent colour:** change the highlight colour to your brand, or keep the style's own.
 5. **Sign-in picture:** upload a landscape photo of your restaurant or a signature dish. It is resized automatically (about 100 KB).

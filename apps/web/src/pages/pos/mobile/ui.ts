@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { MobileStyle, MobileUi, Workstation } from "@pos/core";
 
-export const DEFAULT_MOBILE_UI: MobileUi = { style: "bright", useOn: "phones", showSalesOnHome: true };
+/** New businesses: the app style on every screen (phones, tablets and PCs, each with its own layout). */
+export const DEFAULT_MOBILE_UI: MobileUi = { style: "bright", useOn: "all", showSalesOnHome: true };
 
 export const MOBILE_STYLES: Record<MobileStyle, { name: string; description: string; swatch: string[] }> = {
   bright: { name: "Bright", description: "Light and airy: white cards, blue highlights, photo menu. Easy to read in daylight.", swatch: ["#f4f5fb", "#ffffff", "#1a73e8", "#1e8e3e"] },

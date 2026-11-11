@@ -10,7 +10,7 @@
 
 ## 1. Kitchen and bar tickets (20 min)
 
-When a steward taps **Send**, each item prints at its station: food at the kitchen printer, drinks at the bar printer.
+When a steward taps **Send KOT**, each item prints at its station: food at the kitchen printer, drinks at the bar printer. A restaurant with only one printer gets the kitchen ticket from the counter printer (the same one as the bills): the cashier tears it off and brings it to the kitchen. A lost ticket can be printed again from the order (**Reprint KOT**, marked REPRINT).
 
 A ticket shows:
 

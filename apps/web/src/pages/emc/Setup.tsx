@@ -8,16 +8,18 @@ import {
   lankaQrPayload,
   payhereCheckout,
 } from "./setup-helpers";
-import { Field, PageHead, Toggle } from "../../components/ui";
+import { Field, Loading, PageHead, Toggle } from "../../components/ui";
+import { useDraft } from "../../lib/useDraft";
 import { QrCode } from "../../components/Receipt";
 import { money } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 
 export function BusinessTaxPage() {
-  const { settings, saveSetting, toast } = useApp();
+  const { settings, settingsReady, saveSetting, toast } = useApp();
   const orderTypes = useCollection<{ id: string; name: string }>("orderTypes") ?? [];
-  const [b, setB] = useState<BusinessSettings>(settings.business);
-  const [t, setT] = useState<TaxSettings>(settings.tax);
+  // Drafts follow the saved settings until edited, so a page opened before they load never saves defaults.
+  const [b, setB, savedB] = useDraft<BusinessSettings>(settings.business);
+  const [t, setT, savedT] = useDraft<TaxSettings>(settings.tax);
   const preview = calculateCheckPreview(t, b);
 
   async function save() {
@@ -25,9 +27,12 @@ export function BusinessTaxPage() {
     const isSample = b.isSample && b.tin === settings.business.tin && b.legalName === settings.business.legalName;
     await saveSetting("business", { ...b, isSample });
     await saveSetting("tax", t);
+    savedB();
+    savedT();
     toast("Business and tax settings saved");
   }
 
+  if (!settingsReady) return <Loading />;
   const pctInput = (value: number, onChange: (v: number) => void) => (
     <div className="row"><input className="input num" type="number" step="0.01" min={0} value={value / 100} onChange={(e) => onChange(Math.round(Number(e.target.value || 0) * 100))} /><span className="muted">%</span></div>
   );
@@ -117,11 +122,12 @@ async function fileToLogo(file: File): Promise<string> {
 }
 
 export function BrandingPage() {
-  const { settings, saveSetting, toast } = useApp();
-  const [b, setB] = useState<BrandingSettings>(settings.branding);
+  const { settings, settingsReady, saveSetting, toast } = useApp();
+  const [b, setB, savedB] = useDraft<BrandingSettings>(settings.branding);
+  if (!settingsReady) return <Loading />;
   return (
     <div className="page">
-      <PageHead title="Branding" subtitle="The restaurant's name, logo, colours and bill text. Applied across the POS, back office and printed bills." actions={<button className="btn primary" onClick={async () => { await saveSetting("branding", b); toast("Branding saved"); }}>Save</button>} />
+      <PageHead title="Branding" subtitle="The restaurant's name, logo, colours and bill text. Applied across the POS, back office and printed bills." actions={<button className="btn primary" onClick={async () => { await saveSetting("branding", b); savedB(); toast("Branding saved"); }}>Save</button>} />
       <div className="grid cols-2">
         <div className="card card-body stack">
           <Field label="Display name"><input className="input" value={b.displayName} onChange={(e) => setB({ ...b, displayName: e.target.value })} /></Field>
@@ -159,8 +165,8 @@ export function BrandingPage() {
 }
 
 export function IntegrationsPage() {
-  const { settings, saveSetting, toast } = useApp();
-  const [s, setS] = useState<IntegrationSettings>(settings.integrations);
+  const { settings, settingsReady, saveSetting, toast } = useApp();
+  const [s, setS, savedS] = useDraft<IntegrationSettings>(settings.integrations);
   const [demo, setDemo] = useState<"lankaqr" | "payhere" | null>(null);
   const modeSel = (value: string, onChange: (v: IntegrationSettings["payhere"]["mode"]) => void) => (
     <select className="select" value={value} onChange={(e) => onChange(e.target.value as IntegrationSettings["payhere"]["mode"])}>
@@ -170,9 +176,10 @@ export function IntegrationsPage() {
     </select>
   );
   const amount = 341_261;
+  if (!settingsReady) return <Loading />;
   return (
     <div className="page">
-      <PageHead title="Integrations" subtitle="Third-party connections run as templates with sample data (mock mode) until the client's accounts are approved. Switching to sandbox or live also needs the server-side endpoint deployed." actions={<button className="btn primary" onClick={async () => { await saveSetting("integrations", s); toast("Integration settings saved"); }}>Save</button>} />
+      <PageHead title="Integrations" subtitle="Third-party connections run as templates with sample data (mock mode) until the client's accounts are approved. Switching to sandbox or live also needs the server-side endpoint deployed." actions={<button className="btn primary" onClick={async () => { await saveSetting("integrations", s); savedS(); toast("Integration settings saved"); }}>Save</button>} />
       <div className="grid cols-2">
         <div className="card card-body stack">
           <div className="row between"><h3>PayHere</h3><span className="badge info">{s.payhere.mode}</span></div>
