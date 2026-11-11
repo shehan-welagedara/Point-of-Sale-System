@@ -1,0 +1,26 @@
+{
+  "name": "@pos/console",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Polymath Console: Polymath Tech's own system to manage every POS Suite client (licences, subscriptions, health, usage, updates).",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5174",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pos/core": "workspace:*",
+    "firebase": "11.10.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-router-dom": "7.18.5"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
+    "@vitejs/plugin-react": "4.4.1",
+    "typescript": "5.9.3",
+    "vite": "6.3.5"
+  }
+}

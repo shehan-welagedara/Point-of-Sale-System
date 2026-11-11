@@ -30,6 +30,65 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.15.3)(tsx@4.19.4)(yaml@2.9.1)
 
+  apps/console:
+    dependencies:
+      '@pos/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      firebase:
+        specifier: 11.10.0
+        version: 11.10.0
+      react:
+        specifier: 19.1.0
+        version: 19.1.0
+      react-dom:
+        specifier: 19.1.0
+        version: 19.1.0(react@19.1.0)
+      react-router-dom:
+        specifier: 7.18.5
+        version: 7.18.5(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+    devDependencies:
+      '@types/react':
+        specifier: 19.1.2
+        version: 19.1.2
+      '@types/react-dom':
+        specifier: 19.1.2
+        version: 19.1.2(@types/react@19.1.2)
+      '@vitejs/plugin-react':
+        specifier: 4.4.1
+        version: 4.4.1(vite@6.3.5(@types/node@22.15.3)(tsx@4.19.4)(yaml@2.9.1))
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 6.3.5
+        version: 6.3.5(@types/node@22.15.3)(tsx@4.19.4)(yaml@2.9.1)
+
+  apps/console-functions:
+    dependencies:
+      firebase-admin:
+        specifier: 13.10.0
+        version: 13.10.0
+      firebase-functions:
+        specifier: 6.6.0
+        version: 6.6.0(firebase-admin@13.10.0)
+    devDependencies:
+      '@pos/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@types/node':
+        specifier: 22.15.3
+        version: 22.15.3
+      esbuild:
+        specifier: 0.25.12
+        version: 0.25.12
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.15.3)(tsx@4.19.4)(yaml@2.9.1)
+
   apps/functions:
     dependencies:
       firebase-admin:

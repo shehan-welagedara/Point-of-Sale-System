@@ -1,3 +1,4 @@
+import type { TenantSupplierLink } from "./link.js";
 import type { CheckTotals, Cents, BasisPoints } from "@pos/engine";
 import type { ModuleKey } from "./modules.js";
 import type { Edition, Entitlements } from "./licensing.js";
@@ -29,6 +30,10 @@ export interface Tenant extends Entity {
   trialEndsAt?: string;
   status: "active" | "suspended";
   createdAt: string;
+  /** From the supplier's console (written only by the server's check-in): suspension, notice, contact. */
+  supplier?: TenantSupplierLink;
+  /** The owner lets yesterday's totals go to the supplier at check-in (default: yes). */
+  shareUsage?: boolean;
 }
 
 export interface TenantLicence {
@@ -43,6 +48,10 @@ export interface TenantLicence {
   graceDays: number;
   activatedAt: string;
   activatedBy: string;
+  /** When the vendor issued it (newer licences replace older ones at check-in). */
+  issuedAt?: string;
+  /** "console": delivered by the supplier's console at check-in; otherwise activated by hand. */
+  source?: "manual" | "console";
   /** True when signed with the public demo key (not for live trading). */
   demoKey?: boolean;
 }

@@ -1,0 +1,24 @@
+{
+  "name": "@pos/console-functions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Polymath Console server functions: client check-ins, licences, subscriptions, staff and deployments. Bundled to dist/ for deployment.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run test/unit.test.ts"
+  },
+  "dependencies": {
+    "firebase-admin": "13.10.0",
+    "firebase-functions": "6.6.0"
+  },
+  "devDependencies": {
+    "@pos/core": "workspace:*",
+    "@types/node": "22.15.3",
+    "esbuild": "0.25.12",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

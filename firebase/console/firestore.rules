@@ -1,0 +1,37 @@
+rules_version = '2';
+// Polymath Console (docs/22). Staff read; every change goes through the console's server functions
+// (consoleApi), which check the role and write the audit log. Client systems never use Firestore
+// here: they call the check-in function.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function staff() {
+      return request.auth != null && request.auth.token.consoleRole in ['owner', 'admin', 'sales', 'support', 'engineer'];
+    }
+    function admin() {
+      return request.auth != null && request.auth.token.consoleRole in ['owner', 'admin'];
+    }
+    // Your own staff record, so the app can show your role while it is being set up.
+    match /staff/{uid} {
+      allow read: if staff() || (request.auth != null && request.auth.uid == uid);
+      allow write: if false;
+    }
+    match /invites/{email} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    // Rules that overlap are OR-ed, so each collection is listed (no catch-all that would open invites).
+    match /clients/{id} {
+      allow read: if staff();
+      allow write: if false;
+      match /{sub=**} {
+        allow read: if staff();
+        allow write: if false;
+      }
+    }
+    match /licences/{id} { allow read: if staff(); allow write: if false; }
+    match /deployments/{id} { allow read: if staff(); allow write: if false; }
+    match /audit/{id} { allow read: if staff(); allow write: if false; }
+    match /config/{id} { allow read: if staff(); allow write: if false; }
+    match /unknownProjects/{id} { allow read: if staff(); allow write: if false; }
+  }
+}

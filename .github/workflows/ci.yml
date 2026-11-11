@@ -24,4 +24,8 @@ jobs:
       - run: pnpm test
       - run: pnpm test:rules
       - run: pnpm test:migrations
+      - run: pnpm test:console
+        env:
+          CONSOLE_UI: skip
       - run: pnpm build
+      - run: pnpm build:console

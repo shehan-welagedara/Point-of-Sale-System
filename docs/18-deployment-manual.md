@@ -234,6 +234,8 @@ It fills in, so you don't have to edit them by hand:
 - `release/clients.json`: the client's project ID, region (asia-south1, Mumbai), backup location, and *switched on*;
 - `apps/web/.env.production` and `apps/functions/.env`: your licence public key and the region.
 
+**Polymath Console.** If you have set up the console ([22](22-polymath-console.md), `pnpm console:setup`, once for all clients), `apps/functions/.env` also holds its address (`CONSOLE_URL`), so the client's system checks in with the console from its first deploy. Add the client in the console (Clients → Add client) before or after the deploy.
+
 You can run it again at any time: it only fills in or corrects these values. Carry on to G when it finishes with no ✗.
 
 > **Automatic updates (optional, later).** If you want GitHub to deploy future updates by itself, without your PC, run the access script once with the client's owner: see [20](20-release-and-updates.md). It isn't needed for this installation.
@@ -275,14 +277,14 @@ You can run it again at any time: it only fills in or corrects these values. Car
    - **Hosting** shows a release.
    - **Firestore → Rules** shows our rules.
    - **Firestore → Indexes** lists the indexes (they may show "Building" for a few minutes).
-   - **Functions** lists `ledgerApi`, `licenceApi`, `posAuth`, `deviceApi`, `auditTrail`, `auditTenant` and `auditSealer`.
+   - **Functions** lists `ledgerApi`, `licenceApi`, `posAuth`, `deviceApi`, `consoleLinkNow`, `consoleCheckin`, `auditTrail`, `auditTenant` and `auditSealer`.
    - **Firestore → Time-to-live** has a policy on `printJobs`.
 
 4. **Keep `release/clients.json`.** It is how the next update finds this client. If you keep your copy of the code on GitHub, commit and push it.
 
 The system is now live at **https://PROJECT-ID.web.app** (also `.firebaseapp.com`). Open it: the back office **About** page (section H onwards) shows the version you deployed.
 
-- [ ] Deploy finished with ✓; seven functions listed
+- [ ] Deploy finished with ✓; nine functions listed
 - [ ] The site opens on https://PROJECT-ID.web.app
 
 ---
@@ -305,6 +307,17 @@ The system is now live at **https://PROJECT-ID.web.app** (also `.firebaseapp.com
 ---
 
 ## I. Licence key
+
+**With the Polymath Console** ([22](22-polymath-console.md); set it up once for all clients):
+
+1. In the console: **Clients → Add client** (client id, name, registered name, Firebase project ID). Fill in **Subscription** (plan, price, paid until).
+2. In the client's back office: **About → Check now**. The first check-in appears on the client's page in the console within a minute (if it asks you to confirm the project number, check it against Firebase console → Project settings, and confirm).
+3. In the console: **Licence → Issue licence** (edition, add-ons, valid until). Then in the client's back office, **About → Check now** again: Administration → Licence & modules shows the new edition and validity.
+4. Under the **Modules** tab, switch on what the client uses.
+
+Renewals: in the console, **Subscription → Record payment** with *Renew the licence*; the client's system picks it up within a day.
+
+**Without the console** (or when the client's system can't reach it):
 
 1. In the real business, open **Administration → Licence & modules**. Note the two identifiers it shows: **Project** and **Business**.
 2. On your computer, issue the licence:

@@ -31,6 +31,8 @@ It lists what was found, what was changed, the risk that remains, and the checkl
 | 15 | Medium | Bills printed "Powered by POS Suite (demo)" in real businesses: new businesses took the demo restaurant's default. | **Fixed** (1.6.0). The default is "Polymath Tech"; migration 0004 corrects existing businesses (a name the business typed itself is kept). |
 | 16 | Low | Deploying updates needed the Google Cloud CLI and a second, long-lived sign-in on the vendor's PC (application default credentials). | **Fixed** (1.6.0). The release tool uses the Firebase CLI's sign-in for backups, data updates and permissions. For data updates it lends that sign-in to the migration process through a temporary file readable only by the user, deleted when the step ends. |
 
+| 17 | **High** (design) | Central licence management and suspension (Polymath Console, 1.7.0) adds a channel into every client. | **Designed for it.** Clients call out once a day; nothing calls in. Each client proves its project with a Google-signed identity token of its own service account (no shared secret). The console only answers registered projects, and a new project number is confirmed by an owner or admin. Licences and the active/suspended status are signed with the vendor key and verified with the public key on the client; a status older than the last one applied is ignored (no replay); a licence is applied only if newer than the one in use. If the console is down, nothing changes for the client. The licence signing key is in the console project's Secret Manager, readable only by its server functions. Console staff can read but never write Firestore directly; every change goes through role-checked server functions and is audit-logged. The client's `supplier` field is server-only. Covered by rules tests, unit tests and `pnpm test:console`. |
+
 ## 2. Remaining risks (accepted, with controls)
 
 | Risk | Why it is accepted | Controls |
@@ -40,6 +42,8 @@ It lists what was found, what was changed, the risk that remains, and the checkl
 | Offline PIN copies on devices (finding 8). | Needed to keep trading during outages. | Device-only, salted, 7-day expiry, erased after 5 wrong tries, one device each. |
 | No two-step verification inside the app for back-office logins. | Not built yet. | Strong passwords (Firebase password policy). Owners' Google accounts use 2-Step Verification. Remove leavers promptly (Access review). |
 | Firebase App Check is not enabled. | Optional; needs a reCAPTCHA key per client. | All data access goes through the security rules and authenticated functions anyway. |
+| Usage figures leave the client's project (daily totals per business) when its owner keeps sharing on. | Needed for subscription planning and support. | Only bills, covers and totals for the day; the owner can switch it off (About); documented in the user manual. |
+| A console owner or admin can suspend any client. | It is the purpose of the feature (unpaid subscriptions). | Grace period with a message first; data is never touched; every suspension and restore is audit-logged with who and why; use 2-Step Verification on staff Google accounts. |
 | Cold start: the first PIN check after a quiet period can take 2–4 seconds. | Keeping a function warm costs money. | For busy clients, set `minInstances: 1` on `posAuth` (a few dollars a month). |
 
 ## 3. Scalability

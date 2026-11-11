@@ -825,6 +825,10 @@ The **About** tile on the launchpad (owners and administrators; also Administrat
 - **What's new:** the release notes of the latest versions, with the one you are on marked.
 - **Licence:** the edition, its status and days left, the limits (workstations, employees, back-office users, outlets) and the modules switched on.
 - **Where it runs:** cloud or local demo, the Firebase project and data region, the business ID, and how many devices are not yet updated. Quote the version and business ID when you contact support.
+- **Polymath Tech: help and support:** Polymath Tech's phone, WhatsApp, email and website, and when the system last checked in with Polymath Tech. The system checks in once a day: that is how licence renewals and upgrades arrive by themselves, with no key to type. **Check now** checks in at once (for example right after Polymath Tech tells you a renewal is ready).
+- **Share daily figures with Polymath Tech** (on unless you switch it off): yesterday's number of bills and covers and the sales totals, so Polymath Tech can support you and plan your subscription. Nothing about customers, menu items or staff is sent.
+
+**Messages from Polymath Tech.** Owners and administrators may see a line at the top of the back office, for example *Your subscription renews on 1 December*. If Polymath Tech ever has to suspend an account (for example an unpaid subscription), the message says until when the system keeps working; after that the licensed modules stop like an expired licence, **your data is kept**, and everything comes back as soon as Polymath Tech restores the account.
 
 ---
 

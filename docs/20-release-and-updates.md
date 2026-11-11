@@ -112,6 +112,8 @@ pnpm release:deploy --target kandy-myst
 
 **Redeploy** the current `main` without a new version: Actions → Release → *Run workflow*, target `staging`, `wave:1`, `wave:2` or client ids. Anything other than staging needs the production approval.
 
+**From the Polymath Console** ([22](22-polymath-console.md)): Updates → *New update* (staging, a wave, or chosen clients) runs the same workflow with each client's settings from the console (the `registry` input), so `release/clients.json` doesn't need to be up to date; the console follows the run and shows each client's version after its next check-in. It needs the console's GitHub settings and token (`pnpm console:setup --github-token`), and the repository variable **`CONSOLE_URL`** (the console's check-in address) so client deploys from GitHub check in too.
+
 ## 6. How devices update
 
 - Every screen checks `/version.json` every five minutes, when it comes back into view, and when the internet returns.
