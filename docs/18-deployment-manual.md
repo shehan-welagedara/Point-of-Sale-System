@@ -156,7 +156,7 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
 
 **What this does:** your PC gets the programs that publish the system, a copy of the code, and permission to publish to the client's project. Steps 1 and 2 are done **once** for all your clients.
 
-**Where to type the commands.** On Windows, open **Windows Terminal** or **PowerShell** (Start → type *PowerShell*). Copy each grey box, paste it, press Enter and wait until it finishes. From step 2 on, every command runs **inside the project folder** (`cd Point-of-Sale-System`).
+**Where to type the commands.** On Windows, open **Command Prompt** or **PowerShell** (Start → type *cmd* or *PowerShell*); the commands work in both. Copy each grey box, paste it, press Enter and wait until it finishes. From step 2 on, every command runs **inside the project folder** (`cd Point-of-Sale-System`).
 
 1. **Install these programs** (normal installers; accept the defaults):
 
@@ -205,6 +205,14 @@ Cloud Functions (licence activation, audit trail, accounting) need the **Blaze**
    ```
 
    The first lets you publish the app, the rules and the functions. The other two let the release tool take backups and update the client's data safely.
+
+   **If `firebase login` fails** (*Unable to fetch the CLI MOTD*, *Failed to make request to auth.firebase.tools*, or *Firebase CLI Login Failed* in the browser), your PC's antivirus, proxy or firewall is stopping Node.js. Find the cause and the fix with:
+
+   ```bash
+   pnpm deploy:check
+   ```
+
+   It tests each Google service from Node.js and prints the exact fix (troubleshooting U has more). If nothing helps, use **Cloud Shell** in the browser instead (U, *Deploying from Cloud Shell*).
 
 - [ ] Git, Node.js 22, Google Cloud CLI and pnpm installed
 - [ ] Code downloaded from `main`; `pnpm install` finished without errors
@@ -605,6 +613,7 @@ Staff can use the system at `https://PROJECT-ID.web.app` from anywhere. A domain
 |---|---|
 | Deploy fails the first time with a permissions / service-agent / Eventarc error | New Google services are still being set up. Wait 5 minutes and run `pnpm release:deploy --target CLIENT-ID` again. |
 | `pnpm deploy:setup` shows ✗ | Do what it says on that line (install a program or sign in), then run it again. |
+| `pnpm exec firebase login` fails: *Unable to fetch the CLI MOTD and remote config*, *Failed to make request to https://auth.firebase.tools/attest*, *Your credentials are no longer valid*, or the browser page *Firebase CLI Login Failed* | The browser can reach Google but Node.js (which runs the Firebase tools) can't: antivirus HTTPS scanning, a company proxy or a firewall. Run `pnpm deploy:check`: it tests each Google service from Node.js and prints the fix for your PC. Most often that is `set NODE_OPTIONS=--use-system-ca` in Command Prompt, or `$env:NODE_OPTIONS="--use-system-ca"` in PowerShell (Node.js then trusts the same certificates as Windows; `setx NODE_OPTIONS "--use-system-ca"` keeps it for new terminals). Then run `pnpm exec firebase logout` and `pnpm exec firebase login --reauth`. If nothing helps, deploy from Cloud Shell (below). |
 | "Billing account not configured" when deploying functions | Blaze plan missing (section C). |
 | "Missing or insufficient permissions" in the app | The signed-in login doesn't have the role for that action. Check Back-office logins. |
 | Phone: "This code isn't valid any more" | Codes work once, for 15 minutes. Create a new one (Connect a phone). |
@@ -625,6 +634,43 @@ Staff can use the system at `https://PROJECT-ID.web.app` from anywhere. A domain
 | "Failed to resolve import" after `git pull` (your computer) | Run `pnpm install`. Scripts now do this automatically. |
 | Phone on the local network can't run the dev demo | Use the deployed **https** site, or `pnpm demo` for a local preview. |
 | Budget alert email | Check **Usage and billing** in the Firebase console. Most often an extra paid feature was switched on by mistake. |
+
+### Deploying from Cloud Shell (when your PC can't connect)
+
+Google Cloud Shell is a terminal in the browser, run by Google, with the Google tools already installed and signed in. It avoids any problem with your PC's network, antivirus or tools.
+
+1. Open **console.cloud.google.com**, choose the client's project at the top, and click **Activate Cloud Shell** (the `>_` icon, top right). A terminal opens at the bottom.
+2. Get Node.js 22, pnpm and the code:
+
+```bash
+nvm install 22
+```
+
+```bash
+npm install -g pnpm@10
+```
+
+```bash
+git clone https://github.com/shehan-welagedara/Point-of-Sale-System.git
+```
+
+```bash
+cd Point-of-Sale-System
+```
+
+```bash
+pnpm install
+```
+
+3. Sign in to the Firebase tools. Cloud Shell has no local browser, so use this form: open the link it prints, sign in, and paste back the code it shows:
+
+```bash
+pnpm exec firebase login --no-localhost
+```
+
+4. Then continue with **F** (`pnpm deploy:setup`) and **G** exactly as on a PC. gcloud is already signed in.
+5. **The licence key.** If you already created it on your PC, upload `licence-keys/vendor-key.txt` to the same folder in Cloud Shell first (⋮ menu → *Upload*), so every client uses the same key. If you create it in Cloud Shell, download it straight away (⋮ → *Download*, `Point-of-Sale-System/licence-keys/vendor-key.txt`) and back it up.
+6. After the deploy, keep a copy of `release/clients.json` (download it, or commit and push it), so the next update finds the client.
 
 ---
 
