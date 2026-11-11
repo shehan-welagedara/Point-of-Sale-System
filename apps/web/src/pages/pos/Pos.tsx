@@ -140,6 +140,12 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
   const totals = useMemo(() => (check && activeLines(check).length ? computeCheckTotals(check, ctx) : null), [check, ctx]);
   const bd = businessDateNow(settings.pos);
   const paperWidth = (p?: Printer) => paperWidthFor(ws, p);
+  /**
+   * Printer for a kitchen ticket: the station's printer (kitchen or bar), else the kitchen printer,
+   * else this device's bill printer, so a restaurant with one printer gets KOTs and bills on it.
+   */
+  const kotPrinter = (route: "kitchen" | "bar") => routePrinter(printers, route) ?? routePrinter(printers, "kitchen") ?? printers.find((p) => p.id === ws.receiptPrinterId && p.active);
+  const kotOnSend = settings.pos.printKotOnSend !== false;
   const staffName = (id: string) => staff.find((s) => s.id === id)?.name ?? id;
   const orderTypeName = (id: string) => orderTypes.find((o) => o.id === id)?.name ?? id;
   const tableName = (id?: string) => tables.find((t) => t.id === id)?.name;
@@ -214,24 +220,37 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
   async function send(c = check, leave = true): Promise<Check | null> {
     if (!c) return null;
     const { check: next, sent } = sendRound(c);
-    if (sent.length) {
-      const itemMap = new Map(menuItems.map((m) => [m.id, m]));
-      for (const route of ["kitchen", "bar"] as const) {
-        const lines = sent.filter((l) => l.kotRoute === route);
-        if (!lines.length) continue;
-        const printer = routePrinter(printers, route) ?? routePrinter(printers, "kitchen");
-        await print("kot", buildKot({ check: next, lines, station: route === "bar" ? "Bar" : "Kitchen", width: paperWidth(printer), staffName: staffName(next.staffId), orderTypeName: orderTypeName(next.orderTypeId), tableName: tableName(next.tableId), menuItems: itemMap, at: new Date().toISOString() }), printer);
-      }
-    }
+    if (sent.length && kotOnSend) await printKots(next, sent, false);
     await persist(next);
     if (sent.length) void journal.log({ type: "send", employeeId: user.id, ...onCheck(next), qty: sent.reduce((a, l) => a + l.qty, 0), amount: sent.reduce((a, l) => a + lineValue(l), 0), detail: `round ${next.sentRounds}` });
-    toast(sent.length ? `Sent ${sent.reduce((a, l) => a + l.qty, 0)} item(s) to the kitchen` : "Check saved");
+    toast(sent.length ? `Sent ${sent.reduce((a, l) => a + l.qty, 0)} item(s) to the kitchen${kotOnSend ? " · KOT printed" : ""}` : "Check saved");
     if (leave) {
       setCheck(null);
       setSel(null);
       setSheetOpen(false);
     }
     return next;
+  }
+
+  /** Kitchen tickets for these lines, one per station (kitchen, bar). */
+  async function printKots(c: Check, lines: CheckLine[], reprint: boolean) {
+    const itemMap = new Map(menuItems.map((m) => [m.id, m]));
+    for (const route of ["kitchen", "bar"] as const) {
+      const own = lines.filter((l) => l.kotRoute === route);
+      if (!own.length) continue;
+      const printer = kotPrinter(route);
+      await print("kot", buildKot({ check: c, lines: own, station: route === "bar" ? "Bar" : "Kitchen", width: paperWidth(printer), staffName: staffName(c.staffId), orderTypeName: orderTypeName(c.orderTypeId), tableName: tableName(c.tableId), menuItems: itemMap, at: new Date().toISOString(), reprint }), printer);
+    }
+  }
+
+  /** Prints the kitchen tickets of everything already sent on this check again (marked REPRINT). */
+  async function reprintKot(c = check) {
+    if (!c) return;
+    const sentLines = c.lines.filter((l) => l.sentRound !== undefined && !l.voided && l.kotRoute !== "none");
+    if (!sentLines.length) return toast("Nothing sent to the kitchen yet on this check", true);
+    await printKots(c, sentLines, true);
+    void journal.log({ type: "reprint", employeeId: user.id, ...onCheck(c), detail: "kitchen ticket" });
+    toast("Kitchen ticket printed again");
   }
 
   async function printGuestCheck() {
@@ -294,8 +313,8 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
         then: async (r) => {
           const voided = { ...line, voided: { reasonId: r.id, by: by.id, at: new Date().toISOString() } };
           const next = { ...check, lines: check.lines.map((l) => (l.id === line.id ? voided : l)) };
-          const printer = routePrinter(printers, line.kotRoute === "bar" ? "bar" : "kitchen");
-          await print("kot", buildKot({ check: next, lines: [voided], station: line.kotRoute === "bar" ? "Bar" : "Kitchen", width: paperWidth(printer), staffName: staffName(next.staffId), orderTypeName: orderTypeName(next.orderTypeId), tableName: tableName(next.tableId), menuItems: new Map(menuItems.map((m) => [m.id, m])), at: new Date().toISOString() }), printer);
+          const printer = kotPrinter(line.kotRoute === "bar" ? "bar" : "kitchen");
+          if (kotOnSend) await print("kot", buildKot({ check: next, lines: [voided], station: line.kotRoute === "bar" ? "Bar" : "Kitchen", width: paperWidth(printer), staffName: staffName(next.staffId), orderTypeName: orderTypeName(next.orderTypeId), tableName: tableName(next.tableId), menuItems: new Map(menuItems.map((m) => [m.id, m])), at: new Date().toISOString() }), printer);
           await persist(next);
           void journal.log({ type: "itemVoid", employeeId: user.id, ...(by.id !== user.id ? { authorizedBy: by.id } : {}), ...onCheck(next), itemId: line.menuItemId, itemName: line.name, qty: line.qty, amount: lineValue(line), reasonId: r.id, reason: r.name });
           setDialog(null);
@@ -539,7 +558,7 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
       ws, user, role, staff, rvcs, rvcId, rvc, myRvcs, ctx, bd,
       menuItems, categories: visibleCats, tables, openChecks, orderTypes, tenders, printers, imageOf, catColor, customer,
       check, setCheck, totals, itemCount,
-      startCheck, tapItem, changeQty, voidLine, overridePrice, splitLine, send, printGuestCheck, cancelCheck, pickUp, openTable,
+      startCheck, tapItem, changeQty, voidLine, overridePrice, splitLine, send, printGuestCheck, reprintKot: () => reprintKot(), kotOnSend, cancelCheck, pickUp, openTable,
       withPrivilege, finish: (paid) => finish(paid, false), print, journal, lastInvoice,
       openDiscount: (scope, lineId) => { if (lineId) setSel(lineId); setDialog({ t: "discount", scope }); },
       openTransfer: () => setDialog({ t: "transfer" }),
@@ -732,12 +751,13 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
               </div>
             ) : null}
             <div className="pos-actions">
-              <button className="btn" disabled={!check} onClick={() => send()}>Send</button>
+              <button className="btn" disabled={!check} onClick={() => send()} title={kotOnSend ? "Send the new items to the kitchen and print the kitchen ticket (KOT)" : "Send the new items to the kitchen"}>{kotOnSend ? "Send KOT" : "Send"}</button>
               <button className="btn" disabled={!totals} onClick={printGuestCheck}>Print bill</button>
               <button className="btn" disabled={!totals} onClick={() => setDialog({ t: "discount", scope: "check" })}>Discount</button>
               <button className="btn" disabled={!check} onClick={cancelCheck}>{check && check.lines.some((l) => l.sentRound === undefined) ? "Cancel" : "Close"}</button>
               <button className="btn primary pay" disabled={!totals} onClick={() => withPrivilege("pos.tender", () => setDialog({ t: "pay" }))}>Pay {totals ? money(totals.amountDue) : ""}</button>
-              <button className="btn" style={{ gridColumn: "span 2" }} disabled={!check} onClick={() => send()}>Hold &amp; new</button>
+              <button className="btn" disabled={!check} onClick={() => send()}>Hold &amp; new</button>
+              <button className="btn" disabled={!check || !check.lines.some((l) => l.sentRound !== undefined && !l.voided)} onClick={() => void reprintKot()}>Reprint KOT</button>
             </div>
           </aside>
         </div>

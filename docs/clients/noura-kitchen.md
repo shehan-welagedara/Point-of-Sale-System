@@ -79,8 +79,9 @@ Noura Kitchen starts small: **one phone** as the POS and their **Xprinter XP-T80
 4. **Connect the phone** with a code: POS Configuration → Workstations & printers → **Connect a phone** → name *Counter phone* → **+ New workstation** (`P01`) → **How this phone prints: Bluetooth printer beside it (Chrome on Android)** → **Show the code**. Scan it with the phone, **Connect**, add to the home screen.
 5. **On the phone:** **Connect printer** → **Choose the printer** → pick the XP-T80Q from the list → **Test print**.
    If the printer doesn't appear or the test doesn't print, use RawBT: install RawBT, pair the printer in Android Bluetooth settings (PIN `0000` or `1234`), choose it in RawBT, and set the workstation's **Bluetooth route** to **Through the RawBT app**.
-6. **Test:** an order (the kitchen ticket prints at the counter for the kitchen), a cash payment (the standard bill prints and the drawer opens), the X report.
-7. **More phones later:** connect each one with a code. With several devices, a Print Agent PC and network printers (sections K and O) are usually better than a Bluetooth printer per phone.
+6. **Kitchen tickets and bills on the one printer.** Nothing to set up: with no kitchen printer, **Send KOT** prints the kitchen ticket on the XP-T80Q straight away (leave *Kitchen and bar tickets* on the same printer in the workstation, and *Print a kitchen ticket (KOT) when an order is sent* on in POS Configuration → POS options). The cashier tears the ticket off for the kitchen; the bill prints on the same printer at payment. A lost ticket: order → ⋮ → **Print kitchen ticket again (KOT)**, marked REPRINT.
+7. **Test:** an order → **Send KOT** (only the kitchen ticket prints, no bill, the drawer stays shut), **Reprint KOT** (REPRINT on the ticket), a cash payment (the standard bill prints and the drawer opens), the X report.
+8. **More devices later:** connect each phone with a code. A tablet or PC at the counter uses the same app with its own wide layout (menu and order side by side), so nothing new to learn. With several devices, a Print Agent PC and network printers (sections K and O) are usually better than a Bluetooth printer per phone.
 
 ## 6. Training
 
@@ -103,4 +104,4 @@ Hand over the PDFs (`pnpm manual:pdf -- --client "Noura Kitchen"`): user manual,
 - [ ] Bill photos attached
 - [ ] Trial balance agreed with the owner
 - [ ] Accountant and storekeeper trained and signed off
-- [ ] Later: POS module, menu, employees; the phone connected with a code and printing to the XP-T80Q over Bluetooth: test page, kitchen ticket, standard bill and cash drawer (section 5 above)
+- [ ] Later: POS module, menu, employees; the phone connected with a code and printing to the XP-T80Q over Bluetooth: test page, Send KOT (kitchen ticket only), Reprint KOT, standard bill and cash drawer (section 5 above)

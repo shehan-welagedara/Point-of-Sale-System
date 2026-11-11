@@ -86,6 +86,8 @@ interface AppState {
   tenants: Tenant[];
   store: DocStore | null;
   settings: Settings;
+  /** True once the business's saved settings have arrived (before that, `settings` holds defaults). */
+  settingsReady: boolean;
   on: (m: ModuleKey) => boolean;
   toast: (text: string, bad?: boolean) => void;
   signIn: (email: string, password: string) => Promise<void>;
@@ -211,6 +213,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [store, setStore] = useState<DocStore | null>(null);
   const [settingsDocs, setSettingsDocs] = useState<Partial<Settings>>({});
+  const [settingsReady, setSettingsReady] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastId = useRef(0);
 
@@ -334,6 +337,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Live tenant doc + settings for the active tenant.
   useEffect(() => {
+    setSettingsReady(false);
     if (!store) {
       setSettingsDocs({});
       return;
@@ -342,6 +346,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const next: Partial<Settings> = {};
       for (const d of docs) (next as Record<string, unknown>)[d.id] = d;
       setSettingsDocs(next);
+      setSettingsReady(true);
     });
   }, [store]);
 
@@ -566,6 +571,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     tenants,
     store,
     settings,
+    settingsReady,
     on: (m) => Boolean(tenant?.modules?.[m]) && lic.usable && lic.entitlements.modules.includes(m),
     toast,
     signIn: async (email, password) => {

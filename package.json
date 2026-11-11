@@ -19,6 +19,8 @@
     "test:functions": "pnpm --filter @pos/functions build && node -e \"require('fs').writeFileSync('apps/functions/dist/.env.local','SEAL_DELAY_MS=0\\n')\" && firebase emulators:exec --only auth,firestore,functions --project demo-pos-suite \"vitest run --root apps/functions test/emulator.test.ts\"",
     "licence": "node tools/licence/run.mjs",
     "test:e2e": "node apps/web/e2e/run.mjs",
+    "test:contrast": "node apps/web/e2e/contrast.mjs",
+    "test:golive": "node apps/web/e2e/golive.mjs",
     "test:pairing": "pnpm --filter @pos/functions build && node -e \"require('fs').writeFileSync('apps/functions/dist/.env.local','SEAL_DELAY_MS=0\\n')\" && firebase emulators:exec --only auth,firestore,functions --project demo-pos-suite \"node apps/web/e2e/pairing.mjs\"",
     "manual:screenshots": "node apps/web/e2e/manual-shots.mjs",
     "manual:pdf": "node tools/manual/build-pdf.mjs",
@@ -45,5 +47,5 @@
       "@grpc/grpc-js": "^1.13.6"
     }
   },
-  "version": "1.3.0"
+  "version": "1.4.0"
 }

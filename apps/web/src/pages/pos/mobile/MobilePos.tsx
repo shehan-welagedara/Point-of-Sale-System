@@ -33,7 +33,7 @@ import { Icon, type IconName } from "./icons";
 import { MobilePay, PaySuccess } from "./MobilePay";
 import { BluetoothPrinterButton, BluetoothPrinterPanel } from "../BluetoothPrinter";
 import { MobileReports, SalesChart, StatTile, change, useSales } from "./MobileReports";
-import { greeting, initials, mobileVars } from "./ui";
+import { greeting, initials, mobileVars, useViewport } from "./ui";
 import "./mobile.css";
 
 type Limit = { kind: LimitKind; value: number; label: string };
@@ -83,6 +83,10 @@ export interface PosApi {
   splitLine: (l: CheckLine) => void;
   send: (c?: Check | null, leave?: boolean) => Promise<Check | null>;
   printGuestCheck: () => Promise<void>;
+  /** Prints the kitchen tickets of what was already sent, marked REPRINT. */
+  reprintKot: () => Promise<void>;
+  /** Sending an order prints its kitchen ticket (POS options). */
+  kotOnSend: boolean;
   cancelCheck: () => void;
   pickUp: (c: Check) => void;
   openTable: (t: Table) => Promise<void>;
@@ -118,6 +122,12 @@ const lineValue = (l: CheckLine) => l.qty * (l.unitPrice + l.modifiers.reduce((a
  */
 export function MobilePos({ style, api, children }: { style: MobileStyle; api: PosApi; children: ReactNode }) {
   const { settings, on } = useApp();
+  const vp = useViewport();
+  /**
+   * PCs and landscape tablets: the same app, laid out for the width (navigation rail, menu and
+   * order side by side, split payment). Phones and portrait tablets: the phone layout.
+   */
+  const wide = vp.w >= 960 && vp.h >= 540;
   const [tab, setTab] = useState<Tab>("home");
   const [overlay, setOverlay] = useState<Overlay>(null);
   const lastCheckId = useRef<string | null>(null);
@@ -142,11 +152,19 @@ export function MobilePos({ style, api, children }: { style: MobileStyle; api: P
     setOverlay(null);
     setTab(t);
   };
+  const afterSend = () => setTab(on("tables") && api.tables.length ? "tables" : wide ? "menu" : "home");
   const startPay = () => api.withPrivilege("pos.tender", () => setOverlay({ t: "pay" }));
 
   let screen: ReactNode;
   if (overlay?.t === "pay" && api.check && api.totals) {
-    screen = <MobilePay api={api} style={style} onBack={() => setOverlay(null)} onPaid={(result) => setOverlay({ t: "done", result })} />;
+    screen = wide ? (
+      <div className="w-pay">
+        <aside className="w-pay-order" aria-label="Order"><OrderSummary api={api} /></aside>
+        <div className="w-pay-main"><MobilePay api={api} style={style} onBack={() => setOverlay(null)} onPaid={(result) => setOverlay({ t: "done", result })} /></div>
+      </div>
+    ) : (
+      <MobilePay api={api} style={style} onBack={() => setOverlay(null)} onPaid={(result) => setOverlay({ t: "done", result })} />
+    );
   } else if (overlay?.t === "done") {
     screen = <PaySuccess api={api} result={overlay.result} onDone={() => go(on("tables") && api.tables.length ? "tables" : "menu")} />;
   } else if (overlay?.t === "functions" || overlay?.t === "detailed") {
@@ -161,8 +179,8 @@ export function MobilePos({ style, api, children }: { style: MobileStyle; api: P
       <>
         {tab === "home" ? <Home api={api} style={style} go={go} onRvc={() => setOverlay({ t: "rvc" })} /> : null}
         {tab === "tables" ? <Tables api={api} onQuick={async () => { await api.startCheck({ ...(api.orderTypes.find((o) => !o.requiresTable) ? { orderTypeId: api.orderTypes.find((o) => !o.requiresTable)!.id } : {}) }); setTab("menu"); }} /> : null}
-        {tab === "menu" ? <Menu api={api} onBack={() => setTab(api.check?.tableId ? "tables" : "home")} onCart={() => setTab("cart")} /> : null}
-        {tab === "cart" ? <Cart api={api} onBack={() => setTab("menu")} onPay={startPay} onLine={(line) => setOverlay({ t: "line", line })} onMore={() => setOverlay({ t: "check" })} onSent={() => setTab(on("tables") && api.tables.length ? "tables" : "home")} /> : null}
+        {tab === "menu" || (wide && tab === "cart") ? <Menu api={api} wide={wide} onBack={() => setTab(api.check?.tableId ? "tables" : "home")} onCart={() => setTab("cart")} /> : null}
+        {tab === "cart" && !wide ? <Cart api={api} onBack={() => setTab("menu")} onPay={startPay} onLine={(line) => setOverlay({ t: "line", line })} onMore={() => setOverlay({ t: "check" })} onSent={afterSend} /> : null}
         {tab === "orders" ? <Orders api={api} onOpenOrder={(c) => (c.status === "open" ? api.pickUp(c) : setOverlay({ t: "order", c }))} /> : null}
         {tab === "reports" ? <><MHead title="Reports" /><MobileReports api={api} style={style} onDetailed={() => setOverlay({ t: "detailed" })} /></> : null}
         {tab === "more" ? <More api={api} go={go} onFunctions={() => setOverlay({ t: "functions" })} onReports={() => setTab("reports")} onDetailed={() => setOverlay({ t: "detailed" })} onRvc={() => setOverlay({ t: "rvc" })} /> : null}
@@ -171,7 +189,60 @@ export function MobilePos({ style, api, children }: { style: MobileStyle; api: P
   }
 
   const fullScreen = overlay?.t === "pay" || overlay?.t === "done";
-  const showCartBar = !fullScreen && !overlay && (tab === "menu" || tab === "tables" || tab === "home") && api.check && api.itemCount > 0;
+  const showCartBar = !wide && !fullScreen && !overlay && (tab === "menu" || tab === "tables" || tab === "home") && api.check && api.itemCount > 0;
+  const navOn = (n: Tab) => (tab === n || (wide && n === "menu" && tab === "cart")) && (!overlay || overlay.t === "line" || overlay.t === "check" || overlay.t === "rvc" || overlay.t === "order");
+  // On wide screens the order stays beside the menu and the tables.
+  const orderPanel = wide && !fullScreen && (tab === "menu" || tab === "cart" || tab === "tables") && overlay?.t !== "functions" && overlay?.t !== "detailed";
+  const sheets = (
+    <>
+      {overlay?.t === "rvc" ? (
+        <Sheet title="Revenue centre" onClose={() => setOverlay(null)}>
+          {api.myRvcs.map((r) => (
+            <button key={r} className={`m-sheet-row${r === api.rvcId ? " on" : ""}`} onClick={() => { setOverlay(null); if (r !== api.rvcId) api.changeRvc(r); }}>
+              <Icon name="tables" /> <span className="grow">{api.rvcs.find((x) => x.id === r)?.name ?? r}</span>{r === api.rvcId ? <Icon name="check" /> : null}
+            </button>
+          ))}
+        </Sheet>
+      ) : null}
+      {overlay?.t === "line" && api.check ? <LineSheet api={api} line={api.check.lines.find((l) => l.id === overlay.line.id) ?? overlay.line} onClose={() => setOverlay(null)} /> : null}
+      {overlay?.t === "check" && api.check ? <CheckSheet api={api} onClose={() => setOverlay(null)} onLeave={() => { setOverlay(null); afterSend(); }} /> : null}
+      {overlay?.t === "order" ? <OrderSheet api={api} c={overlay.c} onClose={() => setOverlay(null)} /> : null}
+    </>
+  );
+
+  if (wide) {
+    return (
+      <div className={`mpos wide ${style}`} style={mobileVars(settings.pos.mobile)} data-ui={style}>
+        {!fullScreen ? (
+          <aside className="w-rail">
+            <div className="w-brand" title={settings.branding.displayName}>
+              {settings.branding.logoDataUrl ? <img src={settings.branding.logoDataUrl} alt="" /> : settings.branding.displayName.slice(0, 1)}
+            </div>
+            <nav className="w-nav" aria-label="POS navigation">
+              {nav.map((n) => (
+                <button key={n.key} className={navOn(n.key) ? "on" : ""} onClick={() => go(n.key)} aria-label={n.label} aria-current={navOn(n.key) ? "page" : undefined}>
+                  <span className="w-nav-ico"><Icon name={n.icon} />{n.badge ? <span className="m-badge">{n.badge}</span> : null}</span>
+                  <span>{n.label}</span>
+                </button>
+              ))}
+            </nav>
+            <span className="grow" />
+            <button className="w-user" onClick={() => go("more")} aria-label={`${api.user.name}: profile and sign out`} title={`${api.user.name} · ${api.ws.code}`}>
+              <span className="m-avatar">{initials(api.user.name)}</span>
+            </button>
+          </aside>
+        ) : null}
+        <main className={`m-main w-main${fullScreen ? " full" : ""}`}>{screen}</main>
+        {orderPanel ? (
+          <aside className="w-order" aria-label="Current order">
+            <Cart api={api} panel onBack={() => setTab("menu")} onPay={startPay} onLine={(line) => setOverlay({ t: "line", line })} onMore={() => setOverlay({ t: "check" })} onSent={afterSend} />
+          </aside>
+        ) : null}
+        {sheets}
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className={`mpos ${style}`} style={mobileVars(settings.pos.mobile)} data-ui={style}>
@@ -187,25 +258,14 @@ export function MobilePos({ style, api, children }: { style: MobileStyle; api: P
       {!fullScreen ? (
         <nav className="m-nav" aria-label="POS navigation">
           {nav.map((n) => (
-            <button key={n.key} className={tab === n.key && (!overlay || overlay.t === "line" || overlay.t === "check" || overlay.t === "rvc" || overlay.t === "order") ? "on" : ""} onClick={() => go(n.key)} aria-label={n.label}>
+            <button key={n.key} className={navOn(n.key) ? "on" : ""} onClick={() => go(n.key)} aria-label={n.label}>
               <span className="m-nav-ico"><Icon name={n.icon} />{n.badge ? <span className="m-badge">{n.badge}</span> : null}</span>
               <span>{n.label}</span>
             </button>
           ))}
         </nav>
       ) : null}
-      {overlay?.t === "rvc" ? (
-        <Sheet title="Revenue centre" onClose={() => setOverlay(null)}>
-          {api.myRvcs.map((r) => (
-            <button key={r} className={`m-sheet-row${r === api.rvcId ? " on" : ""}`} onClick={() => { setOverlay(null); if (r !== api.rvcId) api.changeRvc(r); }}>
-              <Icon name="tables" /> <span className="grow">{api.rvcs.find((x) => x.id === r)?.name ?? r}</span>{r === api.rvcId ? <Icon name="check" /> : null}
-            </button>
-          ))}
-        </Sheet>
-      ) : null}
-      {overlay?.t === "line" && api.check ? <LineSheet api={api} line={api.check.lines.find((l) => l.id === overlay.line.id) ?? overlay.line} onClose={() => setOverlay(null)} /> : null}
-      {overlay?.t === "check" && api.check ? <CheckSheet api={api} onClose={() => setOverlay(null)} onLeave={() => { setOverlay(null); setTab(on("tables") && api.tables.length ? "tables" : "home"); }} /> : null}
-      {overlay?.t === "order" ? <OrderSheet api={api} c={overlay.c} onClose={() => setOverlay(null)} /> : null}
+      {sheets}
       {children}
     </div>
   );
@@ -239,7 +299,7 @@ function Thumb({ api, item, size = 52 }: { api: PosApi; item: MenuItem | undefin
   const box = size ? { width: size, height: size } : {};
   if (img) return <img className={`m-thumb${size ? "" : " fill"}`} src={img} alt="" style={box} loading="lazy" />;
   const color = item ? item.buttonColor || api.catColor.get(item.categoryId) || "#94a3b8" : "#94a3b8";
-  return <span className={`m-thumb ph${size ? "" : " fill"}`} style={{ ...box, ["--c" as string]: color }}>{initials(item?.name ?? "?")}</span>;
+  return <span className={`m-thumb ph${size ? "" : " fill"}`} style={{ ...box, ["--c" as string]: color }} aria-hidden="true">{initials(item?.name ?? "?")}</span>;
 }
 
 // ───────────────────────────── Home ─────────────────────────────
@@ -358,7 +418,7 @@ function Tables({ api, onQuick }: { api: PosApi; onQuick: () => void }) {
 
 // ───────────────────────────── Menu ─────────────────────────────
 
-function Menu({ api, onBack, onCart }: { api: PosApi; onBack: () => void; onCart: () => void }) {
+function Menu({ api, onBack, onCart, wide = false }: { api: PosApi; onBack: () => void; onCart: () => void; wide?: boolean }) {
   const [cat, setCat] = useState("");
   const [q, setQ] = useState("");
   const catOrder = new Map(api.categories.map((c, i) => [c.id, i]));
@@ -374,12 +434,16 @@ function Menu({ api, onBack, onCart }: { api: PosApi; onBack: () => void; onCart
   const title = api.check ? (api.check.tableId ? `Table ${api.tableName(api.check.tableId)}` : `Order #${api.check.checkNo}`) : "New order";
   return (
     <>
-      <MHead
-        title={title}
-        sub={api.check ? `${api.orderTypeName(api.check.orderTypeId)} · ${api.check.covers} guest${api.check.covers === 1 ? "" : "s"}` : "Tap + to add items"}
-        onBack={onBack}
-        right={<button className="m-icon-btn" onClick={onCart} aria-label="Order"><Icon name="cart" />{api.itemCount ? <span className="m-badge">{api.itemCount}</span> : null}</button>}
-      />
+      {wide ? (
+        <MHead title="Menu" sub={`${api.rvc?.name ?? api.rvcId} · tap a dish to add it to the order`} />
+      ) : (
+        <MHead
+          title={title}
+          sub={api.check ? `${api.orderTypeName(api.check.orderTypeId)} · ${api.check.covers} guest${api.check.covers === 1 ? "" : "s"}` : "Tap + to add items"}
+          onBack={onBack}
+          right={<button className="m-icon-btn" onClick={onCart} aria-label="Order"><Icon name="cart" />{api.itemCount ? <span className="m-badge">{api.itemCount}</span> : null}</button>}
+        />
+      )}
       <div className="m-screen">
         <label className="m-search"><Icon name="search" size={18} /><input placeholder="Search dishes or codes" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search menu" /></label>
         <div className="m-chips">
@@ -416,7 +480,7 @@ function Menu({ api, onBack, onCart }: { api: PosApi; onBack: () => void; onCart
 
 // ───────────────────────────── Cart / order ─────────────────────────────
 
-function Cart({ api, onBack, onPay, onLine, onMore, onSent }: { api: PosApi; onBack: () => void; onPay: () => void; onLine: (l: CheckLine) => void; onMore: () => void; onSent: () => void }) {
+function Cart({ api, onBack, onPay, onLine, onMore, onSent, panel = false }: { api: PosApi; onBack: () => void; onPay: () => void; onLine: (l: CheckLine) => void; onMore: () => void; onSent: () => void; panel?: boolean }) {
   const { on } = useApp();
   const c = api.check;
   const menu = new Map(api.menuItems.map((m) => [m.id, m]));
@@ -425,14 +489,18 @@ function Cart({ api, onBack, onPay, onLine, onMore, onSent }: { api: PosApi; onB
   return (
     <div className="m-page">
       <MHead
-        title={c ? (c.tableId ? `Table ${api.tableName(c.tableId)}` : `Order #${c.checkNo}`) : "Order"}
-        {...(c ? { sub: `Check #${c.checkNo} · ${api.staffName(c.staffId)}` } : {})}
-        onBack={onBack}
+        title={c ? (c.tableId ? `Table ${api.tableName(c.tableId)}` : `Order #${c.checkNo}`) : panel ? "New order" : "Order"}
+        {...(c ? { sub: `Check #${c.checkNo} · ${api.staffName(c.staffId)}` } : panel ? { sub: "Tap a dish to start" } : {})}
+        {...(panel ? {} : { onBack })}
         right={c ? <button className="m-icon-btn" onClick={onMore} aria-label="Order options"><Icon name="dots" /></button> : undefined}
       />
       <div className="m-screen">
         {!c || !c.lines.length ? (
-          <div className="m-empty"><Icon name="cart" size={40} /><p>No items yet.</p><button className="m-btn cta" onClick={onBack}>Browse the menu</button></div>
+          panel ? (
+            <div className="m-empty"><Icon name="cart" size={40} /><p>No items yet. Tap a dish on the menu{api.tables.length ? ", or choose a table" : ""}.</p></div>
+          ) : (
+            <div className="m-empty"><Icon name="cart" size={40} /><p>No items yet.</p><button className="m-btn cta" onClick={onBack}>Browse the menu</button></div>
+          )
         ) : (
           <>
             <div className="m-order-info">
@@ -484,10 +552,47 @@ function Cart({ api, onBack, onPay, onLine, onMore, onSent }: { api: PosApi; onB
       </div>
       {c && c.lines.length ? (
         <footer className="m-foot row">
-          <button className="m-btn outline" disabled={!unsent} onClick={async () => { await api.send(); onSent(); }}><Icon name="send" size={18} /> Send{unsent ? ` (${unsent})` : ""}</button>
-          <button className="m-btn cta grow lg" disabled={!t} onClick={onPay}>Proceed to Payment <Icon name="chevron" size={18} /></button>
+          <button className="m-btn outline" disabled={!unsent} onClick={async () => { await api.send(); onSent(); }} aria-label={api.kotOnSend ? "Send and print the kitchen ticket" : "Send to the kitchen"}><Icon name="send" size={18} /> {api.kotOnSend ? "Send KOT" : "Send"}{unsent ? ` (${unsent})` : ""}</button>
+          <button className="m-btn cta grow lg" disabled={!t} onClick={onPay}>{panel && t ? `Pay ${money(t.amountDue)}` : "Proceed to Payment"} <Icon name="chevron" size={18} /></button>
         </footer>
       ) : null}
+    </div>
+  );
+}
+
+/** The order beside the payment on wide screens: what the guest is paying for, read only. */
+function OrderSummary({ api }: { api: PosApi }) {
+  const c = api.check!;
+  const t = api.totals;
+  const menu = new Map(api.menuItems.map((m) => [m.id, m]));
+  return (
+    <div className="m-page">
+      <MHead title={c.tableId ? `Table ${api.tableName(c.tableId)}` : `Order #${c.checkNo}`} sub={`Check #${c.checkNo} · ${api.staffName(c.staffId)} · ${c.covers} guest${c.covers === 1 ? "" : "s"}`} />
+      <div className="m-screen">
+        <div className="m-card m-list">
+          {activeLines(c).map((l) => (
+            <div key={l.id} className="m-line">
+              <span className="m-line-main static">
+                <Thumb api={api} item={menu.get(l.menuItemId)} size={40} />
+                <span className="m-line-text">
+                  <strong>{l.qty} × {l.name}</strong>
+                  {l.modifiers.length ? <span>{l.modifiers.map((m) => m.name).join(" · ")}</span> : null}
+                  <span className="m-line-price">{money(lineValue(l))}</span>
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+        {t ? (
+          <div className="m-card m-totals">
+            <div className="row between"><span>Subtotal</span><span>{money(t.itemsTotal)}</span></div>
+            {t.discountTotal ? <div className="row between m-good"><span>Discounts</span><span>−{money(t.discountTotal)}</span></div> : null}
+            {t.charges.filter((x) => x.amount).map((x) => <div key={x.ruleId} className="row between m-muted"><span>{x.name}</span><span>{money(x.amount)}</span></div>)}
+            {t.roundingAdjustment ? <div className="row between m-muted"><span>Rounding</span><span>{money(t.roundingAdjustment)}</span></div> : null}
+            <div className="row between m-grand"><span>Total</span><strong>{money(t.amountDue)}</strong></div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -516,7 +621,8 @@ function CheckSheet({ api, onClose, onLeave }: { api: PosApi; onClose: () => voi
       <button className="m-sheet-row" onClick={act(api.openCovers)}><Icon name="users" /> <span className="grow">Number of guests</span></button>
       <button className="m-sheet-row" onClick={act(() => void api.openCustomer())}><Icon name="user" /> <span className="grow">Guest, allergies, VAT buyer</span></button>
       {c.lines.length ? <button className="m-sheet-row" onClick={act(api.openTransfer)}><Icon name="swap" /> <span className="grow">Transfer to a table or employee</span></button> : null}
-      <button className="m-sheet-row" onClick={async () => { onClose(); await api.send(); onLeave(); }}><Icon name="send" /> <span className="grow">Send and hold</span></button>
+      <button className="m-sheet-row" onClick={async () => { onClose(); await api.send(); onLeave(); }}><Icon name="send" /> <span className="grow">{api.kotOnSend ? "Send, print the KOT and hold" : "Send and hold"}</span></button>
+      {c.lines.some((l) => l.sentRound !== undefined && !l.voided) ? <button className="m-sheet-row" onClick={act(() => void api.reprintKot())}><Icon name="printer" /> <span className="grow">Print kitchen ticket again (KOT)</span></button> : null}
       <button className="m-sheet-row bad" onClick={() => { onClose(); api.cancelCheck(); if (!unsent) onLeave(); }}><Icon name="x" /> <span className="grow">{unsent ? "Cancel unsent items" : "Close this screen"}</span></button>
     </Sheet>
   );

@@ -52,7 +52,7 @@ The bar at the bottom: **Home · Tables · Menu · Orders · More**.
    ![Order](../img/app-bright-cart.jpg)
 
 5. Check the order with the guest. Use **− / +** to correct quantities.
-6. **Send** sends the order to the kitchen and bar. Items show *sent*.
+6. **Send KOT** sends the order to the kitchen and bar and prints the kitchen ticket. Items show *sent*.
 
 **Exercise 2.** Table 3, two guests: two Chicken Kottu (one *extra spicy*), one Lime Juice, one Watalappan with the note "serve with coffee". Send it.
 
@@ -101,7 +101,7 @@ Tap a line in the order:
 | Start a table | Tables → table → guests |
 | Order without a table | Tables → **+** |
 | Add a dish | Menu → **+** |
-| Send to kitchen | Order → **Send** |
+| Send to kitchen | Order → **Send KOT** |
 | Find an order | Orders (or Home → My open orders) |
 | Print the bill | Order → **⋮** → Print bill |
 | Void a sent dish | Order → tap the dish → Void |

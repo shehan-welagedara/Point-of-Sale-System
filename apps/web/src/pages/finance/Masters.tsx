@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { type Account, type AccountType, type AccountingSettings, type TenderMedia, COLLECTIONS as C } from "@pos/core";
 import { type AccountBalance, type CostCenter, type ExchangeRate, type GlBudget, type LedgerSettings, LEDGER as L, budgetVsActual, defaultLedgerSettings } from "@pos/ledger";
 import { tablesToWorkbook } from "../../lib/excel";
-import { Bar, Field, Modal, ModuleOff, PageHead, Toggle } from "../../components/ui";
+import { Bar, Field, Loading, Modal, ModuleOff, PageHead, Toggle } from "../../components/ui";
+import { useDraft } from "../../lib/useDraft";
 import { amount, downloadBuffer, toCents, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 import { AccountSelect, canBooks, useAccounts, useCostCenters, useFiscal, useLedgerSettings } from "./shared";
@@ -249,20 +250,25 @@ const POS_SINGLE: [keyof AccountingSettings["accounts"], string][] = [
 ];
 
 export function FinanceSettingsPage() {
-  const { on, settings, saveSetting, toast, role, store, mode } = useApp();
+  const { on, settings, settingsReady, saveSetting, toast, role, store, mode } = useApp();
   const tenders = useCollection<TenderMedia>(C.tenderMedia) ?? [];
   const costCenters = useCollection<CostCenter>(L.costCenters) ?? [];
   const rates = useCollection<ExchangeRate>(L.exchangeRates) ?? [];
   const current = (settings.accounting as AccountingSettings & { ledger?: LedgerSettings }).ledger ?? defaultLedgerSettings(settings.pos.defaultPropertyId);
-  const [ls, setLs] = useState<LedgerSettings>(current);
-  const [pos, setPos] = useState<AccountingSettings["accounts"]>(settings.accounting.accounts);
+  // Drafts follow the saved settings until edited: a page opened before they load must never save the
+  // built-in defaults (another outlet's cost centre, default limits) over the business's own.
+  const [ls, setLs, savedLs] = useDraft<LedgerSettings>(current);
+  const [pos, setPos, savedPos] = useDraft<AccountingSettings["accounts"]>(settings.accounting.accounts);
   const [rate, setRate] = useState({ currency: "USD", date: todayColombo(), value: "" });
   const [cc, setCc] = useState({ id: "", name: "" });
   if (!on("accounting")) return <ModuleOff name="Accounting" />;
+  if (!settingsReady) return <Loading />;
   const owner = role === "owner" || role === "admin";
 
   async function save() {
     await saveSetting("accounting", { ...settings.accounting, accounts: { ...pos, stockReceivedNotBilled: ls.accounts.stockReceivedNotBilled, inventory: pos.inventory, vatInput: ls.accounts.vatInput }, ledger: ls } as AccountingSettings);
+    savedLs();
+    savedPos();
     toast("Finance settings saved");
   }
 

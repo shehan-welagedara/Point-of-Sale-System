@@ -293,7 +293,7 @@ export function MobileStylePage() {
     <div className="page fill">
       <PageHead
         title="Mobile app style"
-        subtitle="How the POS looks on phones and tablets. Pick a style; staff see it from their next sign-in. Each workstation can also choose its own (Workstations & printers → Screen style)."
+        subtitle="How the POS looks on phones, tablets and PCs. Pick a style; staff see it from their next sign-in. Each workstation can also choose its own (Workstations & printers → Screen style)."
         actions={<button className="btn primary" onClick={async () => { const { accent, ...rest } = m; await saveSetting("pos", { ...settings.pos, mobile: { ...rest, ...(accent ? { accent } : {}) } }); savedMobile(); toast("Mobile app style saved"); }}>Save</button>}
       />
       <div className="appearance-grid">
@@ -317,7 +317,7 @@ export function MobileStylePage() {
           <div className="card card-body stack">
             <h3>Where to use it</h3>
             <Seg<MobileUi["useOn"]> value={m.useOn} onChange={(v) => setM({ ...m, useOn: v })} options={[{ value: "phones", label: "Phones" }, { value: "phonesTablets", label: "Phones and tablets" }, { value: "all", label: "Every screen" }]} />
-            <p className="small muted">Phones are screens narrower than 600 px (any phone, portrait or landscape). Tablets are touch screens up to 1,100 px on the short side. Other screens keep the terminal layout and its theme (Terminal themes).</p>
+            <p className="small muted">Each screen gets a layout made for it: phones and portrait tablets have the bottom bar; PCs and landscape tablets have a navigation rail, the menu and the order side by side, and payment as a split view. <strong>Every screen</strong> (recommended) uses the app style everywhere; with <em>Phones</em> or <em>Phones and tablets</em>, other screens keep the terminal layout (Terminal themes). A workstation can still choose its own under Workstations &amp; printers → Screen style.</p>
             <div className="row between"><span>Show today's sales on the home screen</span><Toggle on={m.showSalesOnHome} onChange={(v) => setM({ ...m, showSalesOnHome: v })} label="Show sales on home" /></div>
             <p className="tiny muted">Only employees whose role includes reports see the figures; others see their own sales or none.</p>
             <div className="row between">
@@ -365,6 +365,8 @@ export function PosOptionsPage() {
           </Field>
           <div className="row between"><span>Print the bill automatically when a check is paid</span><Toggle on={p.autoPrintBillOnClose} onChange={(v) => setP({ ...p, autoPrintBillOnClose: v })} label="Print bill on close" /></div>
           <p className="tiny muted">When off, staff print it from the payment-successful screen or the receipt window.</p>
+          <div className="row between"><span>Print a kitchen ticket (KOT) when an order is sent</span><Toggle on={p.printKotOnSend !== false} onChange={(v) => setP({ ...p, printKotOnSend: v })} label="Print KOT on send" /></div>
+          <p className="tiny muted">Kitchen tickets print on the kitchen or bar printer. With one printer for everything, they print on the bill printer (or on a phone's Bluetooth printer), each cut separately from the bills. Off when the kitchen takes orders another way.</p>
           <Field label="Default outlet for back-office reports">
             <select className="select" value={p.defaultPropertyId} onChange={(e) => setP({ ...p, defaultPropertyId: e.target.value })}>
               {properties.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}

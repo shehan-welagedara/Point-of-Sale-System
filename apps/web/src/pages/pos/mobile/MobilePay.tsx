@@ -68,18 +68,21 @@ export function MobilePay({ api, style, onBack, onPaid }: { api: PosApi; style: 
   const needsRef = Boolean(chosen?.requiresReference) && !isQr;
   const label = style === "indigo" ? "Complete Payment" : "Pay Now";
   return (
-    <div className="m-page">
+    <div className="m-page m-pay">
       <header className="m-head">
         <button className="m-icon-btn" onClick={onBack} aria-label="Back"><Icon name="back" /></button>
         <div className="m-head-title"><strong>Payment</strong><span>Check #{check.checkNo}{check.tableId ? ` · Table ${api.tableName(check.tableId)}` : ""}</span></div>
         <span className="m-icon-btn" />
       </header>
       <div className="m-screen">
+        <div className="m-pay-right">
         <div className="m-card m-hero center">
           <span className="m-muted">{paid ? "Balance to pay" : "Total amount"}</span>
           <strong className="m-big">{money(balance)}</strong>
           {paid ? <span className="m-muted small">Bill {money(due)} · paid {money(paid)}</span> : null}
         </div>
+        </div>
+        <div className="m-pay-left">
         {check.payments.length ? (
           <div className="m-card">
             {check.payments.map((p) => (
@@ -100,8 +103,10 @@ export function MobilePay({ api, style, onBack, onPaid }: { api: PosApi; style: 
             </button>
           ))}
         </div>
+        </div>
+        <div className="m-pay-right m-pay-right-2">
         {chosen && isCash ? (
-          <div className="m-card stack">
+          <div className="m-card stack m-pay-entry">
             <label className="m-field">
               <span>{chosen.type === "foreignCash" ? `${chosen.currency} received` : "Cash received"}</span>
               <input className="m-input num" inputMode="decimal" placeholder={chosen.type === "foreignCash" ? "0.00" : (balance / 100).toFixed(2)} value={entry} onChange={(e) => setEntry(e.target.value.replace(/[^0-9.]/g, ""))} aria-label="Amount received" />
@@ -115,7 +120,7 @@ export function MobilePay({ api, style, onBack, onPaid }: { api: PosApi; style: 
           </div>
         ) : null}
         {chosen && isQr ? (
-          <div className="m-card stack center">
+          <div className="m-card stack center m-pay-entry">
             <QrCode data={qrPayload} size={190} />
             <span className="m-muted small">{chosen.type === "lankaqr" ? "Guest scans with any LankaQR banking app." : "Guest scans to pay online via PayHere."}{mockQr ? " Demo mode: no real money moves." : ""}</span>
             <input className="m-input" placeholder="Transaction reference" value={ref} onChange={(e) => setRef(e.target.value)} aria-label="Transaction reference" />
@@ -123,7 +128,7 @@ export function MobilePay({ api, style, onBack, onPaid }: { api: PosApi; style: 
           </div>
         ) : null}
         {chosen && !isCash && !isQr ? (
-          <div className="m-card stack">
+          <div className="m-card stack m-pay-entry">
             <label className="m-field">
               <span>Amount (leave empty for the full balance)</span>
               <input className="m-input num" inputMode="decimal" placeholder={(balance / 100).toFixed(2)} value={entry} onChange={(e) => setEntry(e.target.value.replace(/[^0-9.]/g, ""))} aria-label="Amount" />
@@ -137,6 +142,7 @@ export function MobilePay({ api, style, onBack, onPaid }: { api: PosApi; style: 
             {chosen.type === "card" ? <span className="m-muted small">Run the card on the bank's machine first, then key in its approval code.</span> : null}
           </div>
         ) : null}
+        </div>
       </div>
       <footer className="m-foot">
         <button className="m-btn cta block lg" disabled={busy || !chosen || (needsRef && !ref.trim()) || (isQr && !ref.trim()) || (chosen?.type === "foreignCash" && !entered)} onClick={() => pay(ref.trim() || undefined)}>
