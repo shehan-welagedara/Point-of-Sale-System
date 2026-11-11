@@ -149,6 +149,11 @@ describe("validation", () => {
   it("refuses bad documents with readable messages", () => {
     expect(validateDoc(C.menuItems, { id: "BAD", code: "BAD", name: "", categoryId: "C1", price: -5, taxClass: "standard", kotRoute: "kitchen", modifierGroupIds: [], allergens: [], available: true, active: true, sortOrder: 1 }).map((i) => i.path)).toEqual(expect.arrayContaining(["name", "price"]));
     expect(validateDoc(C.workstations, { id: "W", propertyId: "P", rvcId: "R", code: "w-01", name: "Bar", deviceProfile: "dedicated", receiptPrinterId: "", printMode: "agent", active: true })[0]?.message).toMatch(/workstation code/);
+    // A phone printing to its own Bluetooth printer (no printer record, no Print Agent).
+    const phone = { id: "P01", propertyId: "P", rvcId: "R", code: "P01", name: "Counter phone", deviceProfile: "mobile", receiptPrinterId: "", printMode: "bluetooth", bluetoothVia: "browser", paperWidthMm: 80, kitchenOnBluetooth: true, active: true };
+    expect(validateDoc(C.workstations, phone)).toEqual([]);
+    expect(validateDoc(C.workstations, { ...phone, bluetoothVia: "usb" }).map((i) => i.path)).toEqual(["bluetoothVia"]);
+    expect(validateDoc(C.workstations, { ...phone, paperWidthMm: 76 }).map((i) => i.path)).toEqual(["paperWidthMm"]);
     expect(validateDoc(C.discounts, { id: "D", name: "Too much", type: "percent", value: 12_000, scope: "check", requiresManager: false, active: true })[0]?.message).toMatch(/100%/);
     expect(validateDoc("somethingElse", { anything: true })).toEqual([]);
   });

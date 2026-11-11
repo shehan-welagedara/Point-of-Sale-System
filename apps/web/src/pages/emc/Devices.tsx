@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { httpsCallable } from "firebase/functions";
-import { type Member, type RevenueCenter, type Workstation, COLLECTIONS as C, canAdd } from "@pos/core";
+import { type Member, type Printer, type RevenueCenter, type Workstation, COLLECTIONS as C, canAdd } from "@pos/core";
 import { ConfirmButton, Field, Modal } from "../../components/ui";
 import { dateTimeColombo } from "../../lib/format";
 import { firebase } from "../../lib/firebase";
@@ -115,9 +115,11 @@ function ConnectPhone({ onClose, connected }: { onClose: () => void; connected: 
   const store = useStore();
   const workstations = (useCollection<Workstation>(C.workstations) ?? []).filter((w) => w.active);
   const rvcs = useCollection<RevenueCenter>(C.revenueCenters) ?? [];
+  const printers = useCollection<Printer>(C.printers) ?? [];
   const taken = new Set(connected.map((d) => d.device!.workstationId));
   const [wsId, setWsId] = useState("__new");
   const [newCode, setNewCode] = useState("");
+  const [printing, setPrinting] = useState<"bluetooth" | "rawbt" | "agent" | "preview">("bluetooth");
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [pairing, setPairing] = useState<{ code: string; expiresAt: string; url: string; qr: string; workstationId: string } | null>(null);
@@ -148,7 +150,12 @@ function ConnectPhone({ onClose, connected }: { onClose: () => void; connected: 
         const propertyId = settings.pos.defaultPropertyId;
         const rvc = rvcs.find((r) => r.propertyId === propertyId && r.active) ?? rvcs.find((r) => r.active);
         if (!rvc) throw new Error("Add a revenue centre first (Properties & revenue centres)");
-        const ws: Workstation = { id: code, code, name: label.trim(), propertyId: rvc.propertyId, rvcId: rvc.id, deviceProfile: "mobile", receiptPrinterId: "", printMode: "agent", uiStyle: "default", active: true };
+        const ws: Workstation = {
+          id: code, code, name: label.trim(), propertyId: rvc.propertyId, rvcId: rvc.id, deviceProfile: "mobile", uiStyle: "default", active: true,
+          receiptPrinterId: printing === "agent" ? (printers.find((p) => p.role === "receipt" && p.active)?.id ?? "") : "",
+          printMode: printing === "rawbt" ? "bluetooth" : printing,
+          ...(printing === "bluetooth" || printing === "rawbt" ? { bluetoothVia: printing === "rawbt" ? "rawbt" : "browser", paperWidthMm: 80, kitchenOnBluetooth: true } : {}),
+        } as Workstation;
         await store.set(C.workstations, ws);
         id = code;
       }
@@ -181,9 +188,19 @@ function ConnectPhone({ onClose, connected }: { onClose: () => void; connected: 
             </select>
           </Field>
           {wsId === "__new" ? (
-            <Field label="Code of the new workstation" help={`Appears in invoice numbers; never reused. ${workstations.length} of ${licence.entitlements.limits.workstations} workstations used.`}>
-              <input className="input mono" value={newCode} placeholder={suggested} onChange={(e) => setNewCode(e.target.value.toUpperCase())} aria-label="Workstation code" />
-            </Field>
+            <>
+              <Field label="Code of the new workstation" help={`Appears in invoice numbers; never reused. ${workstations.length} of ${licence.entitlements.limits.workstations} workstations used.`}>
+                <input className="input mono" value={newCode} placeholder={suggested} onChange={(e) => setNewCode(e.target.value.toUpperCase())} aria-label="Workstation code" />
+              </Field>
+              <Field label="How this phone prints" help="A small business with one phone can print straight to a Bluetooth printer beside it, without a Print Agent PC.">
+                <select className="select" value={printing} onChange={(e) => setPrinting(e.target.value as typeof printing)} aria-label="How this phone prints">
+                  <option value="bluetooth">Bluetooth printer beside it (Chrome on Android)</option>
+                  <option value="rawbt">Bluetooth printer through the RawBT app (Android)</option>
+                  <option value="agent">The restaurant's printers through the Print Agent PC</option>
+                  <option value="preview">No printing (on screen only)</option>
+                </select>
+              </Field>
+            </>
           ) : taken.has(wsId) ? (
             <div className="callout warn small">This workstation already has a connected device. Use it for a replacement phone only, and remove the old one: a workstation must be used on one device at a time.</div>
           ) : null}

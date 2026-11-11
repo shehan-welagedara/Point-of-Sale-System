@@ -27,6 +27,7 @@ import {
 import { type Block, type ReceiptDoc, buildDaySummary, widthForPaper } from "@pos/printing";
 import { Seg, Stat } from "../../components/ui";
 import { amount, money, timeColombo } from "../../lib/format";
+import { paperWidthFor } from "../../lib/printing";
 import { useApp, useCollection } from "../../state/app";
 
 type Scope = "mine" | "rvc" | "property";
@@ -70,7 +71,7 @@ export function PosReports({ ws, user, role, rvcId, staff, rvcs, ctx, journal, w
   const exceptions = myEvents.filter((e) => EXCEPTION_EVENTS.includes(e.type)).sort((a, b) => b.at.localeCompare(a.at));
   const scopeLabel = scope === "mine" ? user.name : scope === "rvc" ? (rvcs.find((r) => r.id === rvcId)?.name ?? rvcId) : "Whole property";
   const printer = printers.find((p) => p.id === ws.receiptPrinterId);
-  const width = widthForPaper(printer?.paperWidthMm ?? 80);
+  const width = paperWidthFor(ws, printer);
 
   function chooseScope(s: Scope) {
     if (s === "mine") return setScope(s);

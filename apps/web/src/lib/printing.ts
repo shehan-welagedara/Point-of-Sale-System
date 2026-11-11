@@ -1,5 +1,10 @@
-import { type DocStore, type PrintJob, type Printer, COLLECTIONS as C, newId } from "@pos/core";
-import type { ReceiptDoc } from "@pos/printing";
+import { type DocStore, type PrintJob, type Printer, type Workstation, COLLECTIONS as C, newId } from "@pos/core";
+import { type ReceiptDoc, widthForPaper } from "@pos/printing";
+
+/** Characters per line for this device's printing: its own Bluetooth printer, or the given printer. */
+export function paperWidthFor(ws: Pick<Workstation, "printMode" | "paperWidthMm">, printer?: Pick<Printer, "paperWidthMm">): number {
+  return widthForPaper(ws.printMode === "bluetooth" ? (ws.paperWidthMm ?? 80) : (printer?.paperWidthMm ?? 80));
+}
 
 /**
  * Sends a document to a printer through the Print Agent queue. Dedicated terminals and tablets

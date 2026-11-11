@@ -2,6 +2,24 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.3.0 — 2026-11-11
+
+**Type:** Minor (new features) · **Deploy:** hosting only (no rule, function or data changes)
+
+### For clients
+
+- **One phone and a Bluetooth printer, no PC.** A small restaurant can print bills, kitchen tickets and reports, and open the cash drawer, straight from its phone to a Bluetooth receipt printer beside it (for example an Xprinter XP-T80Q). No Print Agent or network printer needed. The phone's printer button connects the printer, makes a test print and shows prints waiting while the printer is off.
+- **Tax invoice or standard bill.** Bill designer → *Print the final bill as a TAX INVOICE*. Businesses not registered for VAT or SSCL print a standard bill (Bill No, date and time, items, service charge, total) with no TIN or tax-invoice wording.
+
+### Changes
+
+- Workstation printing *Bluetooth printer next to this phone or tablet*: from the browser (Web Bluetooth, Chrome on Android, Bluetooth LE printers; common printer services such as 18F0 and Xprinter's E7810A71; small-packet fallback) or through the RawBT app (Android, classic Bluetooth); paper width; kitchen tickets on the same printer. Set when connecting a phone or on the workstation. Prints wait on the phone while the printer is off and print on reconnect.
+- iPhone: explained in the app (Bluefy browser) since Safari and Chrome on iOS have no Web Bluetooth.
+- Standard bill: *Bill No* and *Date* instead of the tax invoice's invoice/supply dates; no TIN; tax invoice only for VAT-registered sellers (switch on by default), and always for a VAT-registered buyer.
+- One paper-width rule for all POS printing (bills, tickets, X/Z, reports, reprints).
+- Docs: hardware Model C (one phone + Bluetooth printer), deployment manual O.4, user manual, configuration guide, training, Noura Kitchen plan (XP-T80Q, standard bill, Starter licence with add-ons enough for one phone).
+- Tests: printing (standard bill, switch off, business buyer), validation, and e2e with a simulated XP-T80Q over Web Bluetooth (20-byte packets): connect, test print, kitchen ticket, bill and drawer kick.
+
 ## 1.2.0 — 2026-11-09
 
 **Type:** Minor (new features) · **Deploy:** functions (new `deviceApi`), security rules, hosting

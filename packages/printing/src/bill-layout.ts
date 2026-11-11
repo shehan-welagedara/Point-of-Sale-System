@@ -2,6 +2,7 @@ import type { BillLayout } from "@pos/core";
 
 /** The standard bill: what every business prints until the administrator changes it. */
 export const DEFAULT_BILL_LAYOUT: BillLayout = {
+  taxInvoice: true,
   showLogo: true,
   headerAlign: "center",
   titleSize: 2,
@@ -72,6 +73,11 @@ export const TAX_INVOICE_ALWAYS = [
   "Total amount payable",
   "Purchaser's name, address and TIN (when the buyer is VAT registered)",
 ] as const;
+
+/** Whether a final bill prints as a tax invoice: VAT registered, and the layout asks for it or the buyer gave a TIN. */
+export function isTaxInvoice(vatRegistered: boolean, layout: BillLayout, buyerTin?: boolean): boolean {
+  return vatRegistered && (layout.taxInvoice || Boolean(buyerTin));
+}
 
 /** The feedback QR link for an invoice, or undefined when switched off. */
 export function feedbackLink(layout: BillLayout, invoiceNo: string, website?: string): string | undefined {

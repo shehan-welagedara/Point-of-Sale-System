@@ -21,6 +21,7 @@
 3. Five wrong PINs lock you out: ask your supervisor to unlock you.
 4. The phone signs you out after a short time without a touch. Sign in again; nothing is lost.
 5. Lost your phone, or got a new one? Tell the manager at once so the old one is removed.
+6. **Bluetooth printer** (when your phone prints to a printer beside it): the home screen shows the printer button. *Connect printer* or *2 waiting* means it isn't connected: switch the printer on, tap the button → **Connect printer**. Waiting prints then come out.
 
 **Exercise 1.** Sign in with a wrong PIN once and read the message. Then sign in correctly.
 
