@@ -218,6 +218,8 @@ try {
   // ── Mobile app (phone): sign in, table, menu, cart, payment, success — Bright style by default.
   {
     const ctx = await browser.newContext({ ...devices["iPhone 13"], storageState: await page.context().storageState() });
+    // Phones and tablets run on a mobile workstation (T01); the demo's counter PC W01 keeps the terminal layout.
+    await ctx.addInitScript(() => localStorage.setItem("pos-suite.workstation", "T01"));
     const p = await ctx.newPage();
     p.on("pageerror", (e) => errors.push(`app: ${e.message}`));
     await p.goto(`${B}/pos?mode=local`);
@@ -255,7 +257,7 @@ try {
     check("payment lists tender methods", (await p.locator(".m-tender").count()) >= 3);
     await p.getByRole("button", { name: /Pay Now/ }).click();
     await p.waitForTimeout(1500);
-    check("payment successful screen with invoice number", (await p.locator(".m-success h1").textContent()) === "Payment Successful" && /_W01_/.test(await p.locator(".m-receipt-card").innerText()));
+    check("payment successful screen with invoice number", (await p.locator(".m-success h1").textContent()) === "Payment Successful" && /_T01_/.test(await p.locator(".m-receipt-card").innerText()));
     await p.getByRole("button", { name: "View receipt" }).click();
     await p.waitForTimeout(400);
     check("printed bill follows the bill designer", (await p.locator(".modal .paper").innerText()).includes("AMOUNT DUE"));
@@ -278,6 +280,7 @@ try {
   {
     const st = await page.context().storageState();
     const phone = await browser.newContext({ ...devices["iPhone 13"], storageState: st });
+    await phone.addInitScript(() => localStorage.setItem("pos-suite.workstation", "T01"));
     const pp = await phone.newPage();
     await pp.goto(`${B}/pos?mode=local`);
     await pp.waitForTimeout(800);
@@ -285,6 +288,7 @@ try {
     check("administrator switches phones to the Indigo style", (await pp.locator(".mauth.indigo").count()) === 1);
     await phone.close();
     const tablet = await browser.newContext({ ...devices["iPad (gen 7)"], storageState: st });
+    await tablet.addInitScript(() => localStorage.setItem("pos-suite.workstation", "T01"));
     const tp = await tablet.newPage();
     await tp.goto(`${B}/pos?mode=local`);
     await tp.waitForTimeout(800);
