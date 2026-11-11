@@ -2,6 +2,23 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.5.8 — 2026-11-11
+
+**Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
+
+### For clients
+
+- No change in the system itself.
+
+### Changes
+
+- New `tools/release/functions-access.mjs` (`pnpm deploy:access --project PROJECT-ID`), run by `release:deploy` before the first deploy of the server functions. Firebase's own step failed every time on a new project with only *We failed to modify the IAM policy for the project* and hid Google's reason. The check uses the Firebase CLI's sign-in (no Google Cloud CLI needed) and, in order:
+  - checks that the signed-in account may change the project's permissions (Owner), and says how to fix it if not;
+  - switches on the Compute Engine API when it is off, which creates the "Compute Engine default service account" that the server functions run as (new projects don't have it), and waits for that account;
+  - creates the Pub/Sub and Eventarc service agents;
+  - grants the three roles Firebase needs (Cloud Run Invoker and Eventarc Event Receiver for the compute account, Service Account Token Creator for the Pub/Sub agent), retrying while Google is still creating an account, and printing Google's own reason and the console steps if it refuses.
+- Deployment manual U: the permissions row now points to this check.
+
 ## 1.5.7 — 2026-11-11
 
 **Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
