@@ -2,6 +2,21 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.5.5 — 2026-11-11
+
+**Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)
+
+### For clients
+
+- No change in the system itself.
+
+### Changes
+
+- `release:deploy` on a fresh copy of the code: it stopped after the indexes with *ENOENT … apps/functions/dist/.env.PROJECT-ID*, because it wrote the functions' per-project settings before Firebase had built that folder. It now creates the folder first.
+- First deploy of a new client, without questions: the tool creates the Firebase Hosting site (`PROJECT-ID.web.app`, linked to the project's web app) when the project has none, which the Firebase CLI refuses to do in a scripted deploy; and it passes `--force` to the first functions deploy so Firebase sets the image clean-up policy instead of stopping to ask (a new project has no functions that could be replaced).
+- First deploy: when the server functions fail because Google is still giving its services their permissions (*Eventarc Service Agent*), the tool explains it, waits 3 minutes and tries once more.
+- Deployment manual G and U: the clean-up policy step is gone (the deploy does it); new troubleshooting rows for the three messages above.
+
 ## 1.5.4 — 2026-11-11
 
 **Type:** Patch (deployment tools) · **Deploy:** hosting only (version number)

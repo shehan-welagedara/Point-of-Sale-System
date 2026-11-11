@@ -272,30 +272,23 @@ You can run it again at any time: it only fills in or corrects these values. Car
    pnpm release:deploy --target CLIENT-ID
    ```
 
-   - The **first** deploy takes **5–10 minutes**: Google switches on Cloud Functions and the services it needs.
-   - If it stops with a permissions or *service agent* error, wait 5 minutes and run the same command again. The new services need a few minutes to be ready.
-   - If it asks whether to set up an **artifact clean-up policy**, answer **yes**.
+   - The **first** deploy takes **5–10 minutes**: Google switches on Cloud Functions and the services it needs. There are no questions to answer.
+   - On a first deploy the tool also does three things by itself: it creates the web address (`PROJECT-ID.web.app`), sets the clean-up policy that stops old server-function images from costing money, and, if the server functions stop because Google is still setting up permissions on the new project (*Eventarc Service Agent*), says so, **waits 3 minutes and tries again**. Leave the window open.
+   - If it still stops, read the red *Error* line, wait 5 minutes and run the same command again: every step is safe to repeat, and it continues where it stopped. Section U lists the usual messages.
    - It finishes with ✓ *https://PROJECT-ID.web.app/version.json reports …*: the system is live.
 
-3. **Artifact clean-up policy**, if you weren't asked, once after the first deploy. This stops old build images from costing money:
-
-```bash
-pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1 --project PROJECT-ID
-```
-
-4. **Check** in the Firebase console:
+3. **Check** in the Firebase console:
    - **Hosting** shows a release.
    - **Firestore → Rules** shows our rules.
    - **Firestore → Indexes** lists the indexes (they may show "Building" for a few minutes).
    - **Functions** lists `ledgerApi`, `licenceApi`, `posAuth`, `deviceApi`, `auditTrail`, `auditTenant` and `auditSealer`.
    - **Firestore → Time-to-live** has a policy on `printJobs`.
 
-5. **Keep `release/clients.json`.** It is how the next update finds this client. If you keep your copy of the code on GitHub, commit and push it.
+4. **Keep `release/clients.json`.** It is how the next update finds this client. If you keep your copy of the code on GitHub, commit and push it.
 
 The system is now live at **https://PROJECT-ID.web.app** (also `.firebaseapp.com`). Open it: the back office **About** page (section H onwards) shows the version you deployed.
 
 - [ ] Deploy finished with ✓; seven functions listed
-- [ ] Clean-up policy set
 - [ ] The site opens on https://PROJECT-ID.web.app
 
 ---
@@ -613,7 +606,10 @@ Staff can use the system at `https://PROJECT-ID.web.app` from anywhere. A domain
 
 | Symptom | Cause and fix |
 |---|---|
-| Deploy fails the first time with a permissions / service-agent / Eventarc error | New Google services are still being set up. Wait 5 minutes and run `pnpm release:deploy --target CLIENT-ID` again. |
+| Deploy fails the first time with a permissions / service-agent / Eventarc error | New Google services are still being set up. The deploy waits 3 minutes and tries once more by itself; if it fails again, wait 5 minutes and run `pnpm release:deploy --target CLIENT-ID` again. |
+| Deploy stops with *ENOENT: no such file or directory, open* `…\apps\functions\dist\.env.PROJECT-ID` | A fault in versions up to 1.5.4 on a fresh copy of the code (the folder is created later). Get the fix with `git pull` and `pnpm install`, then run the deploy again; the indexes already deployed are simply checked again. |
+| *Unable to deploy to Hosting as there is no Hosting site* | Versions up to 1.5.4 didn't create the web address. Update (`git pull`) and deploy again; or open **Firebase console → Hosting → Get started**, click through to the end, then deploy again. |
+| *Functions successfully deployed but could not set up cleanup policy* | Versions up to 1.5.4 left this question unanswered. Update (`git pull`) and deploy again, or set it once: `pnpm exec firebase functions:artifacts:setpolicy --location asia-south1 --days 1 --project PROJECT-ID --force`, then deploy again. |
 | PowerShell: *pnpm.ps1 cannot be loaded because running scripts is disabled on this system* | PowerShell blocks scripts by default. Use **Command Prompt** instead (Start → *cmd*), where the same commands work. To use PowerShell anyway, allow local scripts once for your account: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (answer **Y**), then open a new PowerShell window. |
 | `pnpm deploy:setup` shows ✗ | Do what it says on that line (install a program or sign in), then run it again. |
 | `pnpm exec firebase login` fails: *Unable to fetch the CLI MOTD and remote config*, *Failed to make request to https://auth.firebase.tools/attest*, *Your credentials are no longer valid*, or the browser page *Firebase CLI Login Failed* | The browser can reach Google but Node.js (which runs the Firebase tools) can't: antivirus HTTPS scanning, a company proxy or a firewall. Run `pnpm deploy:check`: it tests each Google service from Node.js and prints the fix for your PC. Most often that is `set NODE_OPTIONS=--use-system-ca` in Command Prompt, or `$env:NODE_OPTIONS="--use-system-ca"` in PowerShell (Node.js then trusts the same certificates as Windows; `setx NODE_OPTIONS "--use-system-ca"` keeps it for new terminals). Then run `pnpm exec firebase logout` and `pnpm exec firebase login --reauth`. If nothing helps, deploy from Cloud Shell (below). |

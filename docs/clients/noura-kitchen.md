@@ -25,7 +25,7 @@ pnpm exec firebase login
 pnpm deploy:setup
 ```
 
-4. **Deploy** (deployment manual G): look at the steps first, then deploy. The first deploy takes 5–10 minutes; there is nothing to back up yet, so it skips the backup by itself.
+4. **Deploy** (deployment manual G): look at the steps first, then deploy. The first deploy takes 5–10 minutes; there is nothing to back up yet, so it skips the backup by itself. It also creates the web address and, if Google is still setting up the new project, waits 3 minutes and tries the server functions again: leave the window open.
 
 ```bash
 pnpm release:deploy --target noura-kitchen --dry-run
