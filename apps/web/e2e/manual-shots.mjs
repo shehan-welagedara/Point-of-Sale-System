@@ -174,7 +174,7 @@ try {
     const s = (n) => shot(m, `app-${style}-${n}`);
     await m.goto(`${B}/pos?mode=local`);
     await wait(m);
-    await m.locator(".device-btn", { hasText: "Counter POS" }).click();
+    await m.locator(".device-btn", { hasText: "Floor tablet" }).click();
     await wait(m);
     await s("signin");
     await m.getByLabel("Employee number or card").fill("1001");
@@ -223,6 +223,32 @@ try {
     await wait(m, 1000);
     await s("reports");
     await ctx.close();
+    if (style !== "bright") continue;
+    // The same app on a PC: navigation rail, the menu with the order beside it, payment side by side.
+    const wctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1.25, storageState: await page.context().storageState() });
+    await wctx.addInitScript(() => localStorage.setItem("pos-suite.workstation", "W02"));
+    const w = await wctx.newPage();
+    await w.goto(`${B}/pos?mode=local`);
+    await wait(w);
+    await w.getByLabel("Employee number or card").fill("1001");
+    await w.getByLabel("PIN", { exact: true }).fill("1111");
+    await w.getByRole("button", { name: "Sign In" }).click();
+    await wait(w);
+    if (await w.locator(".mauth-list button").count()) await w.locator(".mauth-list button").first().click();
+    await wait(w, 1000);
+    await w.locator(".w-nav button", { hasText: "Menu" }).click();
+    await wait(w);
+    for (let i = 0; i < 3; i++) {
+      await w.locator(".m-product:not(.out) .m-add").nth(i).click();
+      await wait(w, 300);
+      if (await w.locator(".modal").count()) await w.locator(".modal .btn.primary").last().click();
+      await wait(w, 200);
+    }
+    await shot(w, "app-pc-menu");
+    await w.locator(".w-order .m-btn.cta").click();
+    await wait(w);
+    await shot(w, "app-pc-pay");
+    await wctx.close();
   }
   // Devices report from the POS (the local demo keeps its data per browser profile, so use this one).
   await page.goto(`${B}/pos?mode=local`);

@@ -2,6 +2,25 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.4.0 — 2026-11-11
+
+**Type:** Minor (new features and fixes) · **Deploy:** hosting only (no rule, function or data changes)
+
+### For clients
+
+- **Kitchen tickets and bills from one printer.** *Send KOT* sends the order and prints the kitchen ticket at once. With no kitchen printer, the ticket prints on the counter's own printer (Bluetooth or network), the same one as the bills; the bill and the cash drawer come only at payment. A lost ticket can be printed again from the order (*Print kitchen ticket again*, marked REPRINT). POS options → *Print a kitchen ticket (KOT) when an order is sent* (on by default).
+- **The app look on PCs and tablets too, each with its own layout.** Phones keep the bottom bar. PCs and landscape tablets get a side navigation rail, the menu with the order always beside it (*Send KOT* and *Pay* at hand), more dishes per row, payment with the order, methods and amount side by side, and option sheets as dialogs. New businesses use the app style on every screen; existing businesses keep their choice (POS Configuration → Mobile app style → *Every screen*).
+- **Easier to read everywhere.** Text and status colours were checked on every POS and back-office screen at phone, tablet and PC sizes, in Bright, Indigo, light and dark, and darkened where needed (grey text, green/orange/red statuses, allergen notes, white text on blue).
+
+### Changes
+
+- KOT routing: the dish's bar or kitchen printer, then the kitchen printer, then the sending workstation's bill printer; the *print KOT on send* setting is honoured on the terminal and in the app; *Send KOT* / *Reprint KOT* on the terminal; reprints recorded in the transaction journal.
+- Wide app layout from 960 × 540: navigation rail, order panel, split payment, dialog sheets, container-query columns (4 to 6 dishes per row); sales charts sized to the screen so labels stay small; reports in two columns; payment-success buttons centred.
+- Colour tokens to WCAG AA (4.5:1 text, 3:1 large text): app muted, good, warn, bad and accent-2 colours; back-office secondary text, status colours in dark mode, brand-coloured text (`--brand-text`) readable for any brand colour; dish-initial tiles darkened; decorative icons hidden from assistive tech.
+- **Fix:** settings pages (Business & tax, Branding, Integrations, Finance settings) could save the built-in defaults over the business's settings when opened directly (refresh or link) before the settings had loaded. In a new business this set the demo's cost centre and stopped the opening-balances journal from posting. Pages now wait for the settings and follow saved values until edited.
+- Tests: `pnpm test:contrast` (every visible text on 190+ screens against its real background), `pnpm test:golive` (a Noura Kitchen-style rehearsal from an empty business: settings, menu, staff, phone with a Bluetooth printer, Send KOT, reprint, standard bill, drawer, X report, POS day posting, accounting workbook import, trial balance amounts, audit checks), e2e for Send KOT and REPRINT on the shared printer and the PC/tablet layout.
+- Docs: user manual (sections 3.4, 4, 6.2, 6.3, 6.7), training 01–03, deployment manual O.4, Noura Kitchen plan (one printer for kitchen tickets and bills).
+
 ## 1.3.0 — 2026-11-11
 
 **Type:** Minor (new features) · **Deploy:** hosting only (no rule, function or data changes)

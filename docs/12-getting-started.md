@@ -105,6 +105,8 @@ pnpm test:rules   # security rules on the Firestore emulator (needs Java)
 pnpm test:functions  # Cloud Functions end to end on the emulators (needs Java)
 pnpm test:e2e        # browser end-to-end (needs Playwright + Chromium)
 pnpm test:pairing    # connecting phones with codes, against the Firebase emulators
+pnpm test:contrast   # text colour contrast (WCAG AA) on every screen, all sizes and styles
+pnpm test:golive     # go-live rehearsal from an empty business (phone, Bluetooth printer, books)
 pnpm typecheck
 pnpm build
 ```

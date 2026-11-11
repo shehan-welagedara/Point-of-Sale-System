@@ -67,7 +67,7 @@ try {
   await item.click();
   await page.waitForTimeout(300);
   if (await page.locator(".modal").count()) await page.locator(".modal .btn.primary").last().click();
-  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByRole("button", { name: "Send KOT", exact: true }).click();
   await page.waitForTimeout(600);
   await page.getByRole("tab", { name: /Open/ }).click();
   await page.waitForTimeout(400);
@@ -134,6 +134,8 @@ try {
   const views = [["PC 1920×1080", 1920, 1080, true], ["PC 1366×768", 1366, 768, true], ["PC 1280×720", 1280, 720, true], ["tablet landscape", 1180, 820, true], ["tablet portrait", 820, 1180, false], ["phone", 390, 844, false]];
   for (const [label, width, height, fit] of views) {
     const ctx = await browser.newContext({ viewport: { width, height }, storageState: state });
+    // A phone is set up on a mobile workstation (T01); the counter PC (W01) keeps the terminal layout.
+    if (label === "phone") await ctx.addInitScript(() => localStorage.setItem("pos-suite.workstation", "T01"));
     const p = await ctx.newPage();
     p.on("pageerror", (e) => errors.push(`${label}: ${e.message}`));
     const bad = [];
@@ -216,6 +218,8 @@ try {
   // ── Mobile app (phone): sign in, table, menu, cart, payment, success — Bright style by default.
   {
     const ctx = await browser.newContext({ ...devices["iPhone 13"], storageState: await page.context().storageState() });
+    // Phones and tablets run on a mobile workstation (T01); the demo's counter PC W01 keeps the terminal layout.
+    await ctx.addInitScript(() => localStorage.setItem("pos-suite.workstation", "T01"));
     const p = await ctx.newPage();
     p.on("pageerror", (e) => errors.push(`app: ${e.message}`));
     await p.goto(`${B}/pos?mode=local`);
@@ -253,7 +257,7 @@ try {
     check("payment lists tender methods", (await p.locator(".m-tender").count()) >= 3);
     await p.getByRole("button", { name: /Pay Now/ }).click();
     await p.waitForTimeout(1500);
-    check("payment successful screen with invoice number", (await p.locator(".m-success h1").textContent()) === "Payment Successful" && /_W01_/.test(await p.locator(".m-receipt-card").innerText()));
+    check("payment successful screen with invoice number", (await p.locator(".m-success h1").textContent()) === "Payment Successful" && /_T01_/.test(await p.locator(".m-receipt-card").innerText()));
     await p.getByRole("button", { name: "View receipt" }).click();
     await p.waitForTimeout(400);
     check("printed bill follows the bill designer", (await p.locator(".modal .paper").innerText()).includes("AMOUNT DUE"));
@@ -276,6 +280,7 @@ try {
   {
     const st = await page.context().storageState();
     const phone = await browser.newContext({ ...devices["iPhone 13"], storageState: st });
+    await phone.addInitScript(() => localStorage.setItem("pos-suite.workstation", "T01"));
     const pp = await phone.newPage();
     await pp.goto(`${B}/pos?mode=local`);
     await pp.waitForTimeout(800);
@@ -283,6 +288,7 @@ try {
     check("administrator switches phones to the Indigo style", (await pp.locator(".mauth.indigo").count()) === 1);
     await phone.close();
     const tablet = await browser.newContext({ ...devices["iPad (gen 7)"], storageState: st });
+    await tablet.addInitScript(() => localStorage.setItem("pos-suite.workstation", "T01"));
     const tp = await tablet.newPage();
     await tp.goto(`${B}/pos?mode=local`);
     await tp.waitForTimeout(800);
@@ -455,7 +461,78 @@ try {
     await ph.waitForTimeout(2500);
     const out = await printed();
     check("kitchen ticket, bill and drawer kick print over Bluetooth", out.includes("KOT - ") && out.includes("TAX INVOICE") && out.includes("\x1bp"), `${out.length} bytes`);
+
+    // One printer for kitchen tickets and bills: Send KOT prints the ticket straight away (no bill, no drawer),
+    // and the ticket can be printed again from the order, marked REPRINT.
+    await ph.getByRole("button", { name: "Done" }).click();
+    await ph.waitForTimeout(400);
+    await ph.evaluate(() => { window.__btWrites.length = 0; });
+    await ph.locator(".m-nav button", { hasText: "Menu" }).click();
+    await ph.waitForTimeout(400);
+    await ph.locator(".m-product:not(.out) .m-add").nth(1).click();
+    await ph.waitForTimeout(300);
+    if (await ph.locator(".modal").count()) await ph.locator(".modal .btn.primary").last().click();
+    await ph.locator(".m-cartbar").click();
+    await ph.waitForTimeout(400);
+    check("the order shows Send KOT", (await ph.getByRole("button", { name: "Send and print the kitchen ticket" }).count()) === 1);
+    await ph.getByRole("button", { name: "Send and print the kitchen ticket" }).click();
+    await ph.waitForTimeout(1500);
+    const kot = await printed();
+    check("Send KOT prints the kitchen ticket on the shared printer", kot.includes("KOT - ") && !kot.includes("INVOICE") && !kot.includes("\x1bp"), `${kot.length} bytes`);
+    await ph.evaluate(() => { window.__btWrites.length = 0; });
+    await ph.locator(".m-nav button", { hasText: "Orders" }).click();
+    await ph.waitForTimeout(400);
+    await ph.locator(".m-order", { has: ph.locator(".m-order-ico.open") }).first().click();
+    await ph.waitForTimeout(500);
+    await ph.locator("button[aria-label='Order options']").first().click();
+    await ph.waitForTimeout(300);
+    await ph.locator(".m-sheet-row", { hasText: "Print kitchen ticket again" }).click();
+    await ph.waitForTimeout(1500);
+    check("the kitchen ticket reprints, marked REPRINT", (await printed()).includes("REPRINT"));
     await ctx.close();
+  }
+
+  // ── The app style on every screen: a PC and a landscape tablet get their own layout (navigation rail,
+  //    the order beside the menu, payment methods and amount side by side), not the phone screens stretched.
+  {
+    await page.goto(`${B}/emc/pos/mobile?mode=local`);
+    await page.waitForTimeout(700);
+    await page.getByRole("tab", { name: "Every screen" }).click();
+    await page.getByRole("button", { name: "Save" }).click();
+    await page.waitForTimeout(700);
+    const st = await page.context().storageState();
+    for (const [label, opts] of [["PC 1366×768", { viewport: { width: 1366, height: 768 } }], ["tablet landscape", { ...devices["iPad (gen 7) landscape"] }]]) {
+      const ctx = await browser.newContext({ ...opts, storageState: st });
+      await ctx.addInitScript(() => localStorage.setItem("pos-suite.workstation", "W02"));
+      const p = await ctx.newPage();
+      p.on("pageerror", (e) => errors.push(`${label}: ${e.message}`));
+      await p.goto(`${B}/pos?mode=local`);
+      await p.waitForTimeout(900);
+      await p.getByLabel("Employee number or card").fill("1001");
+      await p.getByLabel("PIN", { exact: true }).fill("1111");
+      await p.getByRole("button", { name: "Sign In" }).click();
+      await p.waitForTimeout(800);
+      if (await p.locator(".mauth-list button").count()) await p.locator(".mauth-list button").first().click();
+      await p.waitForTimeout(600);
+      check(`${label}: app style with a side navigation rail`, (await p.locator(".mpos.wide .w-rail").count()) === 1 && (await p.locator(".m-nav").count()) === 0);
+      await p.locator(".w-nav button", { hasText: "Menu" }).click();
+      await p.waitForTimeout(400);
+      await p.locator(".m-product:not(.out) .m-add").first().click();
+      await p.waitForTimeout(300);
+      if (await p.locator(".modal").count()) await p.locator(".modal .btn.primary").last().click();
+      await p.waitForTimeout(300);
+      const cols = await p.evaluate(() => getComputedStyle(document.querySelector(".m-products")).gridTemplateColumns.split(" ").length);
+      check(`${label}: the order stays beside the menu`, (await p.locator(".w-order .m-line").count()) >= 1 && (await p.locator(".m-products").isVisible()) && cols >= 3, `${cols} columns`);
+      await p.locator(".w-order .m-btn.cta").click();
+      await p.waitForTimeout(500);
+      const payGrid = await p.evaluate(() => getComputedStyle(document.querySelector(".m-pay .m-screen")).display);
+      const over = await p.evaluate(() => document.scrollingElement.scrollWidth - innerWidth);
+      check(`${label}: payment shows the order, methods and amount side by side`, (await p.locator(".w-pay-order").count()) === 1 && payGrid === "grid" && over <= 1, `${payGrid}, ${over}px`);
+      await p.getByRole("button", { name: /Pay Now|Complete Payment/ }).click();
+      await p.waitForTimeout(1200);
+      check(`${label}: payment completes`, (await p.getByText("Payment Successful").count()) === 1);
+      await ctx.close();
+    }
   }
 
   check("no browser errors", errors.length === 0, errors.slice(0, 5).join(" | "));

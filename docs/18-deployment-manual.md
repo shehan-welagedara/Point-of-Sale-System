@@ -492,7 +492,8 @@ A small restaurant can run on **one phone** (or tablet) with **one Bluetooth rec
    3. in RawBT, choose the printer and 80 mm paper;
    4. set the workstation's **Bluetooth route** to **Through the RawBT app**;
    5. **Test print** again.
-6. **Test a sale:** send an order (the kitchen ticket prints) and take a cash payment (the bill prints and the drawer opens).
+6. **Kitchen tickets on the same printer:** no kitchen printer record is needed. With none, **Send KOT** prints the kitchen ticket on the workstation's own printer (here the Bluetooth printer), and the bill prints there at payment. Keep **Print a kitchen ticket (KOT) when an order is sent** on (POS Configuration → POS options).
+7. **Test a sale:** **Send KOT** (only the kitchen ticket prints; no bill, the drawer stays shut), **Reprint KOT** from the order's ⋮ menu (marked REPRINT), then a cash payment (the bill prints and the drawer opens).
 
 If the printer is switched off or out of range, prints **wait on the phone**: the printer button shows how many. They print as soon as the printer is connected again. A bill that never printed can be reprinted from **Orders**.
 

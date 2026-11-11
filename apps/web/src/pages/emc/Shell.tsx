@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MEMBER_ROLE_INFO, editionInfo } from "@pos/core";
 import { DEMO_PEOPLE } from "@pos/sample-data";
+import { Loading } from "../../components/ui";
 import { useApp } from "../../state/app";
 import { type Workspace, WORKSPACES, visibleWorkspaces, workspaceFor } from "../../workspaces";
 
@@ -42,7 +43,7 @@ function TopBar({ workspace, onMenu }: { workspace?: Workspace; onMenu?: () => v
       {workspace ? (
         <>
           <span className="muted hide-sm">/</span>
-          <span className="ws-title" style={{ color: workspace.tone }}>
+          <span className="ws-title" style={{ ["--tone" as string]: workspace.tone }}>
             {workspace.ico} {workspace.name}
           </span>
         </>
@@ -108,7 +109,7 @@ export function Launchpad() {
             <div className="tiles">
               {ws.map((w) => (
                 <button key={w.key} className="tile" onClick={() => navigate(w.external ?? w.sections[0]?.items[0]?.to ?? "/emc/home")} style={{ ["--tone" as string]: w.tone }}>
-                  <span className="tile-ico">{w.ico}</span>
+                  <span className="tile-ico" aria-hidden="true">{w.ico}</span>
                   <span className="tile-name">{w.name}</span>
                   <span className="tile-tag">{w.tagline}</span>
                 </button>
@@ -124,7 +125,7 @@ export function Launchpad() {
           <div className="tiles">
             {locked.map((w) => (
               <Link key={w.key} to="/emc/setup/licence" className="tile locked" style={{ ["--tone" as string]: w.tone }}>
-                <span className="tile-ico">🔒</span>
+                <span className="tile-ico" aria-hidden="true">🔒</span>
                 <span className="tile-name">{w.name}</span>
                 <span className="tile-tag">Available as an upgrade or add-on</span>
               </Link>
@@ -137,7 +138,7 @@ export function Launchpad() {
 }
 
 export function Shell() {
-  const { settings, on, role } = useApp();
+  const { settings, settingsReady, on, role } = useApp();
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   const home = loc.pathname === "/emc/home" || loc.pathname === "/emc" || loc.pathname === "/emc/";
@@ -153,7 +154,7 @@ export function Shell() {
       {ws ? (
         <aside className={`sidebar${open ? " open" : ""}`} onClick={(e) => (e.target as HTMLElement).closest("a") && setOpen(false)}>
           <div className="ws-head" style={{ ["--tone" as string]: ws.tone }}>
-            <span className="tile-ico sm">{ws.ico}</span>
+            <span className="tile-ico sm" aria-hidden="true">{ws.ico}</span>
             <div>
               <div style={{ fontWeight: 700 }}>{ws.name}</div>
               <div className="tiny muted">{ws.tagline}</div>
@@ -168,7 +169,7 @@ export function Shell() {
                   {s.label ? <div>{s.label}</div> : null}
                   {items.map((it) => (
                     <NavLink key={it.to} to={it.to} className={() => (isActive(it.to) ? "active" : "")}>
-                      <span className="ico">{it.ico}</span>
+                      <span className="ico" aria-hidden="true">{it.ico}</span>
                       {it.label}
                     </NavLink>
                   ))}
@@ -185,12 +186,13 @@ export function Shell() {
       ) : null}
       {open ? <div className="scrim" onClick={() => setOpen(false)} /> : null}
       <div className="main">
-        {settings.business.isSample && !loc.pathname.includes("/setup/business") ? (
+        {settingsReady && settings.business.isSample && !loc.pathname.includes("/setup/business") ? (
           <div className="sample-banner">
             Sample business details are in use. Enter the real legal name, TIN and VAT status under <NavLink to="/emc/setup/business">Administration → Business &amp; tax</NavLink> before issuing real bills.
           </div>
         ) : null}
-        <Outlet />
+        {/* Pages wait for the business's settings, so no form starts from (and could save) the defaults. */}
+        {settingsReady ? <Outlet /> : <Loading />}
       </div>
     </div>
   );
