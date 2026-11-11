@@ -121,6 +121,16 @@ function preflight() {
   for (const f of readdirSync(assets).filter((n) => n.endsWith(".js"))) {
     if (/AIza[0-9A-Za-z_-]{35}/.test(readFileSync(join(assets, f), "utf8"))) fail(`the build contains a Firebase API key (${f}): build without apps/web/.env.local so each client uses its own project`);
   }
+  if (parts.has("functions")) {
+    // Built here, not only by Firebase's predeploy step: on Windows the Firebase CLI runs that step
+    // through cross-env, which turns every "/" in it into "\" (so a filter like @pos/functions matched
+    // nothing and the functions were never built). The dry run builds too, so it catches a broken build.
+    console.log("Building the server functions…");
+    exec("pnpm", ["run", "build:functions"], { always: true });
+    for (const f of ["package.json", "index.js"]) {
+      if (!existsSync(join(root, "apps/functions/dist", f))) fail(`the server functions build did not produce apps/functions/dist/${f}. Run \`pnpm run build:functions\` and read its error.`);
+    }
+  }
   const fnEnv = join(root, "apps/functions/.env");
   const fnKey = existsSync(fnEnv) && /^LICENCE_PUBLIC_KEY=\S+/m.test(readFileSync(fnEnv, "utf8"));
   if (!process.env.LICENCE_PUBLIC_KEY && !fnKey) console.warn("! No licence public key in apps/functions/.env: the system will accept only demo licence keys. Run `pnpm deploy:setup` to add yours.");
@@ -221,11 +231,11 @@ for (const c of list) {
       // On a new project, Google takes a few minutes to give its own services the permissions that
       // database-triggered functions need ("Eventarc Service Agent"). Waiting and trying again fixes it.
       const minutes = Number(process.env.POS_DEPLOY_RETRY_MINUTES ?? 3);
-      console.log(`\n  The server functions didn't finish. On a brand-new project that's usual: Google is still setting up permissions.`);
+      console.log(`\n  The server functions didn't finish (see the Error line above). On a brand-new project that is often because Google is still setting up permissions.`);
       console.log(`  Waiting ${minutes} minutes, then trying once more (nothing is lost; you can leave this window open)…\n`);
       await new Promise((r) => setTimeout(r, minutes * 60_000));
       if (!firebase(c.projectId, rulesAndFunctions.join(","), extra, { soft: true })) {
-        fail("the server functions failed again. Read the red Error line above. Common causes: the project isn't on the Blaze plan (manual B), or Google needs a few more minutes (run the same deploy command again in 5 minutes; it continues where it stopped).");
+        fail("the server functions failed again. Read the Error line above; deployment manual U lists the usual ones. If it mentions permissions or a service agent, Google needs a few more minutes: run the same deploy command again in 5 minutes (it continues where it stopped).");
       }
     }
   }

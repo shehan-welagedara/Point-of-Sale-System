@@ -9,6 +9,7 @@
     "dev": "pnpm --filter @pos/web dev",
     "demo": "pnpm --filter @pos/web build && pnpm --filter @pos/web exec vite preview --host --port 5173 --strictPort",
     "build": "pnpm --filter @pos/web build",
+    "build:functions": "pnpm --filter @pos/functions build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "test:rules": "firebase emulators:exec --only firestore --project demo-pos-suite \"vitest run --root firebase\"",
@@ -49,5 +50,5 @@
       "@grpc/grpc-js": "^1.13.6"
     }
   },
-  "version": "1.5.5"
+  "version": "1.5.6"
 }
