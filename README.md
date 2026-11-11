@@ -38,6 +38,7 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 ## What's in the box
 | Area | Highlights |
 |------|-----------|
+| **Polymath Console** (for Polymath Tech) | Central management of every client in its own Firebase project: licences issued and renewed from the browser and delivered automatically, subscriptions and payments with renewal reminders, health and versions from a daily check-in, usage figures, suspend/restore, updates through GitHub Actions, staff roles and an audit log. [Details](docs/22-polymath-console.md) |
 | **Licensing & modules** | Editions (Starter, Professional, Enterprise) with add-ons and limits; vendor-signed licence keys bound to the client's Firebase project; modules chosen at installation; launchpad with a separate workspace per module. [Details](docs/15-licensing-and-modules.md) |
 | **POS** (terminals and tablets) | PIN sign-in with roles and manager override; tables and covers; dine-in, takeaway and delivery; modifiers; **allergy alerts**; send to kitchen (KOT routing kitchen/bar, backup printers); guest check with **LankaQR**; split payments (cash with change, card approval code, LankaQR, PayHere, USD cash, vouchers, house account, comp); voids with reason codes; discounts; 86 items; X/Z reports; **End of Day** (stock deduction, journal, WhatsApp report) |
 | **Sri Lanka compliance** | Service charge → SSCL → VAT order, inclusive or exclusive pricing, **IRD tax invoice format** (Gazette 2481/22) with `YYMMM_W01_n` numbers per workstation, hash-chained immutable invoices, plain invoices for non-VAT businesses |
@@ -81,6 +82,7 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | 19 | [**User manual and role-based training manuals for clients**](docs/manual/README.md) (Cloud Restaurant Edition; PDFs: `pnpm manual:pdf`) |
 | 20 | [**Releases and updates**](docs/20-release-and-updates.md): versions, waves, approvals, backups, migrations, rollback, support levels |
 | 21 | [**Security and reliability review**](docs/21-security-review.md) and the go-live security checklist |
+| 22 | [**Polymath Console**](docs/22-polymath-console.md): central management of clients, licences, subscriptions, health and updates |
 | E | [**Enterprise Hotel Edition (this branch)**](docs/enterprise/README.md) |
 
 ## Commands
@@ -98,12 +100,16 @@ pnpm test:migrations   # data migrations on the Firestore emulator (needs Java)
 pnpm deploy:setup      # vendor PC: check tools and sign-in, licence key, register a client (deployment manual F)
 pnpm deploy:check      # vendor PC: can Node.js reach Google and Firebase? (antivirus, proxy, firewall)
 pnpm deploy:access --project ID  # check and fix a client project's permissions for the server functions
+pnpm console:setup     # Polymath Console: keys in Secret Manager, owner, console address for client deploys (docs/22)
+pnpm console:deploy    # deploy the Polymath Console to its Firebase project
+pnpm console:dev       # the console against the emulators (VITE_USE_EMULATORS=true)
+pnpm test:console      # console + a client's check-in end to end on the emulators, and every console screen
 pnpm release:version 1.1.0       # start a release: version + CHANGELOG entry (then tag vX.Y.Z and push)
 pnpm release:deploy --target …   # deploy: staging, wave:N or client ids (backup → indexes → migrations → rules/functions → hosting); needs only `firebase login`
 pnpm manual:screenshots  # refresh the manual screenshots from the demo restaurant
 pnpm manual:pdf -- --client "Name"  # user and training manuals as A4 PDFs in manual-pdf/
 pnpm licence keygen    # vendor: create your licence signing key (once)
-pnpm licence issue …   # vendor: issue a client licence key (see docs/15)
+pnpm licence issue …   # vendor: issue a client licence key by hand (usually the console does it; docs/15)
 pnpm emulators         # local Firebase Auth + Firestore + Functions
 pnpm build             # production build of the web app
 pnpm build:functions   # build the Cloud Functions bundle
@@ -112,7 +118,7 @@ pnpm agent             # run the Print Agent (apps/print-agent/.env)
 ```
 
 ## Repository layout
-`apps/web` (back office + POS) · `apps/functions` (ledger, licence, PIN checks, phone pairing, audit) · `apps/print-agent` · `packages/{engine,core,ledger,printing,sample-data,excel}` · `firebase/` (rules, indexes, rules tests) · `tools/` (release, licence, manuals) · `release/` (clients and policy) · `templates/` (Excel feeders) · `docs/`
+`apps/web` (back office + POS) · `apps/functions` (ledger, licence, PIN checks, phone pairing, console check-in, audit) · `apps/console` + `apps/console-functions` (Polymath Console) · `apps/print-agent` · `packages/{engine,core,ledger,printing,sample-data,excel}` · `firebase/` (rules, indexes, rules tests) · `tools/` (release, licence, manuals) · `release/` (clients and policy) · `templates/` (Excel feeders) · `docs/`
 
 ---
 

@@ -10,6 +10,8 @@ Follow the [deployment manual](../18-deployment-manual.md) for the technical ste
 
 **Status (11 November 2026): deployed.** The system is live at `https://noura-kitchen-pos.web.app` (Firebase project `noura-kitchen-pos`, asia-south1). The steps below are how it was done, for reference and for the next client. Updates: `git pull`, `pnpm install`, `pnpm release:deploy --target noura-kitchen` (deployment manual S).
 
+**Next: link it to the Polymath Console** ([22](../22-polymath-console.md)). Set up the console once (`pnpm console:setup`, `pnpm console:deploy`), add Noura Kitchen as a client (project `noura-kitchen-pos`), then update Noura Kitchen to 1.7.0 (`pnpm release:deploy --target noura-kitchen`): from then on it checks in daily, and its licence is issued and renewed from the console.
+
 The Firebase project exists and the Blaze plan is active (deployment manual B–D). The rest happens on your PC, in **Command Prompt** (Start → *cmd*) inside the project folder; the deployment manual E–G explains each step.
 
 1. **Budget alert** on the project (deployment manual C): USD 5, alerts to the client and to you.

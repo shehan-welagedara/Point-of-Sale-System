@@ -8,12 +8,44 @@ import { type Workspace, WORKSPACES, visibleWorkspaces, workspaceFor } from "../
 
 function LicenceBadge() {
   const { licence } = useApp();
-  const label = licence.status === "demo" ? (licence.daysLeft !== null ? `Demo · ${licence.daysLeft} days left` : "Demo licence") : licence.status === "trial" ? `Trial · ${licence.daysLeft} days left` : licence.status === "grace" ? "Licence expired · grace period" : licence.status === "expired" ? "Licence expired" : `${editionInfo(licence.edition).name}${licence.daysLeft !== null && licence.daysLeft < 30 ? ` · renews in ${licence.daysLeft} days` : ""}`;
-  const tone = licence.status === "expired" || licence.status === "grace" ? "bad" : licence.status === "trial" || licence.status === "demo" ? "warn" : "good";
+  const label = licence.status === "suspended" ? "Suspended by supplier" : licence.suspension.state === "grace" ? `Suspension in ${Math.max(0, licence.suspension.daysLeft ?? 0)} day(s)` : licence.status === "demo" ? (licence.daysLeft !== null ? `Demo · ${licence.daysLeft} days left` : "Demo licence") : licence.status === "trial" ? `Trial · ${licence.daysLeft} days left` : licence.status === "grace" ? "Licence expired · grace period" : licence.status === "expired" ? "Licence expired" : `${editionInfo(licence.edition).name}${licence.daysLeft !== null && licence.daysLeft < 30 ? ` · renews in ${licence.daysLeft} days` : ""}`;
+  const tone = licence.status === "expired" || licence.status === "grace" || licence.status === "suspended" || licence.suspension.state === "grace" ? "bad" : licence.status === "trial" || licence.status === "demo" ? "warn" : "good";
   return (
     <Link to="/emc/setup/licence" className={`badge ${tone}`} title="Licence and modules">
       {label}
     </Link>
+  );
+}
+
+/**
+ * What the supplier (Polymath Tech) needs this business to see: a suspension (with its grace period)
+ * and notices such as renewal reminders. Shown to owners and administrators.
+ */
+function SupplierBanner() {
+  const { tenant, licence, role } = useApp();
+  if (role !== "owner" && role !== "admin") return null;
+  const s = licence.suspension;
+  const notice = tenant?.supplier?.notice;
+  const who = tenant?.supplier?.contact?.name ?? "your supplier";
+  const until = s.graceUntil ? new Date(s.graceUntil).toLocaleString("en-GB", { timeZone: "Asia/Colombo", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : "";
+  return (
+    <>
+      {s.state === "grace" ? (
+        <div className="callout bad supplier-banner" role="alert">
+          <strong>Message from {who}:</strong> {s.message ?? "Your account needs attention."} The licensed modules stop on {until} unless it is resolved. Your data is kept. <NavLink to="/emc/about">Contact details</NavLink>
+        </div>
+      ) : null}
+      {s.state === "blocked" ? (
+        <div className="callout bad supplier-banner" role="alert">
+          <strong>Suspended by {who}:</strong> {s.message ?? "Please contact your supplier."} The licensed modules are stopped; your data is kept and everything comes back when {who} restores the account. <NavLink to="/emc/about">Contact details</NavLink>
+        </div>
+      ) : null}
+      {notice && s.state === "none" ? (
+        <div className={`callout ${notice.level === "warn" ? "warn" : ""} supplier-banner`} role="status">
+          <strong>{who}:</strong> {notice.text}
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -191,6 +223,7 @@ export function Shell() {
             Sample business details are in use. Enter the real legal name, TIN and VAT status under <NavLink to="/emc/setup/business">Administration → Business &amp; tax</NavLink> before issuing real bills.
           </div>
         ) : null}
+        <SupplierBanner />
         {/* Pages wait for the business's settings, so no form starts from (and could save) the defaults. */}
         {settingsReady ? <Outlet /> : <Loading />}
       </div>

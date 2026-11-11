@@ -19,3 +19,4 @@ apps/functions/.env
 licence-keys/
 e2e-failure*.png
 manual-pdf/
+!apps/console/.env.development

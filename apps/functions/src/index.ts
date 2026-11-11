@@ -15,10 +15,11 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWrittenWithAuthContext } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { type Member, type StaffAuthRequest, type Tenant, DEMO_LICENCE_PUBLIC_KEY, LicenceError, TRIAL_DAYS, builtInEntitlements, clampModules, isOn, licenceStatus, newId, runStaffAuth, verifyLicence } from "@pos/core";
+import { type Member, type StaffAuthRequest, type Tenant, DEMO_LICENCE_PUBLIC_KEY, LicenceError, TRIAL_DAYS, builtInEntitlements, clampModules, isOn, licenceStatus, newId, runStaffAuth, suspensionInfo, verifyLicence } from "@pos/core";
 import { type Actor, type LedgerRequest, LedgerError, PermissionError, UNAUDITED, makeAuditEvent, runLedgerRequest, sealPending } from "@pos/ledger";
 import { AdminStore, adminRunner, collectionRef } from "./admin-store.js";
 import { type DeviceRequest, handleDeviceRequest, prunePairings } from "./devices.js";
+import { metadataIdentity, runCheckin } from "./console-link.js";
 
 initializeApp();
 const db = getFirestore();
@@ -61,6 +62,8 @@ export const ledgerApi = onCall<{ tenantId: string } & LedgerRequest>(async (req
 
 /** The licence (or built-in trial/demo) allows the module and has not lapsed. */
 function entitled(t: Tenant, module: "accounting"): boolean {
+  // Suspended by the supplier and past the grace period: like an expired licence (data kept).
+  if (suspensionInfo(t.supplier, new Date()).state === "blocked") return false;
   const ent = t.entitlements ?? builtInEntitlements(t.plan);
   if (!ent.modules.includes(module)) return false;
   if (t.licence) return licenceStatus(t.licence, new Date()).usable;
@@ -85,7 +88,7 @@ export const licenceApi = onCall<{ tenantId: string; action: "activate"; token: 
   const projectId = process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? "";
   try {
     const { payload } = await verifyLicence(token, LICENCE_PUBLIC_KEY, { projectId, tenantId }, new Date());
-    const licence = { token: token.trim(), licenceId: payload.licenceId, licensee: payload.licensee.name, edition: payload.edition, addOns: payload.addOns, billing: payload.billing, validFrom: payload.validFrom, expiresAt: payload.expiresAt, graceDays: payload.graceDays, activatedAt: new Date().toISOString(), activatedBy: actor.uid, demoKey: LICENCE_PUBLIC_KEY === DEMO_LICENCE_PUBLIC_KEY };
+    const licence = { token: token.trim(), licenceId: payload.licenceId, licensee: payload.licensee.name, edition: payload.edition, addOns: payload.addOns, billing: payload.billing, validFrom: payload.validFrom, expiresAt: payload.expiresAt, graceDays: payload.graceDays, issuedAt: payload.issuedAt, activatedAt: new Date().toISOString(), activatedBy: actor.uid, source: "manual", demoKey: LICENCE_PUBLIC_KEY === DEMO_LICENCE_PUBLIC_KEY };
     await db.collection("tenants").doc(tenantId).set({ plan: payload.edition, entitlements: payload.entitlements, licence, modules: clampModules(tenant.modules, payload.entitlements) }, { merge: true });
     return { edition: payload.edition, expiresAt: payload.expiresAt };
   } catch (e) {
@@ -111,6 +114,33 @@ export const posAuth = onCall<{ tenantId: string } & StaffAuthRequest>({ maxInst
   if (req.action === "identifyCard" && (typeof req.card !== "string" || req.card.length > 64)) throw new HttpsError("invalid-argument", "card is required");
   if (!["verify", "identifyCard", "migrate"].includes(req.action)) throw new HttpsError("invalid-argument", "unknown action");
   return runStaffAuth(new AdminStore(db, tenantId), req as StaffAuthRequest, new Date());
+});
+
+/**
+ * Daily check-in with the supplier's Polymath Console (console-link.ts): versions, devices, errors,
+ * licences and, if shared, yesterday's totals go out; a newer licence key, the signed active/suspended
+ * status, a notice and the supplier's contacts come back. Does nothing when CONSOLE_URL isn't set.
+ */
+const linkEnv = () => ({
+  consoleUrl: process.env.CONSOLE_URL,
+  projectId: process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? "",
+  appVersion: process.env.APP_VERSION ?? "unknown",
+  publicKey: LICENCE_PUBLIC_KEY,
+  identity: metadataIdentity,
+});
+
+export const consoleCheckin = onSchedule({ schedule: "every day 03:17", timeZone: "Asia/Colombo" }, async () => {
+  await runCheckin(db, linkEnv(), "scheduled");
+});
+
+/** "Check now" on the About page (owners and administrators). */
+export const consoleLinkNow = onCall<{ tenantId: string }>({ maxInstances: 2 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "sign in first");
+  const { tenantId } = request.data ?? ({} as { tenantId: string });
+  if (!tenantId) throw new HttpsError("invalid-argument", "tenantId is required");
+  const { actor } = await actorFor(tenantId, request.auth.uid, String(request.auth.token.email ?? ""));
+  if (actor.role !== "owner" && actor.role !== "admin") throw new HttpsError("permission-denied", "only the owner or an administrator can check with the supplier");
+  return runCheckin(db, linkEnv(), "manual");
 });
 
 /** Phones and tablets: one-time pairing codes instead of shared passwords (see devices.ts). */

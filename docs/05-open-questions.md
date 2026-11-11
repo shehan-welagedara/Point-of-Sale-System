@@ -45,6 +45,7 @@
 | D26 | Audit | Field-level audit trail of every business record, captured by a server trigger, sealed hourly in a hash chain. Plus integrity verification, segregation of duties, an auditor role, and SAF-T and auditor exports. |
 | D33 | Product and company | The product is **POS Suite by Polymath Tech**. The company name appears on the login, the About page, bills ("Powered by Polymath Tech", editable per client), exports and the manuals; one definition in `packages/core/src/brand.ts`. |
 | D34 | Updates without gcloud | The release tool talks to Google with the Firebase CLI's sign-in (backups, data updates, permissions), so a vendor PC needs only Node.js, Git and `firebase login`. GitHub Actions uses workload identity. |
+| D35 | Central management | **Polymath Console**: Polymath Tech's own Firebase project and web app for clients, licences (signing key in Secret Manager), subscriptions and renewals, health, usage, suspend/restore and updates through GitHub Actions; staff roles with an audit log. Clients check in once a day (outbound only, Google-signed identity, signed answers). See [22](22-polymath-console.md). |
 
 ## Remaining questions (as of 2026-10-30; items 1, 2, 4 and 6 are now covered by sample data or D16–D19)
 1. **VAT and SSCL status at opening:** is the restaurant VAT-registered and/or SSCL-liable from day 1? I need the registered name, address and TIN for the bill header.

@@ -87,7 +87,7 @@ service cloud.firestore {
     // Licence fields (edition, entitlement, activated licence) are written only by the licence
     // function after it verifies the vendor's signature. Administrators switch modules on and off,
     // but only modules inside the entitlement.
-    function licenceUnchanged() { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'entitlements', 'licence', 'trialEndsAt', 'ownerUid', 'createdAt']); }
+    function licenceUnchanged() { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'entitlements', 'licence', 'trialEndsAt', 'ownerUid', 'createdAt', 'supplier']); }
     function modulesWithinEntitlement() {
       return resource.data.get('plan', '') == 'demo' || !('entitlements' in resource.data)
           || request.resource.data.get('modules', {}).diff(resource.data.get('modules', {})).affectedKeys().hasOnly(resource.data.entitlements.modules);
@@ -96,7 +96,7 @@ service cloud.firestore {
     match /tenants/{t} {
       allow read: if isMember(t) || isPlatformAdmin();
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.id == t
-                    && request.resource.data.plan in ['trial', 'demo'] && !('licence' in request.resource.data)
+                    && request.resource.data.plan in ['trial', 'demo'] && !('licence' in request.resource.data) && !('supplier' in request.resource.data)
                     && mayCreateBusiness();
       allow update: if (isAdmin(t) && licenceUnchanged() && modulesWithinEntitlement()) || isPlatformAdmin();
       allow delete: if false;

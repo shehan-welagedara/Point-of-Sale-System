@@ -29,7 +29,7 @@ import {
   type StaffAuthRequest,
   type StaffAuthResult,
   runStaffAuth,
-  withStaffSecrets, PRODUCT_FULL_NAME, PRODUCT_NAME } from "@pos/core";
+  withStaffSecrets, PRODUCT_FULL_NAME, PRODUCT_NAME, type SuspensionInfo, suspensionInfo } from "@pos/core";
 import { type Actor, type LedgerRequest, type LedgerSettings, UNAUDITED, makeAuditEvent, runLedgerRequest, storeRunner } from "@pos/ledger";
 import { DEMO_PEOPLE, STARTER_PROPERTY_ID, type SampleKind, buildSampleStore, sampleSettings, starterConfig } from "@pos/sample-data";
 import { httpsCallable } from "firebase/functions";
@@ -116,22 +116,34 @@ interface AppState {
   licence: LicenceInfo;
   /** Verifies a vendor licence key and applies it to this business. */
   activateLicence: (token: string) => Promise<void>;
+  /** Checks in with the supplier's console now (Firebase mode, owner or administrator). */
+  checkWithSupplier: () => Promise<{ ok: boolean; skipped?: boolean; error?: string; applied: string[] }>;
 }
 
 export interface LicenceInfo {
   edition: Tenant["plan"];
   entitlements: Entitlements;
-  status: "demo" | "trial" | "valid" | "grace" | "expired";
+  /** "suspended": stopped by the supplier after the grace period (data kept). */
+  status: "demo" | "trial" | "valid" | "grace" | "expired" | "suspended";
   daysLeft: number | null;
   usable: boolean;
   licensee?: string;
   demoKey: boolean;
+  /** Suspension by the supplier: "grace" still works (with a warning), "blocked" stops modules. */
+  suspension: SuspensionInfo;
 }
 
 /** Public key that licence keys must be signed with (your own in production). */
 export const LICENCE_PUBLIC_KEY = (import.meta.env.VITE_LICENCE_PUBLIC_KEY as string | undefined) || DEMO_LICENCE_PUBLIC_KEY;
 
 export function licenceInfo(t: Tenant | null, now = new Date()): LicenceInfo {
+  const base = licenceBase(t, now);
+  const suspension = suspensionInfo(t?.supplier, now);
+  if (suspension.state === "blocked") return { ...base, status: "suspended", usable: false, suspension };
+  return { ...base, suspension };
+}
+
+function licenceBase(t: Tenant | null, now: Date): Omit<LicenceInfo, "suspension"> {
   const plan = t?.plan ?? "demo";
   const entitlements = t?.entitlements ?? builtInEntitlements(plan);
   if (t?.licence) {
@@ -568,6 +580,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [tenant, mode, actor, updateTenant],
   );
 
+  const checkWithSupplier = useCallback(async () => {
+    if (!tenant || mode !== "firebase") return { ok: false, skipped: true, error: "Only in a deployed system.", applied: [] };
+    const res = await httpsCallable(firebase().functions, "consoleLinkNow", { timeout: 60_000 })({ tenantId: tenant.id });
+    return res.data as { ok: boolean; skipped?: boolean; error?: string; applied: string[] };
+  }, [tenant, mode]);
+
   const value: AppState = {
     mode,
     ready,
@@ -605,6 +623,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateTenant,
     licence: lic,
     activateLicence,
+    checkWithSupplier,
     saveSetting,
     resetLocalDemo: () => {
       localStorage.removeItem(LOCAL_KEY);

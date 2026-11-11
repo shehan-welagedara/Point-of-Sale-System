@@ -93,6 +93,8 @@ pnpm release:deploy --target CLIENT-ID         # first deploy: permissions, web 
 | `packages/core` | Domain model, modules, privileges, costing, FIFO inventory, checks, reports, POS day journal, integration templates |
 | `packages/ledger` | General ledger: posting, approvals, assets, bank matching, statements, audit trail, integrity checks, SAF-T |
 | `apps/functions` | Cloud Functions: ledger API, licence activation, PIN checks, phone pairing, audit trail triggers, hourly sealing |
+| `apps/console`, `apps/console-functions` | Polymath Console: Polymath Tech's central management of clients, licences, subscriptions, health and updates ([22](22-polymath-console.md)) |
+| `tools/console` | Console setup, deploy and tests |
 | `tools/release` | Release tools: client setup, deploy, permissions check, backups, data migrations, network check |
 | `tools/licence` | Vendor licence keys (`pnpm licence`) |
 | `tools/manual` | User and training manuals as PDFs |
@@ -112,6 +114,7 @@ pnpm test:pairing    # connecting phones with codes, against the Firebase emulat
 pnpm test:contrast   # text colour contrast (WCAG AA) on every screen, all sizes and styles
 pnpm test:golive     # go-live rehearsal from an empty business (phone, Bluetooth printer, books)
 pnpm test:migrations # data migrations on the Firestore emulator (needs Java)
+pnpm test:console    # Polymath Console and a client's check-in on the emulators, and every console screen
 pnpm typecheck
 pnpm build
 ```
