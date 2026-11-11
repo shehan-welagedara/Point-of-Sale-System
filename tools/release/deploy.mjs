@@ -12,7 +12,7 @@
  * `gcloud auth login`, `gcloud auth application-default login` and `pnpm exec firebase login`).
  * Works from Windows, macOS and Linux. Run by hand, it builds the web app first when needed.
  */
-import { existsSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { runCommand } from "./run-cmd.mjs";
 import { dirname, join, resolve } from "node:path";
@@ -55,17 +55,55 @@ const HINT = {
   pnpm: "Install pnpm (https://pnpm.io/installation) and run `pnpm install` in the project folder.",
 };
 
-/** Runs a command; on Windows through the shell, so pnpm.cmd and gcloud.cmd are found. */
-function exec(cmd, args, { always = false } = {}) {
+/**
+ * Runs a command; on Windows through the shell, so pnpm.cmd and gcloud.cmd are found. Stops the deploy
+ * when it fails, unless `soft` (then returns false so the caller can try again).
+ */
+function exec(cmd, args, { always = false, soft = false } = {}) {
   console.log(`  $ ${cmd} ${args.join(" ")}`);
-  if (dryRun && !always) return;
+  if (dryRun && !always) return true;
   const r = runCommand(cmd, args, { cwd: root, stdio: "inherit", env: process.env });
   if (r.error) fail(`${cmd} could not start (${r.error.message}). ${HINT[cmd] ?? ""}`);
-  if (r.status !== 0) fail(`${cmd} ${args[0]} failed (exit ${r.status})${cmd === "gcloud" ? `. ${HINT.gcloud}` : ""}`);
+  if (r.status === 0) return true;
+  if (soft) return false;
+  fail(`${cmd} ${args[0]} failed (exit ${r.status})${cmd === "gcloud" ? `. ${HINT.gcloud}` : ""}`);
 }
 const run = (cmd, args) => exec(cmd, args);
 
-const firebase = (project, only) => run("pnpm", ["exec", "firebase", "deploy", "--only", only, "--project", project, "--non-interactive"]);
+const firebase = (project, only, extra = [], opts = {}) => exec("pnpm", ["exec", "firebase", "deploy", "--only", only, "--project", project, "--non-interactive", ...extra], opts);
+
+/** A Firebase CLI command's --json answer ({ status, result }), or null. */
+function firebaseJson(args) {
+  const r = runCommand("pnpm", ["exec", "firebase", ...args, "--json"], { cwd: root, encoding: "utf8", env: process.env, timeout: 120_000 });
+  const out = r.stdout ?? "";
+  try {
+    return JSON.parse(out.slice(out.indexOf("{")));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * New Firebase projects have no Hosting site (the web address) until one is created, and the Firebase CLI
+ * won't create it in a scripted deploy. Creates https://<projectId>.web.app, linked to the project's web
+ * app so the system can read its Firebase settings from Hosting.
+ */
+function ensureHostingSite(c) {
+  if (dryRun) return console.log(`  first deploy: creates the web address https://${c.projectId}.web.app if the project has none yet`);
+  const listed = firebaseJson(["hosting:sites:list", "--project", c.projectId]);
+  const sites = listed?.result?.sites;
+  if (!Array.isArray(sites)) return console.warn(`  ! couldn't list the project's Hosting sites (${listed?.error ?? "no answer"}); trying the deploy anyway`);
+  if (sites.some((s) => s.type === "DEFAULT_SITE")) return;
+  const apps = firebaseJson(["apps:list", "WEB", "--project", c.projectId])?.result;
+  const app = Array.isArray(apps) ? apps[0] : undefined;
+  if (!app) console.warn("  ! the project has no web app yet: register one (deployment manual B, \"Register the web app\") so the system can read its Firebase settings");
+  console.log(`  creating the web address https://${c.projectId}.web.app`);
+  exec("pnpm", ["exec", "firebase", "hosting:sites:create", c.projectId, "--project", c.projectId, "--non-interactive", ...(app?.appId ? ["--app", app.appId] : [])]);
+  const again = firebaseJson(["hosting:sites:list", "--project", c.projectId])?.result?.sites;
+  if (Array.isArray(again) && !again.some((s) => s.type === "DEFAULT_SITE")) {
+    fail(`the web address was created but Firebase doesn't treat it as the project's main site. Open Firebase console → Build → Hosting → Get started (click through to the end), then run the deploy again.`);
+  }
+}
 
 function preflight() {
   const live = join(root, "apps/web/dist/version.json");
@@ -164,13 +202,35 @@ for (const c of list) {
   if (first) console.log("  first deploy: no data to update yet (data updates run from the next deploy on)");
   else run("node", ["tools/release/migrate.mjs", "--project", c.projectId, ...(dryRun ? ["--dry-run"] : [])]);
   if (parts.has("functions")) {
-    // Per-project function settings (Firebase reads .env.<projectId> next to the functions code).
+    // Per-project function settings (Firebase reads .env.<projectId> next to the functions code). The
+    // functions are built into dist/ by Firebase just before they upload; on a fresh copy of the
+    // project that folder doesn't exist yet.
     const env = [`LOCATION=${c.region ?? "asia-south1"}`, ...(process.env.LICENCE_PUBLIC_KEY ? [`LICENCE_PUBLIC_KEY=${process.env.LICENCE_PUBLIC_KEY}`] : [])].join("\n");
-    if (!dryRun) writeFileSync(join(root, `apps/functions/dist/.env.${c.projectId}`), `${env}\n`);
+    if (!dryRun) {
+      mkdirSync(join(root, "apps/functions/dist"), { recursive: true });
+      writeFileSync(join(root, `apps/functions/dist/.env.${c.projectId}`), `${env}\n`);
+    }
   }
   const rulesAndFunctions = ["rules", "functions"].filter((p) => parts.has(p)).map((p) => (p === "rules" ? "firestore:rules" : "functions"));
-  if (rulesAndFunctions.length) firebase(c.projectId, rulesAndFunctions.join(","));
+  if (rulesAndFunctions.length) {
+    // First deploy: --force lets Firebase set the clean-up policy for old function images (it otherwise
+    // stops to ask, which a scripted deploy can't answer). A new project has no functions to replace.
+    const extra = first && parts.has("functions") ? ["--force"] : [];
+    const done = firebase(c.projectId, rulesAndFunctions.join(","), extra, { soft: first });
+    if (!done) {
+      // On a new project, Google takes a few minutes to give its own services the permissions that
+      // database-triggered functions need ("Eventarc Service Agent"). Waiting and trying again fixes it.
+      const minutes = Number(process.env.POS_DEPLOY_RETRY_MINUTES ?? 3);
+      console.log(`\n  The server functions didn't finish. On a brand-new project that's usual: Google is still setting up permissions.`);
+      console.log(`  Waiting ${minutes} minutes, then trying once more (nothing is lost; you can leave this window open)…\n`);
+      await new Promise((r) => setTimeout(r, minutes * 60_000));
+      if (!firebase(c.projectId, rulesAndFunctions.join(","), extra, { soft: true })) {
+        fail("the server functions failed again. Read the red Error line above. Common causes: the project isn't on the Blaze plan (manual B), or Google needs a few more minutes (run the same deploy command again in 5 minutes; it continues where it stopped).");
+      }
+    }
+  }
   if (parts.has("hosting")) {
+    if (first) ensureHostingSite(c);
     firebase(c.projectId, "hosting");
     if (!dryRun) await verify(c.projectId);
   }
