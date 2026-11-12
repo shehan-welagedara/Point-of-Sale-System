@@ -4,6 +4,7 @@ import { useApp } from "./state/app";
 import { Login } from "./pages/auth/Login";
 import { Onboarding } from "./pages/auth/Onboarding";
 import { Launchpad, Shell } from "./pages/emc/Shell";
+import { AccountPage, TasksPage } from "./pages/emc/Phone";
 import { LicencePage } from "./pages/emc/Licence";
 import { MobileStylePage, PosOptionsPage, PosThemesPage, SignInPolicyPage } from "./pages/emc/Appearance";
 import { BillDesignerPage } from "./pages/emc/BillDesigner";
@@ -59,6 +60,8 @@ export function App() {
       <Route path="/new-business" element={<Onboarding />} />
       <Route path="/emc" element={<Shell />}>
         <Route path="home" element={<Launchpad />} />
+        <Route path="tasks" element={<TasksPage />} />
+        <Route path="account" element={<AccountPage />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="reports" element={<Reports />} />
         <Route path="revenue/engineering" element={<MenuEngineering />} />

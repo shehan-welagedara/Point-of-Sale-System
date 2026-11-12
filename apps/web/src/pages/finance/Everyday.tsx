@@ -1,3 +1,4 @@
+import { useIsPhone } from "../../lib/useIsPhone";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { type Account, type Attachment, type Vendor, COLLECTIONS as C, addDays, newId } from "@pos/core";
@@ -353,6 +354,8 @@ export function BillsInboxPage() {
   const list = useMemo(() => all.filter((a) => show === "all" || a.status === "inbox").sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)), [all, show]);
   const { upload, busy } = useAttachmentUpload();
   const input = useRef<HTMLInputElement>(null);
+  const camera = useRef<HTMLInputElement>(null);
+  const phone = useIsPhone();
   const [open, setOpen] = useState<Attachment | null>(null);
   const edit = (a: Attachment, patch: Partial<Attachment>) => void store.merge(C.attachments, a.id, patch);
   return (
@@ -362,8 +365,11 @@ export function BillsInboxPage() {
         subtitle="Photograph or scan paper bills here first, then record each one. Every file is kept with a fingerprint, so it can't be changed afterwards."
         actions={
           <>
-            <button className="btn primary" disabled={busy} onClick={() => input.current?.click()}>{busy ? "Saving…" : "📷 Add photos or scans"}</button>
+            {phone ? <button className="btn primary" disabled={busy} onClick={() => camera.current?.click()}>{busy ? "Saving…" : "📷 Take a photo"}</button> : null}
+            <button className={phone ? "btn" : "btn primary"} disabled={busy} onClick={() => input.current?.click()}>{busy ? "Saving…" : phone ? "Choose files" : "📷 Add photos or scans"}</button>
             <input ref={input} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} />
+            {/* On a phone: straight to the rear camera. */}
+            <input ref={camera} type="file" accept="image/*" capture="environment" hidden aria-label="Take a photo of a bill" onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} />
           </>
         }
       />

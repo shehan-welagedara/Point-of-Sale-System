@@ -11,7 +11,7 @@ The screenshots come from the demo restaurant *Spice Lagoon*. Your own system sh
 ## Contents
 
 1. [The system at a glance](#1-the-system-at-a-glance)
-2. [Signing in to the back office](#2-signing-in-to-the-back-office)
+2. [Signing in to the back office](#2-signing-in-to-the-back-office) · [the back office on your phone](#21-the-back-office-on-your-phone)
 3. [The POS on a terminal (PC or large tablet)](#3-the-pos-on-a-terminal)
 4. [The POS app on phones and tablets](#4-the-pos-app-on-phones-and-tablets)
 5. [Approvals, privileges and the transaction journal](#5-approvals-privileges-and-the-transaction-journal)
@@ -86,7 +86,28 @@ The back office is divided into **workspaces**. You only see the ones your licen
 | **+ Business** | Owners and administrators: add another business (for example a second restaurant company, or a training copy with the demo restaurant). |
 | **Sign out** | Ends your back-office session. |
 
-**Inside a workspace**, the left sidebar lists its pages. **← All modules** at the bottom returns to the launchpad. On phones, open the sidebar with ☰.
+**Inside a workspace**, the left sidebar lists its pages. **← All modules** at the bottom returns to the launchpad. On a phone the back office works like an app instead: see 2.1.
+
+### 2.1 The back office on your phone
+
+On a phone the back office is laid out as an app, so the owner and managers can run the business from their pocket.
+
+<p float="left"><img src="img/phone-today.jpg" alt="Today on a phone" width="240" /> <img src="img/phone-tasks.jpg" alt="Tasks on a phone" width="240" /> <img src="img/phone-list.jpg" alt="A list on a phone" width="240" /></p>
+
+**Put it on your home screen** (once): on an iPhone, open the address in Safari, tap **Share**, then **Add to Home Screen**; on Android, open it in Chrome and tap **Install** on the Today screen (or ⋮ → **Add to Home screen**). It then opens full screen, like an app, straight to Today. A phone connected as a POS device (section 3.1) opens the POS instead.
+
+| Part | What it does |
+|---|---|
+| **Today** (first tab) | Today's net sales against the same day last week, the last 14 days, checks and covers, average per cover, the month against its target, what needs you, quick actions (Open POS, Record expense, Snap a bill, Receive goods, Stock count, Reports) and today's best sellers. |
+| **Tasks** (and the bell at the top) | Everything waiting for someone, with the number on the bell: documents to approve, bill photos to record, deliveries to receive, items below par level, checks still open from an earlier day, the licence or trial ending, a message from your supplier. Tap one to go straight to it. |
+| **Middle tabs** | The two places you use most, by role: Reports and POS for owners and managers; Stock for storekeepers; Finance for accountants. |
+| **More** | Every module you may use, your account, and About and help. |
+| **Pills under the top bar** | The pages of the module you are in (for example Menu items, Categories, Modifiers). Swipe them sideways. |
+| **Lists** | One row per record: name, details, the key figure and the status. Tap a row to open it full screen, with **Save** always at the bottom. The **+ New** button floats above the tabs. |
+| **Reports** | Pick **Today**, **Yesterday**, **Last 7 days**, **Last 30 days**, or **Dates…** for your own range. Each report reads as rows with the figure on the right. |
+| **Your initials** (top right) | Your account: who you are, switching business, the licence, signing out. |
+
+Everything else works as on a computer; wide tables scroll sideways with their first column fixed.
 
 **Back-office login roles** (set by the owner or an administrator under People & Security → Back-office logins):
 

@@ -8,6 +8,7 @@ import { installGlobalErrorHandlers } from "./lib/errors";
 import { loadFirebaseConfig } from "./lib/firebase";
 import { AppProvider } from "./state/app";
 import "./styles.css";
+import "./phone.css";
 
 installGlobalErrorHandlers();
 // The client's Firebase project comes from the site it is served from (one build for every client).

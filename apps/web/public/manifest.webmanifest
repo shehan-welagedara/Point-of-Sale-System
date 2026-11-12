@@ -1,10 +1,23 @@
 {
   "name": "POS Suite",
-  "short_name": "POS",
-  "start_url": "/pos",
+  "short_name": "POS Suite",
+  "description": "Point of sale and back office by Polymath Tech",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#F5F5F7",
   "theme_color": "#0F766E",
-  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Today", "url": "/emc/home", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Tasks", "url": "/emc/tasks", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Point of sale", "url": "/pos", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
 }

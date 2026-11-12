@@ -270,6 +270,59 @@ try {
     await ctx.close();
   }
 
+  // ── The back office as a phone app: Today, tasks, bottom tabs, the More sheet, phone lists.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: await page.context().storageState() });
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errors.push(`phone back office: ${e.message}`));
+    const phoneProblems = async () =>
+      p.evaluate(() => ({
+        wide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        small: [...document.querySelectorAll(".p-main button, .p-main input, .p-main select, .p-nav a, .p-nav button, .p-top a, .p-pills a, .p-fab")]
+          .filter((e) => {
+            const r = e.getBoundingClientRect();
+            return r.width > 0 && r.height > 0 && r.height < 40 && getComputedStyle(e).visibility !== "hidden" && !(e instanceof HTMLInputElement && (e.type === "checkbox" || e.type === "radio"));
+          })
+          .map((e) => (e.textContent || e.getAttribute("aria-label") || e.tagName).trim().slice(0, 24)),
+      }));
+    await p.goto(`${B}/emc/home?mode=local`);
+    await p.waitForTimeout(1200);
+    check("phone: Today shows today's sales", (await p.locator(".p-hero-value").count()) === 1 && /Rs/.test(await p.locator(".p-hero-value").innerText()));
+    const tabs = (await p.locator(".p-nav a, .p-nav button").allInnerTexts()).map((t) => t.replace(/\d+|\s+/g, " ").trim());
+    check("phone: bottom tabs Today, Reports, POS, Tasks, More", ["Today", "Reports", "POS", "Tasks", "More"].every((t) => tabs.some((x) => x.startsWith(t))), tabs.join(" | "));
+    check("phone: quick actions on Today", (await p.locator(".p-action").count()) >= 4);
+    await p.locator(".p-nav a", { hasText: "Tasks" }).click();
+    await p.waitForTimeout(600);
+    check("phone: Tasks lists what needs the owner", (await p.locator(".p-task", { hasText: "to approve" }).count()) === 1);
+    await p.locator(".p-nav button", { hasText: "More" }).click();
+    await p.waitForTimeout(300);
+    check("phone: More shows every module", (await p.locator(".p-module").count()) >= 8);
+    await p.locator(".p-module", { hasText: "Menu Management" }).click();
+    await p.waitForTimeout(900);
+    check("phone: a module's pages are pills", (await p.locator(".p-pills a", { hasText: "Menu items" }).count()) === 1 && (await p.locator(".p-pills a.on").innerText()) === "Menu items");
+    check("phone: lists are compact rows", (await p.locator(".p-row").count()) > 10 && (await p.locator(".table.cards-sm").count()) === 0);
+    await p.locator(".p-fab").click();
+    await p.waitForTimeout(400);
+    check("phone: the + button opens a new record", (await p.locator(".drawer h2", { hasText: "New menu item" }).count()) === 1);
+    await p.locator(".drawer button", { hasText: "Cancel" }).click();
+    await p.goto(`${B}/emc/reports?mode=local`);
+    await p.waitForTimeout(1000);
+    await p.locator(".chip", { hasText: "Yesterday" }).click();
+    check("phone: report period chips", (await p.locator(".chip", { hasText: "Yesterday" }).getAttribute("aria-pressed")) === "true");
+    await p.goto(`${B}/emc/account?mode=local`);
+    await p.waitForTimeout(600);
+    check("phone: account page with acting-as", (await p.getByLabel("Acting as").count()) === 1);
+    const bad = [];
+    for (const path of ["/emc/home", "/emc/tasks", "/emc/reports", "/emc/menu/items", "/emc/inventory/stock", "/emc/finance", "/emc/finance/journals", "/emc/finance/expense", "/emc/people/staff", "/emc/account"]) {
+      await p.goto(`${B}${path}?mode=local`);
+      await p.waitForTimeout(700);
+      const m = await phoneProblems();
+      if (m.wide > 1 || m.small.length) bad.push(`${path}${m.wide > 1 ? ` ${m.wide}px wider` : ""}${m.small.length ? ` small: ${m.small.slice(0, 3).join(", ")}` : ""}`);
+    }
+    check("phone: back-office screens fit, with touch targets of 40 px or more", !bad.length, bad.join("; "));
+    await ctx.close();
+  }
+
   // ── Indigo style chosen by the administrator; tablets follow when set to phones and tablets.
   await page.goto(`${B}/emc/pos/mobile?mode=local`);
   await page.waitForTimeout(700);

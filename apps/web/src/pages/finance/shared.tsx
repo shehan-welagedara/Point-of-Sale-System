@@ -1,3 +1,5 @@
+import { PhoneList } from "../../components/PhoneList";
+import { useIsPhone } from "../../lib/useIsPhone";
 import { AttachmentPanel } from "../../components/Attachments";
 import { type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -277,6 +279,8 @@ export function VoucherList({ types, title, subtitle, actions, editor, initialSt
   const vouchers = useCollection<Voucher>(L.vouchers);
   const { personName } = useApp();
   const parties = useParties();
+  const phone = useIsPhone();
+  const partyOf = (v: Voucher) => ("supplierId" in v ? parties.name("supplier", v.supplierId) : "customerId" in v ? parties.name("customer", v.customerId) : "partyId" in v ? parties.name(v.partyType, v.partyId) : "");
   const [status, setStatus] = useState<string>(initialStatus);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<Voucher | null>(null);
@@ -295,17 +299,34 @@ export function VoucherList({ types, title, subtitle, actions, editor, initialSt
           <div className="row wrap">{actions}</div>
         </div>
       ) : null}
-      <div className="row wrap">
-        <input className="input" placeholder="Search number or description" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 260 }} />
-        {["all", "draft", "submitted", "posted", "cancelled"].map((s) => (
-          <button key={s} className={`chip${status === s ? " on" : ""}`} onClick={() => setStatus(s)}>
-            {s === "all" ? "All" : s === "submitted" ? "Awaiting approval" : s[0]!.toUpperCase() + s.slice(1)}
-          </button>
-        ))}
+      <div className={phone ? "stack tight" : "row wrap"}>
+        <input className="input" placeholder="Search number or description" value={q} onChange={(e) => setQ(e.target.value)} style={phone ? undefined : { maxWidth: 260 }} />
+        <div className={phone ? "chip-scroll" : "row wrap"}>
+          {["all", "draft", "submitted", "posted", "cancelled"].map((s) => (
+            <button key={s} className={`chip${status === s ? " on" : ""}`} onClick={() => setStatus(s)}>
+              {s === "all" ? "All" : s === "submitted" ? "Awaiting approval" : s[0]!.toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="card table-wrap fill-card">
+      <div className={phone ? "card" : "card table-wrap fill-card"}>
         {!vouchers ? (
           <Loading />
+        ) : phone ? (
+          rows.length ? (
+            <PhoneList
+              rows={rows.map((v) => ({
+                key: v.id,
+                title: v.remarks || TYPE_LABEL[v.type],
+                sub: [v.number ?? "Draft", TYPE_LABEL[v.type], v.postingDate, partyOf(v)].filter(Boolean).join(" · "),
+                value: money(voucherAmount(v)),
+                badge: <StatusBadge v={v} />,
+                onOpen: () => setOpen(v),
+              }))}
+            />
+          ) : (
+            <p className="muted" style={{ padding: 16 }}>Nothing here yet.</p>
+          )
         ) : (
           <table className="table">
             <thead>
@@ -318,7 +339,7 @@ export function VoucherList({ types, title, subtitle, actions, editor, initialSt
                   <td>{v.postingDate}</td>
                   <td className="muted">{TYPE_LABEL[v.type]}</td>
                   <td>{v.remarks}</td>
-                  <td className="muted">{"supplierId" in v ? parties.name("supplier", v.supplierId) : "customerId" in v ? parties.name("customer", v.customerId) : "partyId" in v ? parties.name(v.partyType, v.partyId) : ""}</td>
+                  <td className="muted">{partyOf(v)}</td>
                   <td className="muted">{personName(v.createdBy)}</td>
                   <td className="num">{money(voucherAmount(v))}</td>
                   <td><StatusBadge v={v} /></td>
