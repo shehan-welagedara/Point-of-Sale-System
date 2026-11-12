@@ -33,6 +33,7 @@
     "deploy:access": "node tools/release/functions-access.mjs",
     "console:setup": "node tools/console/setup.mjs",
     "console:deploy": "node tools/console/deploy.mjs",
+    "console:backup": "node tools/console/backup.mjs",
     "console:dev": "pnpm --filter @pos/console dev",
     "test:console": "pnpm --filter @pos/console-functions build && node tools/console/emulator-env.mjs && firebase emulators:exec --config firebase.console.json --only auth,firestore,functions --project demo-polymath-console \"tsx tools/console/test-console.mts && node tools/console/ui-smoke.mjs\"",
     "console:emulators": "pnpm --filter @pos/console-functions build && node tools/console/emulator-env.mjs && firebase emulators:start --config firebase.console.json --only auth,firestore,functions --project demo-polymath-console",
