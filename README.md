@@ -107,6 +107,7 @@ pnpm release:version 1.1.0       # start a release: version + CHANGELOG entry (t
 pnpm release:deploy --target …   # deploy: staging, wave:N or client ids (backup → indexes → migrations → rules/functions → hosting); needs only `firebase login`
 pnpm manual:screenshots  # refresh the manual screenshots from the demo restaurant
 pnpm manual:pdf -- --client "Name"  # user and training manuals as A4 PDFs in manual-pdf/
+pnpm manual:pdf -- --doc docs/23-polymath-console-deployment.md  # any guide as an A4 PDF (for Polymath Tech)
 pnpm licence keygen    # vendor: create your licence signing key (once)
 pnpm licence issue …   # vendor: issue a client licence key by hand (usually the console does it; docs/15)
 pnpm emulators         # local Firebase Auth + Firestore + Functions

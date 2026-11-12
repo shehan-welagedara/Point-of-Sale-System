@@ -2,6 +2,8 @@
 
 This guide takes you from nothing to a working **Polymath Console**, Polymath Tech's own system for managing every POS Suite client. In it you see every client's licences, subscriptions, health and usage, and you release updates. How it works inside is in [22-polymath-console.md](22-polymath-console.md); this guide is the *doing*.
 
+A printable copy: `pnpm manual:pdf -- --doc docs/23-polymath-console-deployment.md` (in `manual-pdf/`).
+
 **Time:** about an hour the first time, most of it waiting for Google.
 **You need:** the PC you already deploy clients from (deployment manual E), your Google account, and a payment card for the Blaze plan.
 
