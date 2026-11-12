@@ -39,6 +39,17 @@ const PATHS = {
   note: "M5 4h10l4 4v12H5zM14 4v5h5M8 13h8M8 17h5",
   percent: "M19 5 5 19M7 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
   x: "M6 6l12 12M18 6 6 18",
+  bell: "M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2.2 2.2 0 0 0 4 0",
+  inbox: "M3 13h5l1.5 3h5l1.5-3h5M5.5 5h13L21 13v6H3v-6z",
+  box: "M3 7.5 12 3l9 4.5v9L12 21l-9-4.5zM3 7.5 12 12l9-4.5M12 12v9",
+  truck: "M2 6h12v10H2zM14 9h4l3 3.5V16h-7M6 19.5a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6zM17.5 19.5a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6z",
+  camera: "M4 8h3l2-3h6l2 3h3v11H4zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z",
+  clipboard: "M8 4h8v3H8zM6 5.5H4V21h16V5.5h-2M8 12l2 2 4-4M8 17h8",
+  grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
+  receipt: "M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21zM9 8h6M9 12h6M9 16h3",
+  alert: "M12 3 2 20h20zM12 10v4.5M12 17.5v.01",
+  book: "M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2zM4 21a2 2 0 0 1 2-2h14",
+  download: "M12 3v12M7 10l5 5 5-5M4 20h16",
 } as const;
 
 export type IconName = keyof typeof PATHS;

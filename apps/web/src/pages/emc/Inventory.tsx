@@ -22,6 +22,8 @@ import {
 } from "@pos/core";
 import { tablesToWorkbook } from "../../lib/excel";
 import { CrudPage, type FieldDef } from "../../components/CrudPage";
+import { PhoneList } from "../../components/PhoneList";
+import { useIsPhone } from "../../lib/useIsPhone";
 import { Empty, Field, Loading, Modal, ModuleOff, PageHead, Seg } from "../../components/ui";
 import { downloadBuffer, money, stockQty, todayColombo } from "../../lib/format";
 import { useApp, useCollection, useStore } from "../../state/app";
@@ -33,6 +35,7 @@ function useDefaultLocation(): string {
 
 export function StockOnHand() {
   const { on, toast, user } = useApp();
+  const phone = useIsPhone();
   const store = useStore();
   const items = useCollection<InventoryItem>(C.inventoryItems);
   const levels = useCollection<StockLevel>(C.stockLevels);
@@ -111,6 +114,20 @@ export function StockOnHand() {
           <span className="badge brand">Value {money(total)}</span>
         </div>
       </div>
+      {phone ? (
+        <div className="card">
+          <PhoneList
+            rows={rows.map((r) => ({
+              key: r.item.id,
+              title: r.item.name,
+              sub: `${r.item.code} · ${r.item.category}${r.item.parLevel ? ` · par ${r.item.parLevel} ${r.item.purchaseUnit}` : ""}`,
+              value: stockQty(r.qty, r.item.stockUnit),
+              valueSub: money(r.value),
+              badge: r.qty < 0 ? <span className="badge bad">Negative</span> : below.has(r.item.id) ? <span className="badge warn">Below par</span> : undefined,
+            }))}
+          />
+        </div>
+      ) : (
       <div className="card table-wrap fill-card">
         <table className="table">
           <thead>
@@ -139,6 +156,7 @@ export function StockOnHand() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }

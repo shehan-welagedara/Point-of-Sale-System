@@ -311,6 +311,22 @@ try {
     await wait(page, 900);
     await shot(page, "inv-count-kind");
   }
+
+  // ── The back office on a phone (user manual 2.1)
+  {
+    const ph = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, storageState: await page.context().storageState() });
+    const p = await ph.newPage();
+    await p.goto(`${B}/emc/home?mode=local`);
+    await wait(p, 1500);
+    await shot(p, "phone-today");
+    await p.goto(`${B}/emc/tasks?mode=local`);
+    await wait(p, 900);
+    await shot(p, "phone-tasks");
+    await p.goto(`${B}/emc/menu/items?mode=local`);
+    await wait(p, 1000);
+    await shot(p, "phone-list");
+    await ph.close();
+  }
 } finally {
   await browser.close();
   await server.close();

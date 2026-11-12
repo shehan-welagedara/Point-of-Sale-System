@@ -397,6 +397,9 @@ try {
           ["setup checklist", "/emc/setup/checklist"],
           ["reports", "/emc/reports"],
           ["audit center", "/emc/audit"],
+          ["tasks", "/emc/tasks"],
+          ["account", "/emc/account"],
+          ["journals", "/emc/finance/journals"],
         ]) {
           await p.goto(`${B}${path}?mode=local`);
           await p.waitForTimeout(900);

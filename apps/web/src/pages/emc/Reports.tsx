@@ -30,6 +30,8 @@ import { tablesToWorkbook } from "../../lib/excel";
 import { Bar, Empty, Loading, Modal, PageHead, Seg, Stat } from "../../components/ui";
 import { downloadBuffer, money, pct, timeColombo, todayColombo } from "../../lib/format";
 import { useApp, useCollection, useStore } from "../../state/app";
+import { useIsPhone } from "../../lib/useIsPhone";
+import { PhoneList } from "../../components/PhoneList";
 
 export function useProperty(): { properties: Property[]; propertyId: string } {
   const { settings } = useApp();
@@ -38,12 +40,13 @@ export function useProperty(): { properties: Property[]; propertyId: string } {
   return { properties, propertyId };
 }
 
-function useStats(propertyId: string, from: string, to: string): DailyStats[] | undefined {
+export function useStats(propertyId: string, from: string, to: string, enabled = true): DailyStats[] | undefined {
   const store = useStore();
   const [stats, setStats] = useState<DailyStats[] | undefined>();
   useEffect(() => {
     let alive = true;
     setStats(undefined);
+    if (!enabled) return;
     loadStats(store, propertyId, from, to)
       .then((s) => alive && setStats(s))
       .catch((e) => {
@@ -53,9 +56,11 @@ function useStats(propertyId: string, from: string, to: string): DailyStats[] | 
     return () => {
       alive = false;
     };
-  }, [store, propertyId, from, to]);
+  }, [store, propertyId, from, to, enabled]);
   return stats;
 }
+
+const PRESETS: [string, number, number][] = [["Today", 0, 0], ["Yesterday", -1, -1], ["Last 7 days", -6, 0], ["Last 30 days", -29, 0]];
 
 // ───────────────────────────── Dashboard ─────────────────────────────
 
@@ -195,6 +200,8 @@ export function Reports() {
   const today = todayColombo();
   const [from, setFrom] = useState(addDays(today, -6));
   const [to, setTo] = useState(today);
+  const [custom, setCustom] = useState(false);
+  const phone = useIsPhone();
   const [tab, setTab] = useState<Tab>("revenue");
   const [wa, setWa] = useState<string | null>(null);
   const stats = useStats(propertyId, from, to);
@@ -301,19 +308,43 @@ export function Reports() {
           </>
         }
       />
+      {phone ? (
+        <div className="stack tight">
+          <div className="chip-scroll" role="group" aria-label="Period">
+            {PRESETS.map(([label, a, b]) => {
+              const on = from === addDays(today, a) && to === addDays(today, b);
+              return (
+                <button key={label} className={`chip${on ? " on" : ""}`} aria-pressed={on} onClick={() => { setCustom(false); setFrom(addDays(today, a)); setTo(addDays(today, b)); }}>
+                  {label}
+                </button>
+              );
+            })}
+            <button className={`chip${custom || !PRESETS.some(([, a, b]) => from === addDays(today, a) && to === addDays(today, b)) ? " on" : ""}`} onClick={() => setCustom(!custom)}>
+              Dates…
+            </button>
+          </div>
+          {custom ? (
+            <div className="p-dates">
+              <label className="field"><span>From</span><input className="input" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label>
+              <label className="field"><span>To</span><input className="input" type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>
+            </div>
+          ) : null}
+        </div>
+      ) : (
       <div className="card card-body row wrap">
         <label className="small muted">From</label>
         <input className="input" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} style={{ width: 170 }} />
         <label className="small muted">To</label>
         <input className="input" type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} style={{ width: 170 }} />
         <div className="row wrap">
-          {[["Today", 0, 0], ["Yesterday", -1, -1], ["Last 7 days", -6, 0], ["Last 30 days", -29, 0]].map(([label, a, b]) => (
-            <button key={label as string} className="chip" onClick={() => { setFrom(addDays(today, a as number)); setTo(addDays(today, b as number)); }}>
+          {PRESETS.map(([label, a, b]) => (
+            <button key={label} className="chip" onClick={() => { setFrom(addDays(today, a)); setTo(addDays(today, b)); }}>
               {label}
             </button>
           ))}
         </div>
       </div>
+      )}
       <Seg<Tab>
         value={tab}
         onChange={setTab}
@@ -339,6 +370,11 @@ export function Reports() {
             <Stat label="Checks · covers" value={`${merged.checks} · ${merged.covers}`} sub={`Avg check ${money(merged.checks ? Math.round(merged.total / merged.checks) : 0)}`} />
             <Stat label="Voids" value={money(merged.voids.amount)} sub={`${merged.voids.qty} item(s)`} tone={merged.voids.qty ? "warn" : undefined} />
           </div>
+          {phone ? (
+            <div className="card">
+              <PhoneList rows={revenue.map((r) => ({ key: r.date, title: new Date(`${r.date}T12:00:00+05:30`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }), sub: `${r.checks} checks · ${r.covers} covers · avg ${money(r.avgPerCover)}`, value: money(r.netSales), valueSub: `total ${money(r.total)}` }))} />
+            </div>
+          ) : (
           <div className="card table-wrap fill-card">
             <table className="table">
               <thead>
@@ -390,7 +426,12 @@ export function Reports() {
               </tfoot>
             </table>
           </div>
+          )}
         </>
+      ) : tab === "items" && phone ? (
+        <div className="card">
+          <PhoneList rows={items.map((r) => ({ key: r.itemId, title: r.name, sub: `${r.code} · ${r.category} · ${pct(r.mixPctBp)} of sales`, value: money(r.netSales), valueSub: `${r.qty} sold · GP ${money(r.grossProfit)}` }))} />
+        </div>
       ) : tab === "items" ? (
         <div className="card table-wrap fill-card">
           <table className="table">
@@ -421,6 +462,10 @@ export function Reports() {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : tab === "covers" && phone ? (
+        <div className="card">
+          <PhoneList rows={covers.map((r) => ({ key: r.orderType, title: r.orderType, sub: `${r.checks} checks · ${r.covers} covers`, value: money(r.netSales), valueSub: `avg ${money(r.avgPerCover)} per cover` }))} />
         </div>
       ) : tab === "covers" ? (
         <div className="card table-wrap fill-card">
@@ -504,6 +549,19 @@ export function Reports() {
           <div className="card-head"><h3>Checks closed on {to}</h3></div>
           {!checks ? (
             <Loading />
+          ) : phone ? (
+            <PhoneList
+              rows={checks
+                .filter((c) => c.status === "closed")
+                .sort((a, b) => (b.closedAt ?? "").localeCompare(a.closedAt ?? ""))
+                .map((c) => ({
+                  key: c.id,
+                  title: c.invoiceNo ?? c.id,
+                  sub: [timeColombo(c.closedAt), orderTypes.find((o) => o.id === c.orderTypeId)?.name ?? c.orderTypeId, c.payments.map((p) => tenders.find((t) => t.id === p.tenderId)?.name ?? p.tenderId).join(", ")].filter(Boolean).join(" · "),
+                  value: money(c.totals?.amountDue),
+                  valueSub: `${c.covers} cover${c.covers === 1 ? "" : "s"}`,
+                }))}
+            />
           ) : (
             <table className="table">
               <thead>

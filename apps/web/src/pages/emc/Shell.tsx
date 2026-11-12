@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MEMBER_ROLE_INFO, editionInfo } from "@pos/core";
 import { DEMO_PEOPLE } from "@pos/sample-data";
 import { Loading } from "../../components/ui";
 import { useApp } from "../../state/app";
 import { type Workspace, WORKSPACES, visibleWorkspaces, workspaceFor } from "../../workspaces";
+import { BottomNav, MoreSheet, PhoneTopBar, SectionPills, TodayPage, phoneTitle, useIsPhone } from "./Phone";
 
 function LicenceBadge() {
   const { licence } = useApp();
@@ -118,6 +119,11 @@ function TopBar({ workspace, onMenu }: { workspace?: Workspace; onMenu?: () => v
 
 /** Module launchpad: one tile per licensed, switched-on module the person may use. */
 export function Launchpad() {
+  const phone = useIsPhone();
+  return phone ? <TodayPage /> : <LaunchpadTiles />;
+}
+
+function LaunchpadTiles() {
   const { on, role, licence, settings } = useApp();
   const navigate = useNavigate();
   const visible = visibleWorkspaces(on, role);
@@ -169,7 +175,45 @@ export function Launchpad() {
   );
 }
 
+/** The back office on a phone: top bar, module pills, the page, bottom tabs and the More sheet. */
+function PhoneShell() {
+  const { settings, settingsReady } = useApp();
+  const [more, setMore] = useState(false);
+  const loc = useLocation();
+  const home = loc.pathname === "/emc/home" || loc.pathname === "/emc" || loc.pathname === "/emc/";
+  const ws = home ? undefined : workspaceFor(loc.pathname, loc.search);
+  // Each page starts at the top, and the sheet closes when you go somewhere.
+  useEffect(() => {
+    setMore(false);
+    document.querySelector(".p-main")?.scrollTo({ top: 0 });
+  }, [loc.pathname]);
+  // On a phone the sample-details reminder is on Today only (Tasks and the bell list it too).
+  const sample = settingsReady && settings.business.isSample && home;
+  return (
+    <div className="p-shell">
+      <PhoneTopBar title={home ? settings.branding.displayName || "Today" : phoneTitle(loc.pathname, loc.search, "Back office")} />
+      {ws ? <SectionPills ws={ws} /> : null}
+      <div className="p-main">
+        {sample ? (
+          <NavLink to="/emc/setup/business" className="p-sample">
+            <strong>Sample details in use.</strong> Enter your legal name, TIN and VAT status →
+          </NavLink>
+        ) : null}
+        <SupplierBanner />
+        {settingsReady ? <Outlet /> : <Loading />}
+      </div>
+      <BottomNav onMore={() => setMore((m) => !m)} moreOpen={more} />
+      {more ? <MoreSheet onClose={() => setMore(false)} /> : null}
+    </div>
+  );
+}
+
 export function Shell() {
+  const phone = useIsPhone();
+  return phone ? <PhoneShell /> : <DesktopShell />;
+}
+
+function DesktopShell() {
   const { settings, settingsReady, on, role } = useApp();
   const [open, setOpen] = useState(false);
   const loc = useLocation();
