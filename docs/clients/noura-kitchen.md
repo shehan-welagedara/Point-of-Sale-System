@@ -14,7 +14,7 @@ Follow the [deployment manual](../18-deployment-manual.md) for the technical ste
 
 **Next:**
 
-1. **Update** from 1.5.8 to the current version at a quiet time (after closing), from the project folder: `git pull`, `pnpm install`, `pnpm release:deploy --target noura-kitchen`. It backs up their data first, then the data updates change one thing only: bills say *Powered by Polymath Tech* instead of *POS Suite (demo)*. This exact update is rehearsed by `pnpm test:update` on every change.
+1. **Update** from 1.5.8 to the current version at a quiet time (after closing), from the project folder: `git pull`, `pnpm install`, `pnpm release:deploy --target noura-kitchen`. (12 November: the first try with 1.8.0 took the backup and deployed the indexes, then stopped at the data updates with *14 UNAVAILABLE … Protocol error*, an HTTP/2 problem on the PC; nothing else changed. 1.8.1 fixes it: pull and run the same command again.) It backs up their data first, then the data updates change one thing only: bills say *Powered by Polymath Tech* instead of *POS Suite (demo)*. This exact update is rehearsed by `pnpm test:update` on every change.
 2. **Link it to the Polymath Console** ([23](../23-polymath-console-deployment.md)): set up the console once (sections B–H), add Noura Kitchen as a client (project `noura-kitchen-pos`, Restaurant, Colombo), deploy Noura Kitchen once more so it learns the console's address, then *About → Check now* in their back office and confirm the project number. From then on it checks in daily.
 3. **Issue the licence from the console** (Licence → Issue licence: Starter + the four add-ons) and record the subscription. It reaches their system at the next check-in.
 

@@ -5,7 +5,9 @@
  *
  * - a local web server answers for the client's site (/version.json) and for Google's Storage,
  *   Firestore export, project and sign-in APIs, and records every call;
- * - the Firestore emulator holds a client whose businesses were created on 1.5.8;
+ * - the Firestore emulator holds a client whose businesses were created on 1.5.8, reached through a
+ *   relay that speaks only HTTP/1.1 (as through antivirus HTTPS scanning or a proxy), so the data
+ *   updates must work without HTTP/2 (1.8.0 used gRPC and failed on such a PC);
  * - a stand-in `pnpm` records the Firebase deploy commands (it loads the built server functions the
  *   way Firebase does, and publishes the new version.json when the web app is "deployed");
  * - a throw-away Firebase CLI sign-in, so the backup and the data updates use the person's sign-in
@@ -15,7 +17,7 @@
  * should, that a second run changes nothing, and that a failed backup stops the deploy before
  * anything is touched.  Run:  pnpm test:update   (needs Java for the Firestore emulator)
  */
-import { createServer as createHttp } from "node:http";
+import { createServer as createHttp, request as httpRequest } from "node:http";
 import { createServer as createHttps } from "node:https";
 import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -133,6 +135,27 @@ const handler = async (req, res) => {
 };
 const server = tls ? createHttps({ key: readFileSync(join(certDir, "key.pem")), cert: readFileSync(join(certDir, "cert.pem")) }, handler) : createHttp(handler);
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
+
+// The deploy reaches the database only through an HTTP/1.1 relay: anything that needs HTTP/2 fails here.
+const [emuHost, emuPort] = process.env.FIRESTORE_EMULATOR_HOST.split(":");
+const relayed = { ok: 0, refused: 0 };
+const relay = createHttp((req, res) => {
+  relayed.ok++;
+  const up = httpRequest({ host: emuHost, port: emuPort, method: req.method, path: req.url, headers: req.headers }, (r) => {
+    res.writeHead(r.statusCode ?? 502, r.headers);
+    r.pipe(res);
+  });
+  up.on("error", () => {
+    res.writeHead(502);
+    res.end();
+  });
+  req.pipe(up);
+});
+relay.on("clientError", (_e, socket) => {
+  relayed.refused++;
+  socket.destroy();
+});
+await new Promise((r) => relay.listen(0, "127.0.0.1", r));
 const base = `${tls ? "https" : "http"}://127.0.0.1:${server.address().port}`;
 
 // Stand-in pnpm: Firebase commands are recorded (and checked the way Firebase would), everything else runs.
@@ -206,6 +229,7 @@ const deploy = async (extra = []) => {
       CONSOLE_URL: "",
       LICENCE_PUBLIC_KEY: "",
       ...(tls ? { NODE_EXTRA_CA_CERTS: join(certDir, "cert.pem") } : {}),
+      FIRESTORE_EMULATOR_HOST: `127.0.0.1:${relay.address().port}`,
       NO_PROXY: [process.env.NO_PROXY, "127.0.0.1"].filter(Boolean).join(","),
       no_proxy: [process.env.no_proxy, "127.0.0.1"].filter(Boolean).join(","),
     },
@@ -245,7 +269,8 @@ try {
   const fnDeploy = r1.fb.find((e) => only([e])[0]?.includes("functions"));
   check(Array.isArray(fnDeploy?.functions) && ["consoleCheckin", "consoleLinkNow", "auditSealer", "ledgerApi", "licenceApi", "posAuth", "deviceApi"].every((f) => fnDeploy.functions.includes(f)), `the server functions load and include the new ones (${Array.isArray(fnDeploy?.functions) ? fnDeploy.functions.length : 0} functions)`, JSON.stringify(fnDeploy?.functions));
   check(/^LOCATION=asia-south1$/m.test(fnDeploy?.env ?? "") && new RegExp(`^APP_VERSION=${version.replace(/\./g, "\\.")}$`, "m").test(fnDeploy?.env ?? "") && !/CONSOLE_URL/.test(fnDeploy?.env ?? ""), "the functions' settings name the region and the release (no console address until one is set up)", fnDeploy?.env);
-  check(/0001-deployment-owner/.test(r1.out) && /0004-powered-by/.test(r1.out) && /4 applied/.test(r1.out), "all four data updates run once", r1.out.match(/migrations: .*/)?.[0]);
+  check(/0001-deployment-owner/.test(r1.out) && /0004-powered-by/.test(r1.out) && /4 applied/.test(r1.out), "all four data updates run once", r1.out.match(/migrations: .*/)?.[0] ?? r1.out.split("\n").filter((l) => /UNAVAILABLE|stopped/.test(l)).join(" "));
+  check(relayed.ok > 0 && relayed.refused === 0, "the data updates use plain HTTPS (HTTP/1.1): no HTTP/2 needed, so antivirus scanning or a proxy can't break them", `${relayed.ok} relayed, ${relayed.refused} refused`);
   const after = await snapshot();
   const changed = Object.keys({ ...before, ...after }).filter((p) => JSON.stringify(before[p]) !== JSON.stringify(after[p]));
   const expected = [`tenants/${T}/settings/branding`, `tenants/${D}/settings/branding`];
@@ -292,6 +317,7 @@ try {
   check(r4.status === 1 && r4.out.includes("can't tell what is live") && r4.fb.length === 0 && !state.calls.slice(callsBefore4).some((c) => !c.startsWith("GET /site/")), "the deploy stops before doing anything (a live client is never treated as new)");
 } finally {
   server.close();
+  relay.close();
   rmSync(dir, { recursive: true, force: true });
 }
 console.log(failed ? `\n${failed} update check(s) failed` : `\nThe update rehearsal passed (${OLD} → ${version})`);
