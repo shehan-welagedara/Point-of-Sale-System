@@ -132,6 +132,7 @@ button.p-li, a.p-li { cursor: pointer; }
   .btn.sm { min-height: 40px; }
   .icon-btn { width: 44px; height: 44px; }
   .input, .select, textarea.input { min-height: 46px; font-size: 16px; }
+  .input.sm, .select.sm { min-height: 40px; font-size: 16px; }
   .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
   .seg::-webkit-scrollbar { display: none; }
   .seg button { min-height: 40px; padding: 0 14px; white-space: nowrap; font-size: 14px; flex: none; }
