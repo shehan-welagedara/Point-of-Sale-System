@@ -67,7 +67,7 @@ try {
       await page.getByLabel("Email").fill("owner@polymath.test");
       await page.getByLabel("Password").fill("Correct-Horse-9");
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
-      await page.getByRole("heading", { name: "Dashboard" }).waitFor({ timeout: 20_000 });
+      await page.getByRole("heading", { name: "Client distribution" }).waitFor({ timeout: 20_000 });
       const tag = `${vp.name} ${scheme}`;
       const visit = async (label, path, expect, shot) => {
         await page.goto(`http://localhost:5175${path}`);
@@ -75,9 +75,44 @@ try {
         await page.waitForTimeout(300);
         const bad = await page.evaluate(contrastFailures);
         check(!bad.length, `${tag} · ${label}${bad.length ? `: low contrast ${bad.slice(0, 3).join("; ")}` : ""}`);
+        const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        check(wide <= 1, `${tag} · ${label} fits the screen width${wide > 1 ? ` (${wide}px too wide)` : ""}`);
         if (shot && scheme === "light") await page.screenshot({ path: join(shots, `${vp.name}-${shot}.png`), fullPage: vp.name === "pc" });
       };
-      await visit("dashboard", "/", "Needs attention", "dashboard");
+      await visit("overview", "/", "Client distribution", "dashboard");
+      await page.getByText("Kandy Mist").first().waitFor({ timeout: 10_000 }).catch(() => undefined);
+      check(await page.getByText("Welcome back, Owner!").isVisible(), `${tag} · overview greets the signed-in person`);
+      check((await page.locator(".kpi").count()) === 4 && (await page.locator(".spark svg").count()) === 4, `${tag} · four figures with their trend lines`);
+      check((await page.locator(".map .pin").count()) >= 1, `${tag} · clients on the map`);
+      if (vp.name === "pc") {
+        // The map's Sri Lanka view and the platform health donut.
+        await page.getByRole("tab", { name: "Sri Lanka" }).click();
+        check((await page.locator(".map .pin").count()) >= 5, `${tag} · Sri Lanka view shows each town`);
+        if (scheme === "light") await page.locator(".dash-row").first().screenshot({ path: join(shots, "pc-dashboard-row.png") });
+        // Search: type a client's town, Enter opens it.
+        await page.getByRole("combobox", { name: "Search" }).fill("kandy");
+        await page.getByRole("option", { name: /Kandy Mist/ }).waitFor();
+        await page.keyboard.press("Enter");
+        await page.getByRole("heading", { name: "Kandy Mist Café" }).waitFor({ timeout: 10_000 });
+        check(true, `${tag} · search finds a client by town and opens it`);
+        // Alerts: the bell lists clients that need attention.
+        await page.getByRole("button", { name: /^Alerts/ }).click();
+        await page.getByRole("dialog", { name: "Alerts" }).getByText("Ella Bakehouse").waitFor();
+        if (scheme === "light") await page.screenshot({ path: join(shots, "pc-alerts.png") });
+        check(true, `${tag} · the bell lists clients that need attention`);
+        await page.keyboard.press("Escape");
+        await page.mouse.click(5, 400);
+      } else {
+        // The menu opens from the top bar on a phone.
+        await page.getByRole("button", { name: "Open menu" }).click();
+        const menu = page.getByRole("navigation", { name: "Console" });
+        await menu.getByRole("link", { name: "Subscriptions" }).waitFor();
+        await page.waitForTimeout(400); // the menu slides in
+        if (scheme === "light") await page.screenshot({ path: join(shots, "phone-menu.png") });
+        await menu.getByRole("link", { name: "Subscriptions" }).click();
+        await page.getByRole("heading", { name: "Subscriptions", level: 1 }).waitFor();
+        check(true, `${tag} · the phone menu opens and navigates`);
+      }
       await visit("clients", "/clients", "Noura Kitchen", "clients");
       await visit("client overview", "/clients/noura-kitchen", "Registered name", "client");
       for (const [tab, text, shot] of [["Health", "Server version", "client-health"], ["Licence", "Current licence", "client-licence"], ["Subscription", "Payments", "client-subscription"], ["Usage", "Bills, last", null], ["Suspend / notice", "Notice to the client", "client-status"], ["Activity", "issueLicence", null]]) {
@@ -89,7 +124,11 @@ try {
         if (shot && scheme === "light") await page.screenshot({ path: join(shots, `${vp.name}-${shot}.png`), fullPage: vp.name === "pc" });
       }
       await visit("licences", "/licences", "LIC-", "licences");
-      await visit("updates", "/updates", "New update", "updates");
+      await visit("deployments", "/updates", "New update", "updates");
+      await visit("subscriptions", "/subscriptions", "Monthly recurring revenue", "subscriptions");
+      await visit("monitoring", "/monitoring", "Unrecognised check-ins", "monitoring");
+      await visit("reports", "/reports", "Revenue collected", "reports");
+      await visit("support", "/support", "Client contacts", "support");
       await visit("staff", "/staff", "sales@polymath.test", "staff");
       await visit("audit log", "/audit", "suspend", null);
       await visit("settings", "/settings", "Licence public key", "settings");

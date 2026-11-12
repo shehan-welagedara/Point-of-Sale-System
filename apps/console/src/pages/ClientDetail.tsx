@@ -1,7 +1,7 @@
 import { EDITIONS, MODULES, editionInfo } from "@pos/core";
 import { limit, orderBy, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAction, useCol, useDocData, useSession } from "../state";
 import { type AuditEntry, CYCLE_MONTHS, type Client, type Payment, type UsageDay, ago, compareVersions, date, dateTime, fromCents, healthState, plusMonths, rupees, subscriptionState, todayColombo } from "../types";
 import { Field, HealthBadge, Loading, Modal, PageHead, StatusBadge, SubscriptionBadge } from "../ui";
@@ -13,13 +13,17 @@ export function ClientDetail() {
   const { id = "" } = useParams();
   const c = useDocData<Client>(`clients/${id}`);
   const gh = useDocData<{ latestVersion?: string }>("config/github");
-  const [tab, setTab] = useState<Tab>("overview");
+  const [params, setParams] = useSearchParams();
+  const tabs: [Tab, string][] = [["overview", "Overview"], ["health", "Health"], ["licence", "Licence"], ["subscription", "Subscription"], ["usage", "Usage"], ["status", "Suspend / notice"], ["activity", "Activity"]];
+  const asked = params.get("tab") as Tab | null;
+  const tab: Tab = asked && tabs.some(([k]) => k === asked) ? asked : "overview";
+  const setTab = (k: Tab) => setParams(k === "overview" ? {} : { tab: k }, { replace: true });
   if (c === undefined) return <Loading />;
   if (c === null) return <div className="empty">No client {id}. <Link to="/clients">Back to clients</Link></div>;
-  const tabs: [Tab, string][] = [["overview", "Overview"], ["health", "Health"], ["licence", "Licence"], ["subscription", "Subscription"], ["usage", "Usage"], ["status", "Suspend / notice"], ["activity", "Activity"]];
   return (
     <>
-      <PageHead title={c.name} sub={<><span className="mono">{c.projectId}</span> · wave {c.wave} · <a href={`https://${c.projectId}.web.app`} target="_blank" rel="noreferrer">{c.projectId}.web.app</a></>}>
+      <div className="crumbs small"><Link to="/clients">Clients</Link> / {c.name}</div>
+      <PageHead title={c.name} sub={<>{[c.industry, c.city].filter(Boolean).join(" · ")}{c.industry || c.city ? " · " : ""}<span className="mono">{c.projectId}</span> · wave {c.wave} · <a href={`https://${c.projectId}.web.app`} target="_blank" rel="noreferrer">{c.projectId}.web.app</a></>}>
         <div className="row wrap"><StatusBadge c={c} /><HealthBadge c={c} latest={gh?.latestVersion} /><SubscriptionBadge c={c} /></div>
       </PageHead>
       {c.link?.pendingProjectNumber ? <ConfirmProject c={c} /> : null}
@@ -61,6 +65,8 @@ function Overview({ c }: { c: Client }) {
       <div className="card card-body">
         <dl className="kv">
           <dt>Registered name</dt><dd>{c.legalName || "—"}</dd>
+          <dt>Industry</dt><dd>{c.industry || "—"}</dd>
+          <dt>Location</dt><dd>{[c.city, c.country].filter(Boolean).join(", ") || "—"}</dd>
           <dt>Contact</dt><dd>{[c.contact?.name, c.contact?.email, c.contact?.phone].filter(Boolean).join(" · ") || "—"}</dd>
           <dt>Project</dt><dd className="mono">{c.projectId}{c.projectNumber ? ` (${c.projectNumber})` : ""}</dd>
           <dt>Notes</dt><dd>{c.notes || "—"}</dd>
@@ -76,7 +82,7 @@ function Overview({ c }: { c: Client }) {
   );
 }
 
-const toForm = (c: Client): ClientForm => emptyClient({ id: c.id, name: c.name, legalName: c.legalName ?? "", contact: { name: c.contact?.name ?? "", email: c.contact?.email ?? "", phone: c.contact?.phone ?? "" }, address: c.address ?? "", notes: c.notes ?? "", projectId: c.projectId, projectNumber: c.projectNumber ?? "", region: c.region, wave: c.wave, maintenanceWindow: c.maintenanceWindow ?? "", enabled: c.enabled });
+const toForm = (c: Client): ClientForm => emptyClient({ id: c.id, name: c.name, legalName: c.legalName ?? "", contact: { name: c.contact?.name ?? "", email: c.contact?.email ?? "", phone: c.contact?.phone ?? "" }, address: c.address ?? "", industry: c.industry ?? "", city: c.city ?? "", country: c.country ?? "LK", notes: c.notes ?? "", projectId: c.projectId, projectNumber: c.projectNumber ?? "", region: c.region, wave: c.wave, maintenanceWindow: c.maintenanceWindow ?? "", enabled: c.enabled });
 
 function Health({ c, latest }: { c: Client; latest?: string }) {
   const h = healthState(c, latest);

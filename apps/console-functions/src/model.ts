@@ -71,6 +71,10 @@ export interface ConsoleClient {
   legalName?: string;
   contact?: { name?: string; email?: string; phone?: string };
   address?: string;
+  /** For the dashboard's map and lists. country: ISO 3166 two-letter code (LK, MV, …). */
+  industry?: string;
+  city?: string;
+  country?: string;
   notes?: string;
   projectId: string;
   projectNumber?: string;
@@ -91,6 +95,8 @@ export interface ConsoleClient {
 }
 
 export const DEFAULT_SUPPLIER: SupplierContact = { name: "Polymath Tech" };
+
+export const INDUSTRIES = ["Restaurant", "Café", "Bakery", "Bar & pub", "Hotel", "Resort", "Catering", "Retail", "Other"] as const;
 
 const DAY = 86_400_000;
 const dayStart = (d: string) => Date.parse(`${d}T00:00:00+05:30`);
@@ -169,4 +175,60 @@ export function validateCheckin(b: unknown): CheckinRequest {
     t.errors24h = Math.max(0, Math.min(Number(t.errors24h) || 0, 1_000_000));
   }
   return r;
+}
+
+const CYCLE_MONTHS: Record<Subscription["cycle"], number> = { monthly: 1, quarterly: 3, annual: 12, perpetual: 0 };
+
+/** The subscription's monthly equivalent in rupees (0 for perpetual or cancelled). */
+export function monthlyLkr(s: Subscription | undefined): number {
+  if (!s || s.cancelled || !CYCLE_MONTHS[s.cycle]) return 0;
+  return s.priceLkr / CYCLE_MONTHS[s.cycle];
+}
+
+/** One day's figures for the dashboard's trends (metrics/{date}). */
+export interface DailyMetrics {
+  date: string;
+  at: string;
+  clients: number;
+  active: number;
+  suspended: number;
+  /** Checked in within 36 hours. */
+  reporting: number;
+  healthy: number;
+  attention: number;
+  offline: number;
+  noCheckin: number;
+  licencesValid: number;
+  paid: number;
+  due: number;
+  overdue: number;
+  /** Monthly recurring revenue: every live subscription at its monthly equivalent. */
+  mrrLkr: number;
+  versions: Record<string, number>;
+}
+
+export function dailyMetrics(clients: ConsoleClient[], latestVersion: string | undefined, now: Date): DailyMetrics {
+  const live = clients.filter((c) => c.status !== "cancelled");
+  const health = live.map((c) => healthState(c, latestVersion, now).state);
+  const subs = live.map((c) => subscriptionState(c.subscription, now).state);
+  const versions: Record<string, number> = {};
+  for (const c of live) if (c.health?.appVersion) versions[c.health.appVersion.replace(/\./g, "_")] = (versions[c.health.appVersion.replace(/\./g, "_")] ?? 0) + 1;
+  return {
+    date: new Date(now.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10),
+    at: now.toISOString(),
+    clients: live.length,
+    active: live.filter((c) => c.status === "active").length,
+    suspended: live.filter((c) => c.status === "suspended").length,
+    reporting: health.filter((h) => h === "ok" || h === "attention").length,
+    healthy: health.filter((h) => h === "ok").length,
+    attention: health.filter((h) => h === "attention").length,
+    offline: health.filter((h) => h === "offline").length,
+    noCheckin: health.filter((h) => h === "unknown").length,
+    licencesValid: live.filter((c) => c.licence && Date.parse(c.licence.expiresAt) >= now.getTime()).length,
+    paid: subs.filter((x) => x === "paid" || x === "perpetual").length,
+    due: subs.filter((x) => x === "due").length,
+    overdue: subs.filter((x) => x === "overdue").length,
+    mrrLkr: Math.round(live.reduce((n, c) => n + monthlyLkr(c.subscription), 0)),
+    versions,
+  };
 }

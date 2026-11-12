@@ -11,7 +11,7 @@ import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { ActionError, type Deps, runAction } from "./actions.js";
+import { ActionError, type Deps, recordMetrics, runAction } from "./actions.js";
 import { handleCheckin } from "./checkin.js";
 import { IdentityError, verifyGoogleIdToken } from "./identity.js";
 import type { StaffRole } from "./model.js";
@@ -90,4 +90,5 @@ export const consoleApi = onCall({ secrets: [LICENCE_PRIVATE_KEY, GITHUB_TOKEN],
 export const housekeeping = onSchedule({ schedule: "every day 06:15", timeZone: "Asia/Colombo", secrets: [LICENCE_PRIVATE_KEY, GITHUB_TOKEN] }, async () => {
   const system = { uid: "system", email: "system", emailVerified: true, role: "support" };
   await runAction(deps(new Date()), system, { action: "refreshDeployments" }).catch(() => undefined);
+  await recordMetrics(db, new Date());
 });

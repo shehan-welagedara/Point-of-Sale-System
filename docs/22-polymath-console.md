@@ -13,14 +13,17 @@ The **Polymath Console** is Polymath Tech's own system for running the business 
 
 | Area | What you can do |
 |---|---|
-| **Dashboard** | Clients needing attention: not seen for over a day, licence ending within 30 days, renewal due or overdue, errors on their devices, devices on an old version. Totals: clients, active, suspended, revenue due. |
-| **Clients** | Each client's profile (business, contacts, Firebase project, region, release wave), status, notes and full history. |
+| **Overview** | Welcome banner with the systems' status; four figures with 30-day trend lines (clients, systems checking in, revenue this month, health); where clients are (world and Sri Lanka maps); platform health (healthy, attention, offline, not linked; licences valid, paid, on the latest version); recent activity; your clients; quick actions. The bell at the top lists every client needing attention: not seen for over a day, licence ending within 30 days, renewal due or overdue, errors on their devices, devices on an old version. Search (Ctrl/⌘ K) finds a client by name, town, project or licence. |
+| **Clients** | Each client's profile (business, industry, town and country, contacts, Firebase project, region, release wave), status, notes and full history. |
 | **Licences** | Issue, renew, upgrade or add modules from the browser. The licence reaches the client's system **by itself** within a day (or at once, when they press *Check now*); the key can also be copied and pasted as before. Every licence ever issued is kept. |
 | **Suspend / restore** | Suspend a client (for example unpaid). Their system shows a notice for the grace period you choose (7 days by default), then the licensed modules stop, as when a licence expires. **Their data is always kept**, and **Restore** brings everything back at the next check-in. |
-| **Subscriptions** | Plan, price, billing cycle, paid-until date, payments received; one click records a payment and renews the licence to the new paid-until date. Clients see a reminder in their back office before the renewal date. |
+| **Subscriptions** | Plan, price, billing cycle, paid-until date, payments received; one click records a payment and renews the licence to the new paid-until date. Clients see a reminder in their back office before the renewal date. The Subscriptions page totals monthly recurring revenue, renewals due, overdue amounts and the latest payments. |
+| **Monitoring** | Every system as it reported at its last check-in: status, version, devices (and how many run an older version), errors in 24 hours, last check-in, licence end, and what to look at. |
+| **Reports & Analytics** | Revenue collected by month, clients over time, sales through POS Suite across clients that share their figures, and the mix of versions, editions, plans and industries; every chart also as a table. |
+| **Support** | What clients see on their About page, the guides, systems that need help, and every client's contact person. |
 | **Health** | From each client's daily check-in: the server version, each device and its version, errors in the last 24 hours, licence status, businesses in the project, last check-in. |
 | **Usage** | Per business and day: bills, covers, net sales and total (only if the client's owner leaves *Share daily figures with Polymath Tech* on, under About). |
-| **Updates** | Start a release to one client, a wave or everyone; it runs the GitHub Actions release pipeline ([20](20-release-and-updates.md)) with each client's settings from the console, and shows its progress. |
+| **Deployments** | Start a release to one client, a wave or everyone; it runs the GitHub Actions release pipeline ([20](20-release-and-updates.md)) with each client's settings from the console, and shows its progress. |
 | **Staff** | Owner, Admin, Sales, Support and Engineer roles; every action is written to an audit log. |
 | **Company** | Polymath Tech's contact details, shown on every client's About page ("Help and support"). |
 
@@ -62,6 +65,7 @@ sequenceDiagram
 | `clients/{id}/payments/{id}` | Payments received |
 | `licences/{licenceId}` | Every licence issued: payload, key, who issued it and why |
 | `deployments/{id}` | Updates started from the console and their GitHub run |
+| `metrics/{date}` | Each day's figures for the Overview's trend lines (clients, checking in, healthy, paid, monthly recurring revenue, versions), written by housekeeping |
 | `staff/{uid}`, `invites/{email}` | Staff and their roles |
 | `audit/{id}` | Every action by every staff member |
 | `config/company`, `config/github` | Contact details; repository settings |
@@ -69,6 +73,8 @@ sequenceDiagram
 Staff read through the security rules; **every change goes through the console's server functions**, which check the role and write the audit log.
 
 ## 4. Setting it up (once)
+
+The step-by-step guide, with every screen, setting and message, is [23-polymath-console-deployment.md](23-polymath-console-deployment.md). In short:
 
 1. **Firebase project** for the console (Firebase console → Add project, for example `polymath-console`), on the **Blaze** plan with a USD 5 budget alert, like a client's (deployment manual B and C). In it:
    - **Firestore**: create the database in `asia-south1`, production mode.
@@ -89,18 +95,18 @@ Staff read through the security rules; **every change goes through the console's
 
 4. Open `https://CONSOLE-PROJECT-ID.web.app`, sign in with the owner's Google account, and fill in **Settings → Company** (support email, phone, WhatsApp, website).
 5. **Clients → Add client** for each existing client (Noura Kitchen: `noura-kitchen`, project `noura-kitchen-pos`). Then deploy each client once (`pnpm release:deploy --target noura-kitchen`) so their system starts checking in; their first check-in shows on the client's page within a minute of pressing **About → Check now** in their back office.
-6. Optional, for **Updates** from the console: Settings → GitHub (repository, workflow) and the GitHub token (`pnpm console:setup --github-token`), plus the one-time release pipeline setup in [20 §3](20-release-and-updates.md).
+6. Optional, for **Deployments** from the console: Settings → GitHub (repository, workflow) and the GitHub token (`pnpm console:setup --github-token`), plus the one-time release pipeline setup in [20 §3](20-release-and-updates.md).
 
 ## 5. Daily use
 
 - **New client:** Clients → Add client → (deploy them: deployment manual) → Licence → *Issue*: edition, add-ons, limits, months. It reaches their system at the next check-in; or copy the key for the client's administrator.
 - **Payment received:** client → Subscription → *Record payment* (amount, method, reference, paid until) → *Renew licence to paid-until date*.
 - **Not paid:** client → *Suspend*, with a message the client sees and a grace period. *Restore* when paid.
-- **Release:** Updates → *New update* → target (staging, wave 1, wave 2, or clients) → follows the run; the dashboard shows which clients run which version after their next check-in.
+- **Release:** Deployments → *New update* → target (staging, wave 1, wave 2, or clients) → follows the run; the dashboard shows which clients run which version after their next check-in.
 
 ## 6. Costs
 
-The console is one more small Firebase project: a few hundred reads and writes a day, one scheduled job (the daily GitHub status refresh), Secret Manager (6 secret versions free), all inside the free tier. Each client's check-in is one function call a day in their project (one Cloud Scheduler job, still inside the 3 free jobs per billing account together with the hourly audit sealer).
+The console is one more small Firebase project: a few hundred reads and writes a day, one scheduled job (housekeeping every morning: the GitHub status refresh and the day's dashboard figures), Secret Manager (6 secret versions free), all inside the free tier. Each client's check-in is one function call a day in their project (one Cloud Scheduler job, still inside the 3 free jobs per billing account together with the hourly audit sealer).
 
 ## 7. Trying it on your PC (no cloud)
 

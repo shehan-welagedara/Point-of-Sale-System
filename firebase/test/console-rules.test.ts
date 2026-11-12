@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { type RulesTestEnvironment, assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collectionGroup, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 
 let env: RulesTestEnvironment;
 
@@ -52,6 +52,23 @@ describe("Polymath Console rules", () => {
     const support = as("u-support", "support");
     for (const p of ["licences/L1", "deployments/D1", "audit/A1", "config/company", "unknownProjects/p", "clients/noura-kitchen/usage/2026-11-10", "clients/noura-kitchen/payments/P1"]) await assertSucceeds(getDoc(doc(support, p)));
     await assertFails(getDoc(doc(support, "other/x")));
+  });
+  it("lets staff read the daily figures, and every client's payments and usage at once (revenue, reports), and nobody else", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "metrics/2026-11-12"), { clients: 1 });
+      await setDoc(doc(db, "clients/noura-kitchen/payments/P1"), { amount: 60000, date: "2026-11-12" });
+      await setDoc(doc(db, "clients/kandy-myst/payments/P2"), { amount: 90000, date: "2026-11-02" });
+    });
+    await assertSucceeds(getDoc(doc(as("u-support", "support"), "metrics/2026-11-12")));
+    await assertFails(getDoc(doc(as("stranger"), "metrics/2026-11-12")));
+    await assertFails(setDoc(doc(as("u-owner", "owner"), "metrics/2026-11-12"), { clients: 99 }));
+    const all = await assertSucceeds(getDocs(collectionGroup(as("u-sales", "sales"), "payments")));
+    if (all.size !== 2) throw new Error(`expected 2 payments, got ${all.size}`);
+    await assertFails(getDocs(collectionGroup(as("stranger"), "payments")));
+    await assertFails(getDocs(collectionGroup(env.unauthenticatedContext().firestore(), "payments")));
+    await assertSucceeds(getDocs(collectionGroup(as("u-support", "support"), "usage")));
+    await assertFails(getDocs(collectionGroup(as("stranger"), "usage")));
   });
   it("lets a signed-in person read their own staff record", async () => {
     await assertSucceeds(getDoc(doc(as("u-new"), "staff", "u-new")));

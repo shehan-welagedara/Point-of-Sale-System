@@ -1,5 +1,5 @@
 import { type User, onIdTokenChanged, signOut } from "firebase/auth";
-import { type DocumentData, type QueryConstraint, collection, doc, onSnapshot, query } from "firebase/firestore";
+import { type DocumentData, type QueryConstraint, collection, collectionGroup, doc, onSnapshot, query } from "firebase/firestore";
 import { type ReactNode, createContext, useContext, useEffect, useMemo, useState } from "react";
 import { call, errorText, firebase } from "./firebase";
 
@@ -111,6 +111,21 @@ export function useCol<T = DocumentData>(path: string | null, constraints: Query
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, key]);
+  return docs;
+}
+
+/** Live query over every client's sub-collection of this name (payments, usage); adds clientId. */
+export function useGroup<T = DocumentData>(name: string, constraints: QueryConstraint[] = [], key = ""): T[] | undefined {
+  const [docs, setDocs] = useState<T[] | undefined>(undefined);
+  useEffect(() => {
+    setDocs(undefined);
+    return onSnapshot(
+      query(collectionGroup(firebase().db, name), ...constraints),
+      (snap) => setDocs(snap.docs.map((d) => ({ id: d.id, clientId: d.ref.parent.parent?.id, ...d.data() }) as T)),
+      () => setDocs([]),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, key]);
   return docs;
 }
 

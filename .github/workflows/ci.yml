@@ -28,4 +28,6 @@ jobs:
         env:
           CONSOLE_UI: skip
       - run: pnpm build
+      # Rehearses updating a live client (backup, data updates, deploy order) with Google simulated.
+      - run: pnpm test:update
       - run: pnpm build:console
