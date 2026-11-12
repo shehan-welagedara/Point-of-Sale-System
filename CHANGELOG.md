@@ -2,6 +2,26 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.8.0 — 2026-11-12
+
+**Type:** Minor (Polymath Console redesign and new pages; release QA) · **Deploy:** the console (`pnpm console:deploy`); clients optional (their system is unchanged)
+
+### For clients
+
+- Nothing changes in the system restaurants use. Updating to 1.8.0 is safe and optional; it only shows the new version number on the About page.
+
+### Changes
+
+- **Polymath Console in the Polymath Technologies look** (light lavender and violet, with a matching dark theme): white sidebar with icons, the *Polymath Ecosystem* card and your profile; a top bar with search (Ctrl/⌘ K finds a client by name, town, project or licence), alerts (every client needing attention) and an account menu; a slide-in menu on phones.
+- **Overview:** welcome banner with the systems' status; total clients, systems checking in, revenue this month and system health, each with a 30-day trend line; where clients are on a world map and a Sri Lanka map (drawn from Natural Earth, no map library); platform health (healthy, attention, offline, not linked; licences valid, paid, latest version); recent activity; your clients; quick actions.
+- **New pages:** Subscriptions (monthly recurring revenue, annual run rate, collected this month, renewals due, overdue, latest payments), Monitoring (every system's check-in: status, version, devices, errors, licence, what to look at), Reports & Analytics (revenue by month, client growth, sales through POS Suite across clients that share figures, versions, editions, plans, industries; every chart also as a table), Support (what clients see, guides, systems needing help, contacts). *Updates* is now *Deployments*.
+- Clients have an **industry, town and country**. Fixed: a country typed as a name was stored as its first two letters.
+- The console's server writes each day's figures to `metrics/{date}` (morning housekeeping and the `recordMetrics` action). Staff may read every client's payments and usage at once (security rules; a collection-group index for usage).
+- **`pnpm console:backup`**: exports the console's database to a bucket in its own project (90-day retention) and switches on Firestore delete protection.
+- **Docs:** [23 · Polymath Console deployment and configuration (A to Z)](docs/23-polymath-console-deployment.md); docs/22, docs/18 and the README updated.
+- **`pnpm test:update`** (also in CI): rehearses updating a live client end to end with Google simulated: backup with the Firebase sign-in, indexes, the data updates on businesses created on 1.5.8 (only the bill footer changes), rules and functions (the new ones load), the web app and the version check; a second run changes nothing; a failed backup or an unreachable site stops the deploy before anything is touched. The release tool reads `POS_LIVE_BASE` (tests only) for the site address.
+- Tests: console unit tests (11), console rules (7), the console end to end (48 checks) and every console screen in light and dark on a PC and a phone, with contrast and screen-width checks (190 checks in all).
+
 ## 1.7.0 — 2026-11-11
 
 **Type:** Minor (Polymath Console and the link to it) · **Deploy:** full (new functions `consoleCheckin` and `consoleLinkNow`; security rules)

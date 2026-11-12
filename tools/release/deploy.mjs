@@ -140,6 +140,9 @@ function preflight() {
   return built;
 }
 
+/** A project's web address. POS_LIVE_BASE (tests only) points it at a local stand-in: http://127.0.0.1:PORT/{project}. */
+const siteUrl = (projectId) => (process.env.POS_LIVE_BASE ? process.env.POS_LIVE_BASE.replace("{project}", projectId) : `https://${projectId}.web.app`);
+
 /**
  * What is live on a project: { version } when a release is deployed, { none: true } only when Firebase
  * Hosting clearly answers "nothing here" (404), and { unknown } for anything else (no connection, an
@@ -147,7 +150,7 @@ function preflight() {
  */
 async function liveState(projectId) {
   try {
-    const r = await fetch(`https://${projectId}.web.app/version.json?t=${Date.now()}`, { cache: "no-store", signal: AbortSignal.timeout(20_000) });
+    const r = await fetch(`${siteUrl(projectId)}/version.json?t=${Date.now()}`, { cache: "no-store", signal: AbortSignal.timeout(20_000) });
     if (r.status === 404) return { none: true };
     if (!r.ok) return { unknown: `HTTP ${r.status}` };
     const v = (await r.json().catch(() => ({}))).version;
@@ -172,7 +175,7 @@ async function backup(c, stamp) {
 }
 
 async function verify(projectId) {
-  const url = `https://${projectId}.web.app/version.json`;
+  const url = `${siteUrl(projectId)}/version.json`;
   for (let i = 0; i < 6; i++) {
     try {
       const v = await (await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" })).json();

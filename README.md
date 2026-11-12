@@ -35,7 +35,7 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 ## What's in the box
 | Area | Highlights |
 |------|-----------|
-| **Polymath Console** (for Polymath Tech) | Central management of every client in its own Firebase project: licences issued and renewed from the browser and delivered automatically, subscriptions and payments with renewal reminders, health and versions from a daily check-in, usage figures, suspend/restore, updates through GitHub Actions, staff roles and an audit log. [Details](docs/22-polymath-console.md) |
+| **Polymath Console** (for Polymath Tech) | Central management of every client in its own Firebase project, in the Polymath Technologies look: an overview with live figures, trend lines, a map of clients (world and Sri Lanka) and platform health; licences issued and renewed from the browser and delivered automatically; subscriptions, payments and monthly recurring revenue; monitoring of every system's daily check-in; reports and analytics; suspend/restore; updates through GitHub Actions; staff roles and an audit log. [How it works](docs/22-polymath-console.md) · [Deployment and configuration](docs/23-polymath-console-deployment.md) |
 | **Licensing & modules** | Editions (Starter, Professional, Enterprise) with add-ons and limits; vendor-signed licence keys bound to the client's Firebase project; modules chosen at installation; launchpad with a separate workspace per module. [Details](docs/15-licensing-and-modules.md) |
 | **POS** (terminals and tablets) | PIN sign-in with roles and manager override; tables and covers; dine-in, takeaway and delivery; modifiers; **allergy alerts**; send to kitchen (KOT routing kitchen/bar, backup printers); guest check with **LankaQR**; split payments (cash with change, card approval code, LankaQR, PayHere, USD cash, vouchers, house account, comp); voids with reason codes; discounts; 86 items; X/Z reports; **End of Day** (stock deduction, journal, WhatsApp report) |
 | **Sri Lanka compliance** | Service charge → SSCL → VAT order, inclusive or exclusive pricing, **IRD tax invoice format** (Gazette 2481/22) with `YYMMM_W01_n` numbers per workstation, hash-chained immutable invoices, plain invoices for non-VAT businesses |
@@ -80,6 +80,7 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | 20 | [**Releases and updates**](docs/20-release-and-updates.md): versions, waves, approvals, backups, migrations, rollback, support levels |
 | 21 | [**Security and reliability review**](docs/21-security-review.md) and the go-live security checklist |
 | 22 | [**Polymath Console**](docs/22-polymath-console.md): central management of clients, licences, subscriptions, health and updates |
+| 23 | [**Polymath Console deployment and configuration (A to Z)**](docs/23-polymath-console-deployment.md): Firebase project, setup, deploy, staff, clients, linking, GitHub updates, backups, troubleshooting |
 
 ## Commands
 ```bash
@@ -93,17 +94,20 @@ pnpm test:pairing      # connecting phones with codes, in a browser against the 
 pnpm test:contrast     # text colour contrast (WCAG AA) on every POS and back-office screen, all sizes and styles
 pnpm test:golive       # go-live rehearsal: a new restaurant from empty to its first day in the books
 pnpm test:migrations   # data migrations on the Firestore emulator (needs Java)
+pnpm test:update       # rehearses updating a live client (backup, data updates, deploy order) with Google simulated
 pnpm deploy:setup      # vendor PC: check tools and sign-in, licence key, register a client (deployment manual F)
 pnpm deploy:check      # vendor PC: can Node.js reach Google and Firebase? (antivirus, proxy, firewall)
 pnpm deploy:access --project ID  # check and fix a client project's permissions for the server functions
-pnpm console:setup     # Polymath Console: keys in Secret Manager, owner, console address for client deploys (docs/22)
+pnpm console:setup     # Polymath Console: keys in Secret Manager, owner, console address for client deploys (docs/23)
 pnpm console:deploy    # deploy the Polymath Console to its Firebase project
+pnpm console:backup    # back up the console's database (clients, licences, payments, audit) and switch on delete protection
 pnpm console:dev       # the console against the emulators (VITE_USE_EMULATORS=true)
 pnpm test:console      # console + a client's check-in end to end on the emulators, and every console screen
 pnpm release:version 1.1.0       # start a release: version + CHANGELOG entry (then tag vX.Y.Z and push)
 pnpm release:deploy --target …   # deploy: staging, wave:N or client ids (backup → indexes → migrations → rules/functions → hosting); needs only `firebase login`
 pnpm manual:screenshots  # refresh the manual screenshots from the demo restaurant
 pnpm manual:pdf -- --client "Name"  # user and training manuals as A4 PDFs in manual-pdf/
+pnpm manual:pdf -- --doc docs/23-polymath-console-deployment.md  # any guide as an A4 PDF (for Polymath Tech)
 pnpm licence keygen    # vendor: create your licence signing key (once)
 pnpm licence issue …   # vendor: issue a client licence key by hand (usually the console does it; docs/15)
 pnpm emulators         # local Firebase Auth + Firestore + Functions

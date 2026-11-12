@@ -234,7 +234,7 @@ It fills in, so you don't have to edit them by hand:
 - `release/clients.json`: the client's project ID, region (asia-south1, Mumbai), backup location, and *switched on*;
 - `apps/web/.env.production` and `apps/functions/.env`: your licence public key and the region.
 
-**Polymath Console.** If you have set up the console ([22](22-polymath-console.md), `pnpm console:setup`, once for all clients), `apps/functions/.env` also holds its address (`CONSOLE_URL`), so the client's system checks in with the console from its first deploy. Add the client in the console (Clients → Add client) before or after the deploy.
+**Polymath Console.** If you have set up the console ([23](23-polymath-console-deployment.md), `pnpm console:setup`, once for all clients), `apps/functions/.env` also holds its address (`CONSOLE_URL`), so the client's system checks in with the console from its first deploy. Add the client in the console (Clients → Add client) before or after the deploy.
 
 You can run it again at any time: it only fills in or corrects these values. Carry on to G when it finishes with no ✗.
 

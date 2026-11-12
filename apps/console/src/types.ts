@@ -42,6 +42,10 @@ export interface Client {
   legalName?: string;
   contact?: { name?: string; email?: string; phone?: string };
   address?: string;
+  industry?: string;
+  city?: string;
+  /** ISO 3166 two-letter code. */
+  country?: string;
   notes?: string;
   projectId: string;
   projectNumber?: string;
@@ -72,6 +76,8 @@ export interface UsageDay {
 
 export interface Payment {
   id: string;
+  /** Filled in when payments of every client are read at once. */
+  clientId?: string;
   date: string;
   amount: number;
   method: string;
@@ -110,6 +116,28 @@ export interface Staff {
   active: boolean;
   joinedAt: string;
 }
+
+/** One day's figures (metrics/{date}, written by the console's server every morning). */
+export interface DailyMetrics {
+  id: string;
+  date: string;
+  clients: number;
+  active: number;
+  suspended: number;
+  reporting: number;
+  healthy: number;
+  attention: number;
+  offline: number;
+  noCheckin: number;
+  licencesValid: number;
+  paid: number;
+  due: number;
+  overdue: number;
+  mrrLkr: number;
+  versions: Record<string, number>;
+}
+
+export const INDUSTRIES = ["Restaurant", "Café", "Bakery", "Bar & pub", "Hotel", "Resort", "Catering", "Retail", "Other"] as const;
 
 export interface UnknownProject {
   id: string;
@@ -189,3 +217,58 @@ export const plusMonths = (d: string, months: number) => {
   return x.toISOString().slice(0, 10);
 };
 export const CYCLE_MONTHS: Record<string, number> = { monthly: 1, quarterly: 3, annual: 12, perpetual: 0 };
+
+/** Rs 12.8M · Rs 845K · Rs 9,500 */
+export const rupeesShort = (n: number) => {
+  const a = Math.abs(n);
+  if (a >= 1e6) return `Rs ${(n / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, "")}M`;
+  if (a >= 1e5) return `Rs ${Math.round(n / 1e3).toLocaleString("en-LK")}K`;
+  return rupees(n);
+};
+export const percent = (r: number, digits = 1) => `${(Math.round(r * 1000) / 10).toFixed(digits).replace(/\.0$/, "")}%`;
+
+/** The subscription's monthly equivalent (0 for perpetual or cancelled). */
+export function monthlyLkr(s: Subscription | undefined): number {
+  if (!s || s.cancelled || !CYCLE_MONTHS[s.cycle]) return 0;
+  return s.priceLkr / CYCLE_MONTHS[s.cycle]!;
+}
+
+/** The newest POS Suite version: the release branch's, else the newest any client runs. */
+export function latestVersion(clients: Client[], gh?: { latestVersion?: string } | null): string | undefined {
+  return gh?.latestVersion ?? clients.map((c) => c.health?.appVersion).filter((v): v is string => Boolean(v)).sort(compareVersions).pop();
+}
+
+/** Everything that needs a person's attention, newest problems first. */
+export function attentionList(clients: Client[], latest: string | undefined, now = new Date()): { c: Client; reasons: string[]; level: "warn" | "bad" }[] {
+  return clients
+    .filter((c) => c.status !== "cancelled")
+    .map((c) => {
+      const h = healthState(c, latest, now);
+      const s = subscriptionState(c.subscription, now);
+      const reasons = h.reasons.filter((r) => r !== "no check-in yet");
+      if (s.state === "overdue") reasons.push(`payment ${-(s.daysLeft ?? 0)} day(s) late`);
+      if (s.state === "due") reasons.push(`renewal in ${s.daysLeft} day(s)`);
+      if (c.status === "suspended") reasons.push(`suspended${c.suspension ? ` (grace until ${date(c.suspension.graceUntil)})` : ""}`);
+      const level: "warn" | "bad" = h.state === "offline" || c.status === "suspended" || s.state === "overdue" ? "bad" : "warn";
+      return { c, reasons, level };
+    })
+    .filter((x) => x.reasons.length)
+    .sort((a, b) => (a.level === b.level ? a.c.name.localeCompare(b.c.name) : a.level === "bad" ? -1 : 1));
+}
+
+/** "Online", "Warning", "Critical" or "Not linked yet", as the client list shows it. */
+export function liveStatus(c: Client, latest: string | undefined, now = new Date()): { tone: "good" | "warn" | "bad" | "none"; label: string } {
+  if (c.status === "suspended") return { tone: "bad", label: "Suspended" };
+  if (c.status === "cancelled") return { tone: "none", label: "Cancelled" };
+  const h = healthState(c, latest, now).state;
+  if (h === "ok") return { tone: "good", label: "Online" };
+  if (h === "attention") return { tone: "warn", label: "Warning" };
+  if (h === "offline") return { tone: "bad", label: "Offline" };
+  return { tone: "none", label: "Not linked yet" };
+}
+
+/** Initials for an avatar: "Noura Kitchen" → "NK". */
+export const initials = (name: string) => name.split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
+
+/** This month in Sri Lanka: "2026-11". */
+export const colomboMonth = (d = new Date()) => new Date(d.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 7);

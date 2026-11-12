@@ -3,6 +3,7 @@
  *
  *   pnpm manual:pdf
  *   pnpm manual:pdf -- --client "Kandy Myst Restaurant"
+ *   pnpm manual:pdf -- --doc docs/23-polymath-console-deployment.md   (any guide, for Polymath Tech)
  *
  * Output: manual-pdf/*.pdf (git-ignored). Screenshots come from docs/manual/img
  * (refresh them with `pnpm manual:screenshots`).
@@ -26,10 +27,11 @@ const flag = (name) => {
   return i >= 0 ? argv[i + 1] : undefined;
 };
 const client = flag("client");
-const product = flag("product") ?? "POS Suite by Polymath Tech · Restaurant POS & Back Office";
+const single = flag("doc");
+const product = flag("product") ?? (single ? "Polymath Tech" : "POS Suite by Polymath Tech · Restaurant POS & Back Office");
 const issued = new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
-const docs = [
+const docs = single ? [{ file: resolve(root, single), name: basename(single, ".md").replace(/^\d+-/, "").replace(/(^|-)([a-z])/g, (_, a, b) => a + b.toUpperCase()), kind: "Guide" }] : [
   { file: join(manual, "user-manual.md"), name: "User-Manual", kind: "User manual" },
   { file: join(manual, "configuration-guide.md"), name: "Configuration-Guide", kind: "Configuration guide" },
   ...readdirSync(join(manual, "training"))
@@ -90,16 +92,16 @@ try {
   const page = await browser.newPage();
   for (const d of docs) {
     const md = readFileSync(d.file, "utf8");
-    const title = (md.match(/^# (.+)$/m)?.[1] ?? d.name).replace(/^Training: /, "");
+    const title = (md.match(/^# (.+)$/m)?.[1] ?? d.name).replace(/^Training: /, "").replace(/^\d+\.\s*/, "");
     const body = toHtml(md);
-    const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${pathToFileURL(dirname(d.file)).href}/"><style>${CSS}</style></head><body class="${d.kind === "Training manual" ? "training" : "manual"}">
+    const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${pathToFileURL(dirname(d.file)).href}/"><style>${CSS}</style></head><body class="${d.kind === "Training manual" || d.kind === "Guide" ? "training" : "manual"}">
 <section class="cover">
   <div class="band"></div>
   <div class="kind">${d.kind}</div>
   <div class="title">${title}</div>
   <div class="product">${product}</div>
-  ${client ? `<div class="for">Prepared for<br><strong>${client.replace(/</g, "&lt;")}</strong></div>` : `<div class="for">Prepared for: ______________________________</div>`}
-  <div class="meta">Issued ${issued}. The screens shown are from the demo restaurant; your system shows your own name, menu and prices.</div>
+  ${single ? "" : client ? `<div class="for">Prepared for<br><strong>${client.replace(/</g, "&lt;")}</strong></div>` : `<div class="for">Prepared for: ______________________________</div>`}
+  <div class="meta">${single ? `Issued ${issued}. For Polymath Tech staff.` : `Issued ${issued}. The screens shown are from the demo restaurant; your system shows your own name, menu and prices.`}</div>
 </section>
 <main class="doc">${body}</main></body></html>`;
     const htmlFile = join(tmp, `${d.name}.html`);

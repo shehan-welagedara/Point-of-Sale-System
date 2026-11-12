@@ -33,5 +33,10 @@ service cloud.firestore {
     match /audit/{id} { allow read: if staff(); allow write: if false; }
     match /config/{id} { allow read: if staff(); allow write: if false; }
     match /unknownProjects/{id} { allow read: if staff(); allow write: if false; }
+    match /metrics/{date} { allow read: if staff(); allow write: if false; }
+    // Every client's payments at once (revenue on the dashboard and reports).
+    match /{path=**}/payments/{id} { allow read: if staff(); }
+    // Every client's daily figures at once (Reports).
+    match /{path=**}/usage/{date} { allow read: if staff(); }
   }
 }
