@@ -27,6 +27,7 @@
     "manual:screenshots": "node apps/web/e2e/manual-shots.mjs",
     "manual:pdf": "node tools/manual/build-pdf.mjs",
     "test:migrations": "firebase emulators:exec --only firestore --project demo-migrations \"node tools/release/test-migrations.mjs\"",
+    "test:update": "firebase emulators:exec --only firestore --project demo-noura-kitchen \"node tools/release/test-update.mjs\"",
     "deploy:setup": "node tools/release/setup.mjs",
     "deploy:check": "node tools/release/netcheck.mjs",
     "deploy:access": "node tools/release/functions-access.mjs",
