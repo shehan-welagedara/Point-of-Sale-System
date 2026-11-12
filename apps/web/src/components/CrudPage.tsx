@@ -1,3 +1,5 @@
+import { useIsPhone } from "../lib/useIsPhone";
+import { PhoneList } from "./PhoneList";
 import { type ReactNode, useMemo, useState } from "react";
 import { codeToId, newId } from "@pos/core";
 import { useApp, useCollection, useStore } from "../state/app";
@@ -200,10 +202,42 @@ export interface CrudProps {
   noun?: string;
   /** Fit the list to the screen with its own scroll (default). Off when a page stacks several lists. */
   fill?: boolean;
+  /** How a row reads on a phone; by default it is built from the columns (name, details, figure, status). */
+  phoneRow?: { title: (d: AnyDoc) => ReactNode; sub?: (d: AnyDoc) => ReactNode; value?: (d: AnyDoc) => ReactNode; valueLabel?: string; badge?: (d: AnyDoc) => ReactNode };
+}
+
+/** A phone row from the list's columns: the name, two details, the first figure and the status. */
+function phoneRowFrom(columns: ColumnDef[]): NonNullable<CrudProps["phoneRow"]> {
+  const isCode = (h: string) => /^(code|no\.?|#|number)$/i.test(h.trim());
+  // Columns without a header (photos, buttons) don't read as text on a phone.
+  const cols = columns.filter((c) => c.header.trim() && !/^(photo|image|picture)$/i.test(c.header.trim()));
+  const nameCol = cols.find((c) => /^(name|item|employee|customer|vendor|supplier|title|description)$/i.test(c.header.trim())) ?? cols.find((c) => !isCode(c.header) && !c.num) ?? cols[0] ?? columns[0]!;
+  const status = cols.find((c) => /status|state|active/i.test(c.header) && c !== nameCol);
+  const value = cols.find((c) => c.num && c !== nameCol);
+  const details = cols.filter((c) => c !== nameCol && c !== status && c !== value && !c.num).slice(0, 2);
+  return {
+    title: nameCol.render,
+    sub: details.length
+      ? (d) => (
+          <>
+            {details.map((c, i) => (
+              <span key={c.header}>
+                {i ? " · " : ""}
+                {c.render(d)}
+              </span>
+            ))}
+          </>
+        )
+      : undefined,
+    value: value?.render,
+    valueLabel: value && !/price|amount|total|cost|value|balance/i.test(value.header) ? value.header : undefined,
+    badge: status?.render,
+  } as NonNullable<CrudProps["phoneRow"]>;
 }
 
 export function CrudPage(p: CrudProps) {
   const { toast } = useApp();
+  const phone = useIsPhone();
   const store = useStore();
   const docs = useCollection<AnyDoc>(p.col);
   const [q, setQ] = useState("");
@@ -269,9 +303,11 @@ export function CrudPage(p: CrudProps) {
         actions={
           <>
             {p.headerActions}
-            <button className="btn primary" onClick={() => setEditing({ doc: { id: "", ...p.newDoc() }, isNew: true })}>
-              + New {noun}
-            </button>
+            {phone ? null : (
+              <button className="btn primary" onClick={() => setEditing({ doc: { id: "", ...p.newDoc() }, isNew: true })}>
+                + New {noun}
+              </button>
+            )}
           </>
         }
       />
@@ -287,6 +323,9 @@ export function CrudPage(p: CrudProps) {
             {!q ? <p>Add one with “New {noun}”, or import from Excel under Data.</p> : null}
           </Empty>
         ) : (
+          phone ? (
+            <PhoneRows rows={rows} spec={p.phoneRow ?? phoneRowFrom(p.columns)} canEdit={p.canEdit} onOpen={(d) => setEditing({ doc: d, isNew: false })} rowActions={p.rowActions} />
+          ) : (
           <div className="table-wrap">
             <table className="table cards-sm">
               <thead>
@@ -317,8 +356,14 @@ export function CrudPage(p: CrudProps) {
               </tbody>
             </table>
           </div>
+          )
         )}
       </div>
+      {phone ? (
+        <button className="p-fab" onClick={() => setEditing({ doc: { id: "", ...p.newDoc() }, isNew: true })} aria-label={`New ${noun}`}>
+          <span aria-hidden="true">+</span> New {noun}
+        </button>
+      ) : null}
       {editing ? (
         <Drawer
           title={editing.isNew ? `New ${noun}` : String(editing.doc.name ?? editing.doc.code ?? editing.doc.id)}
@@ -351,5 +396,26 @@ export function CrudPage(p: CrudProps) {
         </Drawer>
       ) : null}
     </div>
+  );
+}
+
+/** The list on a phone: one compact row per record; tap to open it. */
+function PhoneRows({ rows, spec, canEdit, onOpen, rowActions }: { rows: AnyDoc[]; spec: NonNullable<CrudProps["phoneRow"]>; canEdit?: (d: AnyDoc) => boolean; onOpen: (d: AnyDoc) => void; rowActions?: (d: AnyDoc) => ReactNode }) {
+  return (
+    <PhoneList
+      rows={rows.map((d) => {
+        const editable = !canEdit || canEdit(d);
+        return {
+          key: d.id,
+          title: spec.title(d),
+          sub: spec.sub?.(d),
+          value: spec.value?.(d),
+          valueSub: spec.value && spec.valueLabel && !spec.badge ? spec.valueLabel : undefined,
+          badge: spec.badge?.(d),
+          ...(editable ? { onOpen: () => onOpen(d) } : {}),
+          actions: rowActions?.(d),
+        };
+      })}
+    />
   );
 }
