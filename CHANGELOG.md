@@ -2,6 +2,29 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.9.0 — 2026-11-12
+
+**Type:** Minor (the back office on phones) · **Deploy:** web app (`pnpm release:deploy`); no data updates
+
+### For clients
+
+- **Run the restaurant from your phone.** On a phone the back office now works like an app, with tabs at the bottom: **Today**, the two places you use most, **Tasks** and **More**.
+- **Today** shows today's sales against the same day last week, the last 14 days, checks and covers, the month against its target, today's best sellers, and one-tap actions such as Record expense, Snap a bill, Receive goods and Stock count.
+- **Tasks** (and the bell at the top) lists what needs you: documents to approve, bill photos to record, deliveries to receive, items running low, checks left open from an earlier day, and licence or supplier messages. Tap one to go straight to it.
+- Lists show one clear row per item, with a **+ New** button at the bottom; reports have one-tap periods (Today, Yesterday, Last 7 days, Last 30 days); bill photos open the camera directly.
+- **Add it to your home screen** (Safari: Share → Add to Home Screen; Chrome: Install) and it opens full screen, straight to Today. Phones connected as POS devices still open the POS.
+- On computers and tablets nothing changes.
+
+### Changes
+
+- Back office phone layout (screens up to 600 px; `pages/emc/Phone.tsx`, `phone.css`): top bar with the module, a tasks bell and your initials; module pages as swipeable pills; bottom tabs by role (owners and managers: Reports, POS; accountants: Finance, Reports; storekeepers: Stock, Menu; auditors and viewers: Reports, Finance); a More sheet with every module, your account and About.
+- New pages on every screen size: **Tasks** (`/emc/tasks`) and **Account** (`/emc/account`: acting-as in the demo, switching business, licence, sign out).
+- Phone lists: `CrudPage` (menu, staff, customers, suppliers, tenders and the rest), voucher lists (journals, approvals, payables, receivables), stock on hand and the reports (daily revenue, item-wise, covers, checks) read as compact rows; a floating **+ New**; report periods as chips with **Dates…** for a custom range; tables that stay tables scroll with the first column pinned; full-screen editors with **Save** pinned at the bottom.
+- Touch: 44 px buttons and 40 px chips and tabs, 16 px inputs (no zoom on iPhone), safe areas for the notch and the home bar.
+- Installable app: PNG icons (`tools/web/make-app-icons.mjs`), the manifest starts at `/` (Today for the back office, the POS for connected devices) with shortcuts to Today, Tasks and the POS; iPhone home-screen meta.
+- Tests: the end-to-end suite checks the phone back office (Today, tabs, Tasks, More, pills, rows, + New, report chips, account; no sideways scrolling and touch targets of 40 px or more on ten screens); contrast covers Tasks, Account and Journals in light and dark on PC and phone.
+- Docs: user manual 2.1 *The back office on your phone* with screenshots; README.
+
 ## 1.8.1 — 2026-11-12
 
 **Type:** Patch (release tool; console wording) · **Deploy:** clients as usual; the console (`pnpm console:deploy`) for the wording
