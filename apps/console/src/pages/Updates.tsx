@@ -20,7 +20,7 @@ export function UpdatesPage() {
   const affected = kind === "clients" ? clients.filter((c) => picked.includes(c.id)) : kind === "staging" ? [] : clients.filter((c) => c.enabled && c.status !== "cancelled" && c.wave === (kind === "wave:1" ? 1 : 2));
   return (
     <>
-      <PageHead title="Updates" sub={gh?.latestVersion ? `Version on ${gh.owner}/${gh.repo}: ${gh.latestVersion} (checked ${dateTime(gh.latestCheckedAt)})` : "Release a version to your staging project, a wave, or chosen clients."}>
+      <PageHead title="Deployments" sub={gh?.latestVersion ? `Version on ${gh.owner}/${gh.repo}: ${gh.latestVersion} (checked ${dateTime(gh.latestCheckedAt)})` : "Release a version to your staging project, a wave, or chosen clients."}>
         <button className="btn" disabled={busy} onClick={() => void run("refreshDeployments", {}, "Refreshed from GitHub")}>Refresh from GitHub</button>
       </PageHead>
       {!gh?.owner ? <div className="callout warn">Set the GitHub repository in Settings → GitHub first.</div> : null}

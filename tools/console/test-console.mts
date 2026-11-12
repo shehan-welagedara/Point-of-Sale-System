@@ -170,6 +170,18 @@ check(!(await cdb.doc(`clients/noura-kitchen/usage/${yesterday}`).get()).exists 
 const audit = (await cdb.collection("audit").get()).docs.map((d) => d.data().action as string);
 check(["claimAccess", "inviteStaff", "createClient", "issueLicence", "saveSubscription", "recordPayment", "suspend", "restore", "confirmProject"].every((a) => audit.includes(a)), "every staff action is in the audit log");
 
+// ── Location and industry; the dashboard's daily figures ──
+await api(salesToken, { action: "saveClient", client: { id: "noura-kitchen", name: "Noura Kitchen", legalName: "Noura Kitchen (Pvt) Ltd", projectId: CLIENT, wave: 1, industry: "Restaurant", city: "Colombo", country: "lk", contact: { name: "Nuwan Perera", phone: "+94 77 555 0101", email: "owner@noura.example" } } });
+const located = (await cdb.doc("clients/noura-kitchen").get()).data()!;
+check(located.industry === "Restaurant" && located.city === "Colombo" && located.country === "LK", "a client's industry, town and country are saved (country as its code)");
+await api(salesToken, { action: "saveClient", client: { id: "lagoon", name: "Lagoon Cafe", projectId: "lagoon-cafe-pos", industry: "Spaceport", country: "Sri Lanka" } });
+const lagoon = (await cdb.doc("clients/lagoon").get()).data()!;
+check(lagoon.industry === "" && lagoon.country === "LK", "an unknown industry or a country that isn't a code isn't stored");
+await api(salesToken, { action: "saveClient", client: { id: "lagoon", name: "Lagoon Cafe", projectId: "lagoon-cafe-pos", industry: "Café", city: "Negombo", country: "LK" } });
+const today = (await api(supportToken, { action: "recordMetrics" })).result as { date: string; clients: number; mrrLkr: number; paid: number } | undefined;
+check(today?.clients === 2 && today.mrrLkr === 5000 && today.paid === 1 && (await cdb.doc(`metrics/${today.date}`).get()).exists, "today's dashboard figures are recorded (clients, monthly revenue, paid)");
+check((await api(await stranger.token(), { action: "recordMetrics" })).error?.status === "PERMISSION_DENIED", "…but not for someone outside the staff");
+
 // Leave a realistic picture for the screen test (ui-smoke.mjs): sharing back on, two weeks of figures.
 await pdb.doc("tenants/noura").set({ shareUsage: true }, { merge: true });
 await runCheckin(pdb, env(), "scheduled");
@@ -179,6 +191,61 @@ for (let d = 2; d <= 14; d++) {
   await cdb.doc(`clients/noura-kitchen/usage/${date}`).set({ date, checks, covers: Math.round(checks * 1.7), netSales: checks * 2_950_00, total: checks * 3_150_00, tenants: {}, reportedAt: new Date().toISOString() });
 }
 await api(ownerToken, { action: "saveCompany", company: { name: "Polymath Tech", email: "support@polymath.example", phone: "+94 11 234 5678", whatsapp: "+94 77 123 4567", website: "polymath.example" } });
+
+// More clients in different states, a year of payments and a month of daily figures, for the screens.
+const DAY_MS = 86_400_000;
+const isoAgo = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString();
+const health = (name: string, version: string, hoursAgo: number, errors = 0, devices = 3) => ({
+  lastCheckinAt: new Date(Date.now() - hoursAgo * 3_600_000).toISOString(),
+  appVersion: version,
+  reason: "scheduled",
+  tenants: [{ id: "main", name, plan: "professional", modules: ["pos", "tables", "inventory"], devices: Array.from({ length: devices }, (_, i) => ({ id: `T0${i + 1}`, appVersion: version, lastSeenAt: isoAgo(0) })), errors24h: errors, counts: { workstations: devices, employees: 9, backOfficeUsers: 2 }, shareUsage: true }],
+});
+const demo = [
+  { id: "galle-fort", name: "Galle Fort Bistro", industry: "Restaurant", city: "Galle", country: "LK", created: 300, plan: ["Enterprise", 240000, "annual"], paid: 200, health: health("Galle Fort Bistro", "1.7.0", 5), edition: "enterprise", contact: "Dilini Fernando" },
+  { id: "kandy-mist", name: "Kandy Mist Café", industry: "Café", city: "Kandy", country: "LK", created: 240, plan: ["Premium", 15000, "monthly"], paid: 18, health: health("Kandy Mist Café", "1.7.0", 3, 0, 2), edition: "professional", contact: "Ravi Senanayake" },
+  { id: "trinco-bay", name: "Trinco Bay Resort", industry: "Resort", city: "Trincomalee", country: "LK", created: 180, plan: ["Enterprise", 360000, "annual"], paid: 300, health: health("Trinco Bay Resort", "1.6.0", 7, 0, 5), edition: "enterprise", contact: "Mohamed Rizwan" },
+  { id: "male-harbour", name: "Malé Harbour Grill", industry: "Restaurant", city: "Malé", country: "MV", created: 120, plan: ["Premium", 180000, "annual"], paid: 270, health: health("Malé Harbour Grill", "1.7.0", 9), edition: "professional", contact: "Aishath Shifa" },
+  { id: "ella-bakehouse", name: "Ella Bakehouse", industry: "Bakery", city: "Ella", country: "LK", created: 90, plan: ["Standard", 36000, "quarterly"], paid: -5, health: health("Ella Bakehouse", "1.7.0", 80, 2, 1), edition: "starter", contact: "Kasun Jayasuriya" },
+  { id: "negombo-beach", name: "Negombo Beach Bar", industry: "Bar & pub", city: "Negombo", country: "LK", created: 12, plan: ["Standard", 9500, "monthly"], paid: 5, health: null, edition: null, contact: "Chamari Silva" },
+] as const;
+let n = 1;
+for (const d of demo) {
+  n++;
+  await api(ownerToken, { action: "saveClient", create: true, client: { id: d.id, name: d.name, industry: d.industry, city: d.city, country: d.country, projectId: `${d.id}-pos`, wave: n % 2 ? 1 : 2, contact: { name: d.contact, phone: `+94 77 555 01${String(n).padStart(2, "0")}` } } });
+  await api(ownerToken, { action: "saveSubscription", clientId: d.id, subscription: { plan: d.plan[0], priceLkr: d.plan[1], cycle: d.plan[2], startedOn: colomboDate(new Date(), -d.created), paidUntil: colomboDate(new Date(), d.paid) } });
+  if (d.edition) await api(ownerToken, { action: "issueLicence", clientId: d.id, edition: d.edition, expiresOn: colomboDate(new Date(), d.paid > 0 ? 365 : 20), reason: "new client" });
+  await cdb.doc(`clients/${d.id}`).set({ createdAt: isoAgo(d.created), ...(d.health ? { health: d.health } : {}) }, { merge: true });
+}
+await cdb.doc("clients/noura-kitchen").set({ createdAt: isoAgo(360) }, { merge: true });
+await cdb.doc("clients/lagoon").set({ createdAt: isoAgo(45) }, { merge: true });
+// A year of payments (older ones written directly; the latest through the console, so they are in the audit log).
+const pay = (clientId: string, daysAgo: number, amount: number, paidUntil: number) =>
+  cdb.collection(`clients/${clientId}/payments`).add({ date: colomboDate(new Date(), -daysAgo), amount, method: "bank transfer", reference: `INV-${1000 + daysAgo}`, paidUntil: colomboDate(new Date(), paidUntil), recordedBy: "sales@polymath.test", at: isoAgo(daysAgo) });
+for (let m = 1; m <= 8; m++) await pay("kandy-mist", 30 * m + 2, 15000, 18 - 30 * m);
+await pay("galle-fort", 165, 240000, 200);
+await pay("trinco-bay", 65, 360000, 300);
+await pay("male-harbour", 95, 180000, 270);
+await pay("ella-bakehouse", 98, 36000, -5);
+await pay("noura-kitchen", 330, 60000, 30);
+await api(salesToken, { action: "recordPayment", clientId: "kandy-mist", amount: 15000, method: "card", reference: "VISA 4471", date: colomboDate(new Date(), -1), paidUntil: colomboDate(new Date(), 18), renewLicence: false });
+await api(salesToken, { action: "recordPayment", clientId: "negombo-beach", amount: 9500, method: "cash", reference: "RCPT 0042", date: colomboDate(new Date(), 0), paidUntil: colomboDate(new Date(), 5), renewLicence: false });
+// A month of daily figures, as the server's housekeeping writes them, with today's from the console itself.
+for (let d = 30; d >= 1; d--) {
+  const date = colomboDate(new Date(), -d);
+  const clients = 6 + (d < 12 ? 2 : d < 20 ? 1 : 0);
+  const reporting = clients - 2 - (d % 9 === 0 ? 1 : 0);
+  const healthy = reporting - 1 - (d % 7 === 0 ? 1 : 0);
+  await cdb.doc(`metrics/${date}`).set({ date, at: isoAgo(d), clients, active: clients - 1, suspended: 1, reporting, healthy, attention: reporting - healthy, offline: 1, noCheckin: 1, licencesValid: clients - 2, paid: clients - 3, due: 1, overdue: 1, mrrLkr: 80000 + (30 - d) * 900, versions: { "1_7_0": reporting - 1, "1_6_0": 1 } });
+}
+await api(ownerToken, { action: "recordMetrics" });
+for (const id of ["galle-fort", "kandy-mist", "trinco-bay"]) {
+  for (let d = 1; d <= 28; d++) {
+    const date = colomboDate(new Date(), -d);
+    const checks = (id === "trinco-bay" ? 60 : id === "galle-fort" ? 85 : 40) + ((d * 11) % 30);
+    await cdb.doc(`clients/${id}/usage/${date}`).set({ date, checks, covers: Math.round(checks * 1.8), netSales: checks * 3_400_00, total: checks * 3_650_00, tenants: {}, reportedAt: isoAgo(d) });
+  }
+}
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll console checks passed");
 process.exit(failed ? 1 : 0);

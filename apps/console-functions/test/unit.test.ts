@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { DEMO_LICENCE_PUBLIC_KEY, publicKeyFromPrivate, signDirective, suspensionInfo, verifyDirective } from "@pos/core";
 import { describe, expect, it } from "vitest";
 import { IdentityError, serviceAccountProject, verifyGoogleIdToken } from "../src/identity.js";
-import { can, healthState, noticeFor, subscriptionState, validateCheckin } from "../src/model.js";
+import { type ConsoleClient, can, dailyMetrics, healthState, monthlyLkr, noticeFor, subscriptionState, validateCheckin } from "../src/model.js";
 
 const DEMO_PRIVATE = /^private=(.+)$/m.exec(readFileSync(resolve(__dirname, "../../../tools/licence/demo-key.txt"), "utf8"))![1]!.trim();
 
@@ -90,6 +90,22 @@ describe("console rules", () => {
     expect(healthState({ status: "active", health }, "1.6.0", now).state).toBe("attention");
     expect(healthState({ status: "active", health: { ...health, tenants: [{ ...health.tenants[0]!, devices: [] }] } }, "1.6.0", now).state).toBe("ok");
     expect(healthState({ status: "active", health: { ...health, lastCheckinAt: "2026-11-08T00:00:00Z" } }, "1.6.0", now).state).toBe("offline");
+  });
+  it("daily figures: health, subscriptions, monthly revenue and versions", () => {
+    const now = new Date("2026-11-12T06:00:00Z");
+    const base = { region: "asia-south1", wave: 1, enabled: true, createdAt: "", updatedAt: "" };
+    const health = (at: string, v: string, errors = 0) => ({ lastCheckinAt: at, appVersion: v, reason: "scheduled", tenants: [{ id: "t", name: "T", plan: "standard", modules: [], devices: [], errors24h: errors, counts: { workstations: 1, employees: 1, backOfficeUsers: 1 }, shareUsage: true }] });
+    const clients = [
+      { ...base, id: "a", name: "A", projectId: "a-pos-1", status: "active", health: health("2026-11-12T03:00:00Z", "1.8.0"), subscription: { plan: "Standard", priceLkr: 120000, cycle: "annual", paidUntil: "2027-06-01" } },
+      { ...base, id: "b", name: "B", projectId: "b-pos-1", status: "active", health: health("2026-11-12T03:00:00Z", "1.7.0", 2), subscription: { plan: "Premium", priceLkr: 15000, cycle: "monthly", paidUntil: "2026-11-20" } },
+      { ...base, id: "c", name: "C", projectId: "c-pos-1", status: "suspended", health: health("2026-11-01T03:00:00Z", "1.7.0"), subscription: { plan: "Standard", priceLkr: 30000, cycle: "quarterly", paidUntil: "2026-10-01" } },
+      { ...base, id: "d", name: "D", projectId: "d-pos-1", status: "active" },
+      { ...base, id: "e", name: "E", projectId: "e-pos-1", status: "cancelled", subscription: { plan: "Standard", priceLkr: 99000, cycle: "annual", cancelled: true } },
+    ] as ConsoleClient[];
+    const m = dailyMetrics(clients, "1.8.0", now);
+    expect(m).toMatchObject({ date: "2026-11-12", clients: 4, active: 3, suspended: 1, reporting: 2, healthy: 1, attention: 1, offline: 1, noCheckin: 1, paid: 1, due: 1, overdue: 1, mrrLkr: 35000, versions: { "1_8_0": 1, "1_7_0": 2 } });
+    expect(monthlyLkr({ plan: "x", priceLkr: 120000, cycle: "perpetual" })).toBe(0);
+    expect(monthlyLkr({ plan: "x", priceLkr: 120000, cycle: "annual", cancelled: true })).toBe(0);
   });
   it("check-in validation keeps reports bounded", () => {
     expect(() => validateCheckin({ v: 2 })).toThrow();

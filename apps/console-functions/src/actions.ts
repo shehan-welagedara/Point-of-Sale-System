@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { EDITIONS, type Edition, type LicencePayload, MODULES, type ModuleKey, type UsageLimits, buildEntitlements, publicKeyFromPrivate, signDirective, signLicence } from "@pos/core";
 import { type DocumentReference, FieldValue, type Firestore } from "firebase-admin/firestore";
 import { type GithubConfig, dispatchRelease, recentRuns, releaseBranchVersion } from "./github.js";
-import { type ClientLicence, type ConsoleClient, type Permission, STAFF_ROLES, type StaffRole, type Subscription, can } from "./model.js";
+import { type ClientLicence, type ConsoleClient, type DailyMetrics, INDUSTRIES, type Permission, STAFF_ROLES, type StaffRole, type Subscription, can, compareVersions, dailyMetrics } from "./model.js";
 
 export interface Actor {
   uid: string;
@@ -156,6 +156,16 @@ async function githubConfig(deps: Deps): Promise<GithubConfig & { stagingProject
   return { ...g, workflow: g.workflow || "release.yml", ref: g.ref || "main" };
 }
 
+/** Today's figures for the dashboard's trends; one document per day, rewritten during the day. */
+export async function recordMetrics(db: Firestore, now: Date): Promise<DailyMetrics> {
+  const clients = (await db.collection("clients").get()).docs.map((d) => d.data() as ConsoleClient);
+  const gh = (await db.doc("config/github").get()).data() as { latestVersion?: string } | undefined;
+  const latest = gh?.latestVersion ?? clients.map((c) => c.health?.appVersion).filter((v): v is string => Boolean(v)).sort(compareVersions).pop();
+  const m = dailyMetrics(clients, latest, now);
+  await db.collection("metrics").doc(m.date).set(m);
+  return m;
+}
+
 export async function runAction(deps: Deps, actor: Actor, data: Record<string, unknown>): Promise<unknown> {
   const { db, now } = deps;
   const at = now.toISOString();
@@ -248,6 +258,9 @@ export async function runAction(deps: Deps, actor: Actor, data: Record<string, u
         legalName: str(d.legalName, 160),
         contact: { name: str((d.contact as Record<string, unknown>)?.name, 120), email: str((d.contact as Record<string, unknown>)?.email, 120), phone: str((d.contact as Record<string, unknown>)?.phone, 40) },
         address: str(d.address, 300),
+        industry: (INDUSTRIES as readonly string[]).includes(str(d.industry, 40)) ? str(d.industry, 40) : "",
+        city: str(d.city, 80),
+        country: /^[A-Za-z]{2}$/.test(str(d.country, 10)) ? str(d.country, 10).toUpperCase() : "LK",
         notes: str(d.notes, 2000),
         projectId,
         ...(projectNumber ? { projectNumber } : {}),
@@ -420,6 +433,11 @@ export async function runAction(deps: Deps, actor: Actor, data: Record<string, u
       const latest = await releaseBranchVersion(g, token, deps.fetch).catch(() => undefined);
       if (latest) await db.doc("config/github").set({ latestVersion: latest, latestCheckedAt: at }, { merge: true });
       return { ok: true, latestVersion: latest };
+    }
+    // Today's dashboard figures (also written every morning by housekeeping).
+    case "recordMetrics": {
+      need(actor, "read");
+      return await recordMetrics(db, now);
     }
   }
   throw bad(`unknown action ${action}`);

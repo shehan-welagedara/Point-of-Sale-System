@@ -1,9 +1,11 @@
-import { orderBy } from "firebase/firestore";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAction, useCol, useDocData, useSession } from "../state";
-import { type Client, type UnknownProject, ago, compareVersions, date } from "../types";
-import { Field, HealthBadge, Loading, Modal, PageHead, StatusBadge, SubscriptionBadge } from "../ui";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useConsole } from "../App";
+import { COUNTRIES, LK_TOWNS } from "../geo";
+import { Icon } from "../icons";
+import { useAction, useSession } from "../state";
+import { INDUSTRIES, ago, date, initials, liveStatus } from "../types";
+import { Field, Loading, Modal, PageHead, SubscriptionBadge } from "../ui";
 
 export interface ClientForm {
   id: string;
@@ -11,6 +13,9 @@ export interface ClientForm {
   legalName: string;
   contact: { name: string; email: string; phone: string };
   address: string;
+  industry: string;
+  city: string;
+  country: string;
   notes: string;
   projectId: string;
   projectNumber: string;
@@ -26,6 +31,9 @@ export const emptyClient = (p: Partial<ClientForm> = {}): ClientForm => ({
   legalName: "",
   contact: { name: "", email: "", phone: "" },
   address: "",
+  industry: "Restaurant",
+  city: "",
+  country: "LK",
   notes: "",
   projectId: "",
   projectNumber: "",
@@ -56,6 +64,21 @@ export function ClientFields({ f, set, isNew }: { f: ClientForm; set: (f: Client
           <option value={2}>Wave 2</option>
         </select>
       </Field>
+      <Field label="Industry">
+        <select className="input" value={f.industry} onChange={(e) => set({ ...f, industry: e.target.value })}>
+          <option value="">Not set</option>
+          {INDUSTRIES.map((i) => <option key={i}>{i}</option>)}
+        </select>
+      </Field>
+      <Field label="Town or city" hint={f.country === "LK" ? "Shown on the map (e.g. Colombo, Kandy, Galle)" : "Shown in lists; the map uses the country"}>
+        <input className="input" list="lk-towns" value={f.city} onChange={(e) => set({ ...f, city: e.target.value })} placeholder="Colombo" />
+        <datalist id="lk-towns">{Object.keys(LK_TOWNS).map((t) => <option key={t} value={t.replace(/\b\w/g, (ch) => ch.toUpperCase())} />)}</datalist>
+      </Field>
+      <Field label="Country">
+        <select className="input" value={f.country} onChange={(e) => set({ ...f, country: e.target.value })}>
+          {Object.entries(COUNTRIES).sort((a, b) => (a[0] === "LK" ? -1 : b[0] === "LK" ? 1 : a[1][0].localeCompare(b[1][0]))).map(([code, [name]]) => <option key={code} value={code}>{name}</option>)}
+        </select>
+      </Field>
       <Field label="Contact person"><input className="input" value={f.contact.name} onChange={(e) => set({ ...f, contact: { ...f.contact, name: e.target.value } })} /></Field>
       <Field label="Contact email"><input className="input" type="email" value={f.contact.email} onChange={(e) => set({ ...f, contact: { ...f.contact, email: e.target.value } })} /></Field>
       <Field label="Contact phone"><input className="input" value={f.contact.phone} onChange={(e) => set({ ...f, contact: { ...f.contact, phone: e.target.value } })} /></Field>
@@ -71,15 +94,23 @@ export function ClientFields({ f, set, isNew }: { f: ClientForm; set: (f: Client
 }
 
 export function ClientsPage() {
-  const clients = useCol<Client>("clients", [orderBy("name")], "name");
-  const unknown = useCol<UnknownProject>("unknownProjects");
-  const gh = useDocData<{ latestVersion?: string }>("config/github");
+  const { clients, unknown, latest } = useConsole();
   const { can } = useSession();
   const { busy, run } = useAction();
   const nav = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [adding, setAdding] = useState<ClientForm | null>(null);
+  const [q, setQ] = useState("");
+  // The dashboard's "Add client" opens the form here.
+  useEffect(() => {
+    if (params.get("add") === "1" && can("clients")) {
+      setAdding(emptyClient());
+      setParams({}, { replace: true });
+    }
+  }, [params, setParams, can]);
   if (!clients) return <Loading />;
-  const latest = gh?.latestVersion ?? clients.map((c) => c.health?.appVersion).filter((v): v is string => Boolean(v)).sort(compareVersions).pop();
+  const t = q.trim().toLowerCase();
+  const shown = t ? clients.filter((c) => [c.name, c.id, c.projectId, c.city, c.industry, c.contact?.name].some((v) => v?.toLowerCase().includes(t))) : clients;
 
   const save = async () => {
     if (!adding) return;
@@ -93,7 +124,7 @@ export function ClientsPage() {
   return (
     <>
       <PageHead title="Clients" sub="Every business running POS Suite, with its project, status, licence and subscription.">
-        {can("clients") ? <button className="btn primary" onClick={() => setAdding(emptyClient())}>Add client</button> : null}
+        {can("clients") ? <button className="btn primary" onClick={() => setAdding(emptyClient())}><Icon name="plus" size={18} /> Add client</button> : null}
       </PageHead>
       {unknown?.length ? (
         <div className="card">
@@ -120,22 +151,32 @@ export function ClientsPage() {
         </div>
       ) : null}
       <div className="card">
+        <div className="card-head">
+          <h2 className="grow">All clients <span className="muted small">({clients.length})</span></h2>
+          <div className="search inline">
+            <Icon name="search" size={18} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by name, town, project…" aria-label="Filter clients" />
+          </div>
+        </div>
         <div className="table-wrap">
-          <table>
-            <thead><tr><th>Client</th><th>Project</th><th>Status</th><th>Health</th><th>Version</th><th>Licence until</th><th>Subscription</th></tr></thead>
+          <table className="clients-table">
+            <thead><tr><th>Client</th><th className="hide-sm">Industry</th><th className="hide-sm">Location</th><th>Status</th><th className="hide-sm">Version</th><th className="hide-sm">Licence until</th><th>Subscription</th></tr></thead>
             <tbody>
-              {clients.map((c) => (
-                <tr key={c.id} className="click" onClick={() => nav(`/clients/${c.id}`)}>
-                  <td><strong>{c.name}</strong><div className="tiny muted">{c.id} · wave {c.wave}</div></td>
-                  <td className="mono">{c.projectId}</td>
-                  <td><StatusBadge c={c} /></td>
-                  <td><HealthBadge c={c} latest={latest} /></td>
-                  <td>{c.health?.appVersion ?? "—"}</td>
-                  <td>{c.licence ? `${date(c.licence.expiresAt)} · ${c.licence.edition}` : "—"}</td>
-                  <td><SubscriptionBadge c={c} /></td>
-                </tr>
-              ))}
-              {!clients.length ? <tr><td colSpan={7} className="empty">No clients yet.</td></tr> : null}
+              {shown.map((c) => {
+                const st = liveStatus(c, latest);
+                return (
+                  <tr key={c.id} className="click" onClick={() => nav(`/clients/${c.id}`)}>
+                    <td><div className="who-cell"><span className="avatar sm" aria-hidden="true">{initials(c.name)}</span><span><strong>{c.name}</strong><span className="tiny muted">{c.projectId} · wave {c.wave}{c.enabled ? "" : " · updates off"}</span></span></div></td>
+                    <td className="hide-sm">{c.industry || "—"}</td>
+                    <td className="hide-sm">{[c.city, c.country && c.country !== "LK" ? c.country : ""].filter(Boolean).join(", ") || "—"}</td>
+                    <td><span className="status"><span className={`status-dot ${st.tone}`} aria-hidden="true" />{st.label}</span></td>
+                    <td className="hide-sm">{c.health?.appVersion ?? "—"}</td>
+                    <td className="hide-sm">{c.licence ? `${date(c.licence.expiresAt)} · ${c.licence.edition}` : "—"}</td>
+                    <td><SubscriptionBadge c={c} /></td>
+                  </tr>
+                );
+              })}
+              {!shown.length ? <tr><td colSpan={7} className="empty">{clients.length ? `No client matches “${q}”.` : "No clients yet."}</td></tr> : null}
             </tbody>
           </table>
         </div>

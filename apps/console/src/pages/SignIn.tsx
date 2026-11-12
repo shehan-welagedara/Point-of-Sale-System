@@ -1,6 +1,7 @@
 import { GoogleAuthProvider, createUserWithEmailAndPassword, sendEmailVerification, signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
 import { useState } from "react";
 import { errorText, firebase } from "../firebase";
+import { Logo } from "../icons";
 import { Field } from "../ui";
 
 /** Staff sign in with Google (recommended) or with a verified email and password. */
@@ -30,11 +31,12 @@ export function SignIn({ denied }: { denied: string | null }) {
     <div className="auth">
       <div className="card">
         <div className="card-body stack">
-          <div className="row">
-            <div className="logo" aria-hidden="true" style={{ width: 40, height: 40, borderRadius: 10, background: "#0f766e", color: "#fff", display: "grid", placeItems: "center", fontWeight: 800 }}>P</div>
+          <div className="auth-brand">
+            <Logo size={44} />
             <div>
-              <h2>Polymath Console</h2>
-              <div className="small muted">Polymath Tech · clients, licences and updates</div>
+              <h1 className="sr-only">Polymath Console</h1>
+              <strong>Polymath Technologies</strong>
+              <div className="small muted">Console · clients, licences and updates</div>
             </div>
           </div>
           {denied ? (
