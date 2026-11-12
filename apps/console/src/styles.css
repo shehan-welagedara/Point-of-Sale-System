@@ -312,6 +312,11 @@ dl.kv dd { margin: 0; }
 
 /* Health */
 .health-body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px 18px; align-items: center; }
+.health-card { container-type: inline-size; }
+@container (max-width: 380px) {
+  .health-body { grid-template-columns: 1fr; justify-items: center; }
+  .health-body .legend, .health-body .meters { width: 100%; }
+}
 .donut { position: relative; flex: none; }
 .donut path { cursor: pointer; outline: none; transition: stroke-width 0.12s; }
 .donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; }

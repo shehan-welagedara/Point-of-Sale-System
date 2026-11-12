@@ -2,6 +2,20 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.8.1 — 2026-11-12
+
+**Type:** Patch (release tool; console wording) · **Deploy:** clients as usual; the console (`pnpm console:deploy`) for the wording
+
+### For clients
+
+- Nothing changes in the system restaurants use.
+
+### Changes
+
+- **Release tool: the data updates use plain HTTPS.** They talked to Firestore over gRPC, which needs HTTP/2 all the way to Google; on a Windows PC with antivirus HTTPS scanning or a proxy that breaks, and the deploy stopped with `14 UNAVAILABLE: No connection established … Protocol error` after the backup (nothing else changed). They now use Firestore's REST transport over HTTP/1.1, like the backup and the rest of the tool. A failure is explained in plain words, and the deploy says that nothing else changed and that running it again is safe.
+- `pnpm test:update` now reaches the database only through a relay that speaks HTTP/1.1, so a deploy that needs HTTP/2 fails the rehearsal (it fails 1.8.0's tool with the same error; 29 checks).
+- **Console:** the banner no longer says *All systems online* when there are no clients or no check-ins yet (*No clients yet*, *Waiting for the first check-in*, or *N of M systems checking in*). The Platform health card stacks its legend under the donut when the card is narrow.
+
 ## 1.8.0 — 2026-11-12
 
 **Type:** Minor (Polymath Console redesign and new pages; release QA) · **Deploy:** the console (`pnpm console:deploy`); clients optional (their system is unchanged)

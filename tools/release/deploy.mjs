@@ -217,7 +217,7 @@ for (const c of list) {
     const creds = childCredentials();
     const ok = exec("node", ["tools/release/migrate.mjs", "--project", c.projectId, ...(dryRun ? ["--dry-run"] : [])], { always: true, soft: true, env: creds.env });
     creds.cleanup();
-    if (!ok) fail("the data updates (migrations) failed: read the error above. The backup taken before this deploy is in the client's backup bucket.");
+    if (!ok) fail(`the data updates (migrations) stopped: see the line above. Nothing else was changed on ${c.projectId}: its system keeps running ${before ?? "the version it had"}, and the backup taken just now is in ${c.backupBucket}. Running the same deploy again is safe: it continues from the first data update that didn't finish.`);
   }
   if (parts.has("functions")) {
     // Per-project function settings (Firebase reads .env.<projectId> next to the functions code). The

@@ -78,7 +78,18 @@ export function Dashboard() {
   const healthRatio = linked ? healthy / linked : null;
   const healthTrend = [...history.map((m) => (m.clients - m.noCheckin ? m.healthy / (m.clients - m.noCheckin) : 0)), healthRatio ?? 0];
   const lastSeen = live.map((c) => c.health?.lastCheckinAt).filter((v): v is string => Boolean(v)).sort().pop();
-  const allWell = attention.length === 0 && unknown.length === 0;
+  const problems = attention.length + unknown.length;
+  // What the banner's status says: never "all systems online" when nothing has checked in yet.
+  const status: { tone: "good" | "warn" | "none"; title: string; sub: string; to: string } =
+    problems > 0
+      ? { tone: "warn", title: `${problems} need${problems === 1 ? "s" : ""} attention`, sub: lastSeen ? `Last check-in ${ago(lastSeen)}` : "No check-ins yet", to: "/monitoring" }
+      : !live.length
+        ? { tone: "none", title: "No clients yet", sub: "Add your first client to start", to: "/clients?add=1" }
+        : !lastSeen
+          ? { tone: "none", title: "Waiting for the first check-in", sub: "Deploy a client, then About → Check now", to: "/monitoring" }
+          : reporting < live.length
+            ? { tone: "none", title: `${reporting} of ${live.length} systems checking in`, sub: `Last check-in ${ago(lastSeen)}`, to: "/monitoring" }
+            : { tone: "good", title: "All systems online", sub: `Last check-in ${ago(lastSeen)}`, to: "/monitoring" };
   const name = displayName(me, user?.email ?? null, user?.displayName).split(" ")[0]!;
 
   // Platform health beside the donut.
@@ -124,11 +135,11 @@ export function Dashboard() {
         <div className="hero-art" aria-hidden="true">
           <HeroArt />
         </div>
-        <Link to="/monitoring" className={`hero-status ${allWell ? "good" : "warn"}`}>
-          <span className={`status-dot ${allWell ? "good" : "warn"}`} />
+        <Link to={status.to} className={`hero-status ${status.tone}`}>
+          <span className={`status-dot ${status.tone}`} />
           <span>
-            <strong>{allWell ? "All systems online" : `${attention.length + unknown.length} need${attention.length + unknown.length === 1 ? "s" : ""} attention`}</strong>
-            <span className="tiny">{lastSeen ? `Last check-in ${ago(lastSeen)}` : "No check-ins yet"}</span>
+            <strong>{status.title}</strong>
+            <span className="tiny">{status.sub}</span>
           </span>
         </Link>
       </section>
@@ -177,7 +188,7 @@ export function Dashboard() {
           <div className="card-head"><h2 className="grow">Client distribution</h2><Link to="/clients" className="small">All clients</Link></div>
           <div className="card-body"><ClientMap clients={live} /></div>
         </section>
-        <section className="card">
+        <section className="card health-card">
           <div className="card-head"><h2 className="grow">Platform health</h2><Link to="/monitoring" className="small">Monitor</Link></div>
           <div className="card-body health-body">
             <Donut
