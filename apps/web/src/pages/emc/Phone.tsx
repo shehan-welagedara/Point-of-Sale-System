@@ -138,17 +138,30 @@ export function TodayPage() {
   const tasks = useTasks();
   const name = firstName(mode === "local" ? DEMO_PEOPLE[persona].name : user?.name);
 
-  const actions: { icon: IconName; label: string; to: string; show: boolean }[] = [
-    { icon: "bolt", label: "Open POS", to: "/pos", show: on("pos") && visibleWorkspaces(on, role).some((v) => v.key === "pos") },
-    { icon: "receipt", label: "Record expense", to: "/emc/finance/expense", show: on("accounting") && sees("/emc/finance/expense") },
-    { icon: "camera", label: "Snap a bill", to: "/emc/finance/bills", show: on("accounting") && sees("/emc/finance/bills") },
-    { icon: "truck", label: "Receive goods", to: "/emc/inventory/grn", show: on("purchasing") && sees("/emc/inventory/grn") },
-    { icon: "clipboard", label: "Stock count", to: "/emc/inventory/counts", show: on("inventory") && sees("/emc/inventory/counts") },
-    { icon: "reports", label: "Reports", to: "/emc/reports", show: sees("/emc/reports") },
-    { icon: "menu", label: "Menu items", to: "/emc/menu/items", show: sees("/emc/menu/items") },
-    { icon: "users", label: "Employees", to: "/emc/people/staff", show: sees("/emc/people/staff") },
-  ];
-  const shown = actions.filter((a) => a.show).slice(0, 6);
+  const all: Record<string, { icon: IconName; label: string; to: string; show: boolean }> = {
+    pos: { icon: "bolt", label: "Open POS", to: "/pos", show: on("pos") && visibleWorkspaces(on, role).some((v) => v.key === "pos") },
+    expense: { icon: "receipt", label: "Record expense", to: "/emc/finance/expense", show: on("accounting") && sees("/emc/finance/expense") },
+    bill: { icon: "camera", label: "Snap a bill", to: "/emc/finance/bills", show: on("accounting") && sees("/emc/finance/bills") },
+    receive: { icon: "truck", label: "Receive goods", to: "/emc/inventory/grn", show: on("purchasing") && sees("/emc/inventory/grn") },
+    count: { icon: "clipboard", label: "Stock count", to: "/emc/inventory/counts", show: on("inventory") && sees("/emc/inventory/counts") },
+    order: { icon: "cart", label: "Purchase orders", to: "/emc/inventory/po", show: on("purchasing") && sees("/emc/inventory/po") },
+    stock: { icon: "box", label: "Stock on hand", to: "/emc/inventory/stock", show: on("inventory") && sees("/emc/inventory/stock") },
+    reports: { icon: "reports", label: "Reports", to: "/emc/reports", show: sees("/emc/reports") },
+    approvals: { icon: "check", label: "Approvals", to: "/emc/finance/approvals", show: on("accounting") && sees("/emc/finance/approvals") },
+    statements: { icon: "note", label: "Financial statements", to: "/emc/finance/statements", show: on("accounting") && sees("/emc/finance/statements") },
+    journals: { icon: "book", label: "Journals", to: "/emc/finance/journals", show: on("accounting") && sees("/emc/finance/journals") },
+    audit: { icon: "lock", label: "Audit Center", to: "/emc/audit", show: sees("/emc/audit") },
+    menu: { icon: "menu", label: "Menu items", to: "/emc/menu/items", show: sees("/emc/menu/items") },
+    staff: { icon: "users", label: "Employees", to: "/emc/people/staff", show: sees("/emc/people/staff") },
+  };
+  // What each role does day to day; read-only roles get places to look, not forms.
+  const order: Record<string, string[]> = {
+    accountant: ["expense", "bill", "approvals", "statements", "journals", "reports"],
+    storekeeper: ["receive", "count", "order", "stock", "menu", "reports"],
+    auditor: ["audit", "statements", "journals", "reports", "stock"],
+    viewer: ["reports", "statements", "stock", "menu"],
+  };
+  const shown = (order[role ?? ""] ?? ["pos", "expense", "bill", "receive", "count", "reports", "menu", "staff"]).map((k) => all[k]!).filter((a) => a.show).slice(0, 6);
 
   const todayStats = stats?.find((s) => s.businessDate === today);
   const lastWeek = stats?.find((s) => s.businessDate === addDays(today, -7));
@@ -363,7 +376,17 @@ export function BottomNav({ onMore, moreOpen }: { onMore: () => void; moreOpen: 
     { to: "/emc/finance", label: "Finance", icon: "bank", match: (p) => p.startsWith("/emc/finance"), show: on("accounting") && sees("/emc/finance") },
     { to: "/emc/menu/items", label: "Menu", icon: "menu", match: (p) => p.startsWith("/emc/menu") || p.startsWith("/emc/recipes"), show: sees("/emc/menu/items") },
   ];
-  const middle = candidates.filter((c) => c.show).slice(0, 2);
+  // The two places each role uses most.
+  const priority: Record<string, string[]> = {
+    accountant: ["Finance", "Reports"],
+    auditor: ["Reports", "Finance"],
+    viewer: ["Reports", "Stock"],
+    storekeeper: ["Stock", "Menu"],
+  };
+  const want = priority[role ?? ""] ?? ["Reports", "POS", "Stock", "Finance", "Menu"];
+  const middle = [...want.map((l) => candidates.find((c) => c.label === l)), ...candidates]
+    .filter((c, i, a): c is (typeof candidates)[number] => Boolean(c?.show) && a.indexOf(c) === i)
+    .slice(0, 2);
   const tabs: Tab[] = [
     { to: "/emc/home", label: "Today", icon: "home", match: (p) => p === "/emc/home" || p === "/emc" || p === "/emc/" },
     ...middle,
