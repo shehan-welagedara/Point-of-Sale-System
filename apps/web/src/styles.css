@@ -577,3 +577,32 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .closed-grid { grid-template-columns: 1fr; }
   .closed-list { max-height: 34vh; }
 }
+
+/* ── Sales & Orders, WhatsApp (1.11.0) ── */
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line-strong); vertical-align: -1px; }
+.size-grid .table td, .size-grid .table th { padding: 4px 6px; }
+.table.compact td, .table.compact th { padding: 4px 8px; font-size: 13px; }
+.wa-grid { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 12px; align-items: start; }
+.wa-grid.with-sim { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(240px, 320px); }
+.wa-list { display: flex; flex-direction: column; gap: 4px; padding: 8px; max-height: calc(100vh - 220px); overflow: auto; }
+.wa-conv { display: flex; gap: 8px; align-items: flex-start; text-align: left; border: 0; background: transparent; padding: 8px; border-radius: 10px; cursor: pointer; color: var(--text); min-height: 44px; }
+.wa-conv:hover { background: var(--surface-2); }
+.wa-conv.on { background: var(--brand-soft); }
+.wa-last { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.wa-unread { display: inline-block; margin-left: 6px; min-width: 20px; padding: 0 6px; border-radius: 999px; background: #16a34a; color: #fff; text-align: center; font-weight: 700; }
+.wa-thread { display: flex; flex-direction: column; min-height: 420px; max-height: calc(100vh - 200px); }
+.wa-head, .wa-orders, .wa-compose { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.wa-compose { border-top: 1px solid var(--line); border-bottom: 0; }
+.wa-msgs { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--sunken); }
+.wa-msg { max-width: min(80%, 520px); padding: 8px 10px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
+.wa-msg.out { align-self: flex-end; background: var(--good-bg); }
+.wa-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.wa-sim { display: flex; flex-direction: column; gap: 8px; }
+@media (max-width: 900px) {
+  .wa-grid, .wa-grid.with-sim { grid-template-columns: minmax(0, 1fr); }
+  .wa-list { max-height: 260px; }
+}
+.industry-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.industry-btn { display: flex; gap: 8px; align-items: center; text-align: left; min-height: 48px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); cursor: pointer; font-weight: 550; font-size: 13px; }
+.industry-btn.on { border-color: var(--brand); background: var(--brand-soft); box-shadow: 0 0 0 1px var(--brand) inset; }
+.industry-ico { font-size: 20px; }

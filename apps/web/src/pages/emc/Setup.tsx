@@ -13,6 +13,25 @@ import { useDraft } from "../../lib/useDraft";
 import { QrCode } from "../../components/Receipt";
 import { money } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
+import { INDUSTRY_MODELS, industryModel } from "@pos/core";
+
+/** The business's industry model: its starting modules and the words on screens (owners and administrators). */
+function IndustryCard() {
+  const { tenant, updateTenant, role, toast } = useApp();
+  const current = industryModel(tenant?.industry);
+  const admin = role === "owner" || role === "admin";
+  return (
+    <div className="card card-body stack">
+      <h3>Kind of business</h3>
+      <Field label="Industry model" help="Changes the wording and suggestions. Modules stay as they are: switch them under Licence & modules.">
+        <select className="input" value={tenant?.industry ?? ""} disabled={!admin} aria-label="Industry model" onChange={(e) => updateTenant({ industry: e.target.value }).then(() => toast(`Set to ${industryModel(e.target.value).name}`))}>
+          {tenant?.industry ? null : <option value="">Not set ({current.name})</option>}
+          {INDUSTRY_MODELS.map((m) => <option key={m.key} value={m.key}>{m.icon} {m.name}{m.status === "preview" ? " (preview)" : m.status === "edition" ? " (Hotel Edition)" : ""}</option>)}
+        </select>
+      </Field>
+    </div>
+  );
+}
 
 export function BusinessTaxPage() {
   const { settings, settingsReady, saveSetting, toast } = useApp();
@@ -42,6 +61,7 @@ export function BusinessTaxPage() {
       <PageHead title="Business & tax" subtitle="Legal details print on every bill exactly as entered (IRD tax invoice format). Rates are editable as the law changes." actions={<button className="btn primary" onClick={save}>Save</button>} />
       {b.isSample ? <div className="callout warn">These are sample details. Replace them with the client's registered name, address and 9-digit TIN before issuing real bills.</div> : null}
       <div className="grid cols-2">
+        <IndustryCard />
         <div className="card card-body stack">
           <h3>Legal entity</h3>
           <Field label="Registered name (as on the VAT certificate)"><input className="input" value={b.legalName} onChange={(e) => setB({ ...b, legalName: e.target.value })} /></Field>

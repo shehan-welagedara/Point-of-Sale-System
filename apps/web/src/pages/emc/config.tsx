@@ -591,11 +591,14 @@ export function VendorsPage() {
 
 export function CustomersPage() {
   const { on } = useApp();
-  if (!on("crm")) return <ModuleOff name="Customers (CRM)" />;
+  const priceLists = useCollection<{ id: string; name: string }>(on("wholesale") ? "priceLists" : null) ?? [];
+  if (!on("crm") && !on("wholesale")) return <ModuleOff name="Customers (CRM)" />;
+  const trade = on("wholesale");
+  const wa = on("whatsappCommerce");
   return (
     <CrudPage
       title="Customers"
-      subtitle="Guests and business buyers. Visits, spend and points update automatically when a check with the customer is closed."
+      subtitle={trade ? "Shops and resellers: price list, credit limit and days to pay, WhatsApp number and consent for offers." : "Guests and business buyers. Visits, spend and points update automatically when a check with the customer is closed."}
       col={C.customers}
       idFrom="auto"
       noun="customer"
@@ -611,15 +614,37 @@ export function CustomersPage() {
         { key: "marketingConsent", label: "Agreed to WhatsApp/email offers", type: "bool" },
         { key: "vatTin", label: "VAT TIN (business buyer)", type: "text", help: "Printed on tax invoices when the customer is VAT-registered." },
         { key: "address", label: "Address", type: "textarea" },
-        { key: "notes", label: "Notes (preferences, allergies)", type: "textarea" },
+        ...(trade
+          ? ([
+              { key: "shopName", label: "Shop / business name", type: "text" },
+              { key: "area", label: "Area", type: "text", placeholder: "e.g. Kandy" },
+              { key: "priceListId", label: "Price list", type: "select", options: [{ value: "", label: "List prices" }, ...priceLists.map((p) => ({ value: p.id, label: p.name }))] },
+              { key: "creditLimit", label: "Credit limit", type: "money", help: "Most this customer may owe at once. Leave 0 for cash customers." },
+              { key: "paymentTermsDays", label: "Days to pay", type: "number" },
+            ] as FieldDef[])
+          : []),
+        ...(wa
+          ? ([
+              { key: "whatsapp", label: "WhatsApp number", type: "text", placeholder: "94771234567", help: "With country code, no + or spaces." },
+              { key: "whatsappOptIn", label: "Agreed to receive offers on WhatsApp", type: "bool" },
+            ] as FieldDef[])
+          : []),
+        { key: "notes", label: trade ? "Notes" : "Notes (preferences, allergies)", type: "textarea" },
       ]}
       columns={[
-        { header: "Name", render: (d) => <div><div>{d.name}</div><div className="tiny muted">{(d.tags ?? []).join(" · ")}</div></div> },
+        { header: "Name", render: (d) => <div><div>{d.shopName ? `${d.shopName} – ${d.name}` : d.name}</div><div className="tiny muted">{[d.area, ...(d.tags ?? [])].filter(Boolean).join(" · ")}</div></div> },
         { header: "Mobile", render: (d) => d.phone },
-        { header: "Visits", render: (d) => d.visits ?? 0, num: true },
-        { header: "Spend", render: (d) => money(d.totalSpend), num: true },
-        { header: "Points", render: (d) => d.points ?? 0, num: true },
-        { header: "Last visit", render: (d) => (d.lastVisit ? d.lastVisit.slice(0, 10) : "—") },
+        ...(trade
+          ? [
+              { header: "Price list", render: (d: Record<string, any>) => priceLists.find((p) => p.id === d.priceListId)?.name ?? "List" },
+              { header: "Credit", render: (d: Record<string, any>) => (d.creditLimit ? money(d.creditLimit) : "Cash"), num: true },
+            ]
+          : [
+              { header: "Visits", render: (d: Record<string, any>) => d.visits ?? 0, num: true },
+              { header: "Spend", render: (d: Record<string, any>) => money(d.totalSpend), num: true },
+              { header: "Points", render: (d: Record<string, any>) => d.points ?? 0, num: true },
+              { header: "Last visit", render: (d: Record<string, any>) => (d.lastVisit ? d.lastVisit.slice(0, 10) : "—") },
+            ]),
       ]}
     />
   );

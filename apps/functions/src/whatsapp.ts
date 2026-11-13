@@ -16,12 +16,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import {
-  type BroadcastSegment,
   type BusinessSettings,
   type Customer,
   type IntegrationSettings,
   type Member,
-  type OrderMessageKind,
   type SalesOrder,
   type StockLevel,
   type Style,
@@ -31,6 +29,7 @@ import {
   type WaInbound,
   type WaMessage,
   type WaOutbound,
+  type WhatsappApiRequest,
   COLLECTIONS as C,
   WA,
   WHOLESALE,
@@ -46,6 +45,8 @@ import {
   recordOutbound,
 } from "@pos/core";
 import { AdminStore } from "./admin-store.js";
+
+export type { WhatsappApiRequest };
 
 export const GRAPH = `https://graph.facebook.com/${process.env.WHATSAPP_GRAPH_VERSION || "v23.0"}`;
 
@@ -170,17 +171,6 @@ export async function webhookReceive(db: Firestore, raw: Buffer | string, signat
 }
 
 // ───────────────────────────── Staff API ─────────────────────────────
-
-export type WhatsappApiRequest =
-  | { action: "status"; tenantId: string }
-  | { action: "connect"; tenantId: string; phoneNumberId: string; accessToken?: string; appSecret?: string; verifyToken?: string }
-  | { action: "disconnect"; tenantId: string }
-  | { action: "send"; tenantId: string; conversationId: string; message: WaOutbound }
-  | { action: "orderMessage"; tenantId: string; orderId: string; kind: OrderMessageKind; link?: string }
-  | { action: "simulate"; tenantId: string; message: Omit<WaInbound, "id" | "at"> }
-  | { action: "syncCatalogue"; tenantId: string; imageBase: string; link: string }
-  | { action: "broadcast"; tenantId: string; name: string; template: string; params: string[]; segment: BroadcastSegment; test?: string }
-  | { action: "media"; tenantId: string; mediaId: string };
 
 const SELLERS = ["owner", "admin", "manager", "sales"];
 

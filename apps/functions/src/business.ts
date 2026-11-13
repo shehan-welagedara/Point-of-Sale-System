@@ -23,6 +23,8 @@ export interface BusinessApiRequest {
   /** For a demo: which sample business to load. */
   sample?: string;
   modules?: string[];
+  /** Industry model (1.11.0). */
+  industry?: string;
   note?: string;
 }
 
@@ -33,6 +35,7 @@ export interface StoredBusinessRequest {
   kind: "business" | "demo";
   sample?: string;
   modules: string[];
+  industry?: string;
   uid: string;
   email: string;
   userName?: string;
@@ -137,6 +140,7 @@ export async function handleBusinessApi(db: Firestore, env: LinkEnv, caller: Cal
         name,
         kind: data.kind === "demo" ? "demo" : "business",
         ...(data.kind === "demo" && typeof data.sample === "string" && /^[a-z-]{3,30}$/.test(data.sample) ? { sample: data.sample } : {}),
+        ...(typeof data.industry === "string" && /^[a-z]{3,20}$/.test(data.industry) ? { industry: data.industry } : {}),
         modules,
         uid: caller.uid,
         email: caller.email,

@@ -16,7 +16,7 @@ export const STARTER_LOCATION_ID = "MAIN";
  * Parts are included only for the modules the client chose, so the security rules accept them.
  * Pass `existing` (collection → ids) to add only what is missing (Setup checklist).
  */
-export function starterConfig(args: { name: string; addressLines?: string[]; modules: Partial<Record<ModuleKey, boolean>>; existing?: Partial<Record<string, Set<string>>> }): WriteOp[] {
+export function starterConfig(args: { name: string; addressLines?: string[]; modules: Partial<Record<ModuleKey, boolean>>; existing?: Partial<Record<string, Set<string>>>; industry?: string }): WriteOp[] {
   const ops: WriteOp[] = [];
   const put = (col: string, data: { id: string } & Record<string, unknown>) => {
     if (!args.existing?.[col]?.has(data.id)) ops.push({ op: "set", col, data });
@@ -30,11 +30,20 @@ export function starterConfig(args: { name: string; addressLines?: string[]; mod
     ([["dine-in", "Dine-in", true], ["takeaway", "Takeaway", false], ["delivery", "Delivery", false]] as const).forEach(([id, name, requiresTable], i) => put(C.orderTypes, { id, name, requiresTable, sortOrder: i + 1, active: true }));
   }
   sampleTenders().filter((t) => t.type !== "foreignCash" || on("pos")).forEach((t) => put(C.tenderMedia, { ...t, active: t.type === "cash" || t.type === "card" || (t.type === "lankaqr" && on("lankaqr")) || (t.type === "payhere" && on("payhere")) }));
-  const reasons: [string, string][] = [["void", "Customer changed mind"], ["void", "Wrong entry"], ["void", "Kitchen error"], ["refund", "Quality complaint"], ["comp", "Guest recovery"], ["waste", "Spoiled"], ["waste", "Expired"], ["waste", "Burnt / dropped"], ["waste", "Spillage"], ["paidOut", "Petty cash purchase"]];
+  const goods = args.industry === "wholesale" || args.industry === "fashion" || args.industry === "retail";
+  const reasons: [string, string][] = goods
+    ? [["void", "Customer changed mind"], ["void", "Wrong entry"], ["refund", "Faulty item"], ["refund", "Wrong size or colour"], ["refund", "Customer return"], ["waste", "Damaged"], ["waste", "Damaged in transit"], ["waste", "Print defect"], ["paidOut", "Petty cash purchase"]]
+    : [["void", "Customer changed mind"], ["void", "Wrong entry"], ["void", "Kitchen error"], ["refund", "Quality complaint"], ["comp", "Guest recovery"], ["waste", "Spoiled"], ["waste", "Expired"], ["waste", "Burnt / dropped"], ["waste", "Spillage"], ["paidOut", "Petty cash purchase"]];
   reasons.forEach(([type, name], i) => put(C.reasonCodes, { id: `RC${String(i + 1).padStart(2, "0")}`, type, name }));
-  if (on("inventory")) put(C.locations, { id: STARTER_LOCATION_ID, name: "Main store", isDefault: true });
+  if (on("inventory")) put(C.locations, { id: STARTER_LOCATION_ID, name: goods ? "Warehouse" : "Main store", isDefault: true });
+  if (on("wholesale")) {
+    put("priceLists", { id: "A-GRADE", name: "A-grade shops (5% off)", kind: "percent", percentOff: 500, active: true });
+    put("couriers", { id: "COURIER", name: "Courier (rename)", codFeeBp: 100, parcelFee: 350_00, active: true });
+  }
   if (on("accounting")) {
-    defaultChartOfAccounts().forEach((a) => put(C.accounts, a as unknown as { id: string }));
+    // Goods businesses: the "other" sales, cost of sales and stock accounts read as goods.
+    const rename: Record<string, string> = goods ? { "4020": "Sales – goods", "5020": "Cost of sales – goods", "1200": "Inventory – goods" } : {};
+    defaultChartOfAccounts().forEach((a) => put(C.accounts, (rename[a.id] ? { ...a, name: rename[a.id] } : a) as unknown as { id: string }));
     defaultCostCenters([{ id: STARTER_PROPERTY_ID, name: args.name }]).forEach((cc) => put(L.costCenters, cc as unknown as { id: string }));
   }
   return ops;

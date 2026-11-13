@@ -30,6 +30,7 @@ export interface HealthTenant {
   plan: string;
   licence?: { licenceId: string; expiresAt: string; status: string };
   modules: string[];
+  industry?: string;
   devices: { id: string; appVersion?: string; lastSeenAt?: string }[];
   errors24h: number;
   counts: { workstations: number; employees: number; backOfficeUsers: number };
@@ -153,7 +154,10 @@ export interface DailyMetrics {
   versions: Record<string, number>;
 }
 
-export const INDUSTRIES = ["Restaurant", "Café", "Bakery", "Bar & pub", "Hotel", "Resort", "Catering", "Retail", "Other"] as const;
+export const INDUSTRIES = ["Restaurant", "Café", "Bakery", "Bar & pub", "Hotel", "Resort", "Catering", "Retail", "Clothing & apparel", "Wholesale & distribution", "Salon & spa", "Tattoo studio", "Services", "Other"] as const;
+
+/** Industry models reported by the client systems (1.11.0). */
+export const MODEL_NAMES: Record<string, string> = { restaurant: "Restaurant", cafe: "Café & coffee shop", bar: "Bar & pub", bakery: "Bakery", hotel: "Hotel", retail: "Retail shop", fashion: "Clothing & apparel", wholesale: "Wholesale & distribution", salon: "Salon & spa", tattoo: "Tattoo studio", services: "Services" };
 
 export interface UnknownProject {
   id: string;
@@ -235,6 +239,7 @@ export interface BusinessRequest {
   name: string;
   kind: "business" | "demo";
   modules: string[];
+  industry?: string;
   requestedBy: { uid: string; email: string; name?: string };
   requestedAt: string;
   note?: string;

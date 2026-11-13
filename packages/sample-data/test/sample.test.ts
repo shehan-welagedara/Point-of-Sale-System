@@ -109,3 +109,28 @@ describe("sample dataset", () => {
     expect(dataHealth(snapshot, tenant.modules).map((h) => `${h.collection}/${h.id}: ${h.message}`)).toEqual([]);
   });
 });
+
+describe("Colombo Tees (wholesale demo)", () => {
+  it("builds through the real services: stock, orders, invoices, payments, WhatsApp, balanced books", async () => {
+    const { WHOLESALE, COLLECTIONS: C } = await import("@pos/core");
+    const { LEDGER: L } = await import("@pos/ledger");
+    const { buildSampleStore } = await import("../src/index.js");
+    const { store, tenant } = await buildSampleStore({ today: "2026-11-13", kind: "colombo-tees" });
+    expect(tenant).toMatchObject({ id: "demo-colombo-tees", industry: "wholesale", modules: { wholesale: true, whatsappCommerce: true, accounting: true } });
+    const orders = await store.list<{ number: string; status: string; channel: string; invoiceNo?: string; paymentStatus: string; payments: { status: string; proofAttachmentId?: string }[] }>(WHOLESALE.salesOrders);
+    const by = (s: string) => orders.filter((o) => o.status === s).length;
+    expect({ quotation: by("quotation"), draft: by("draft"), confirmed: by("confirmed"), packed: by("packed"), dispatched: by("dispatched"), delivered: by("delivered") }).toEqual({ quotation: 1, draft: 1, confirmed: 1, packed: 1, dispatched: 2, delivered: 4 });
+    expect(orders.filter((o) => o.invoiceNo).length).toBe(6);
+    const wa = orders.find((o) => o.channel === "whatsapp")!;
+    expect(wa.payments).toMatchObject([{ status: "pending", proofAttachmentId: "demo-slip" }]);
+    expect((await store.list(WHOLESALE.styles)).length).toBe(5);
+    expect((await store.list<{ type: string }>(C.stockMovements)).filter((m) => m.type === "sale").length).toBe(6);
+    // Every posted voucher balances, and the trial balance nets to zero.
+    const entries = await store.list<{ debit: number; credit: number; account: string }>(L.ledger);
+    expect(entries.reduce((a, e) => a + e.debit - e.credit, 0)).toBe(0);
+    const sales = entries.filter((e) => e.account === "4020").reduce((a, e) => a + e.credit - e.debit, 0);
+    const cogs = entries.filter((e) => e.account === "5020").reduce((a, e) => a + e.debit - e.credit, 0);
+    expect(sales).toBeGreaterThan(cogs);
+    expect(cogs).toBeGreaterThan(0);
+  });
+});

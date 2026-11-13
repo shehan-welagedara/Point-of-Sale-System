@@ -299,6 +299,11 @@ export interface IntegrationSettings extends Entity {
     templateLanguage?: string;
     /** Last catalogue sync to Meta Commerce Manager. */
     catalogSyncedAt?: string;
+    /** Send order confirmations, dispatch, delivery and payment messages automatically (default on). */
+    autoNotify?: boolean;
+    /** Public address of style photos for the catalogue (folder URL) and the shop link. */
+    catalogImageBase?: string;
+    catalogLink?: string;
   };
   accountingExport: { target: "excel" | "erpnext" | "akaunting"; baseUrl?: string };
 }

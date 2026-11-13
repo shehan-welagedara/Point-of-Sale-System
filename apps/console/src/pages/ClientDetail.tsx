@@ -3,7 +3,7 @@ import { limit, orderBy, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAction, useCol, useDocData, useSession } from "../state";
-import { type AuditEntry, CYCLE_MONTHS, type Client, type Payment, type UsageDay, ago, compareVersions, date, dateTime, fromCents, healthState, plusMonths, rupees, subscriptionState, todayColombo } from "../types";
+import { type AuditEntry, CYCLE_MONTHS, MODEL_NAMES, type Client, type Payment, type UsageDay, ago, compareVersions, date, dateTime, fromCents, healthState, plusMonths, rupees, subscriptionState, todayColombo } from "../types";
 import { Field, HealthBadge, Loading, Modal, PageHead, StatusBadge, SubscriptionBadge } from "../ui";
 import { ClientFields, type ClientForm, emptyClient } from "./Clients";
 
@@ -110,6 +110,7 @@ function Health({ c, latest }: { c: Client; latest?: string }) {
         <div key={t.id} className="card">
           <div className="card-head">
             <h3 className="grow">{t.name}</h3>
+            {t.industry ? <span className="badge">{MODEL_NAMES[t.industry] ?? t.industry}</span> : null}
             <span className="badge brand">{editionInfo(t.plan as never)?.name ?? t.plan}</span>
             {t.licence ? <span className={`badge ${t.licence.status === "valid" ? "good" : "warn"}`}>Licence {t.licence.status} · {date(t.licence.expiresAt)}</span> : <span className="badge warn">No licence</span>}
             {t.shareUsage ? null : <span className="badge">Figures not shared</span>}

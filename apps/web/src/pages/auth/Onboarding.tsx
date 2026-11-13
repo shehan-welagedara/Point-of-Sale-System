@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MODULES, type ModuleKey, type Tenant, builtInEntitlements, businessKey, setModule } from "@pos/core";
+import { INDUSTRY_MODELS, MODULES, type IndustryKey, type ModuleKey, type Tenant, builtInEntitlements, businessKey, industryModel, setModule } from "@pos/core";
 import type { SampleKind } from "@pos/sample-data";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { firebase } from "../../lib/firebase";
@@ -8,6 +8,7 @@ import { type BusinessRequestDoc, newBusinessId, useApp } from "../../state/app"
 
 const STARTER: ModuleKey[] = ["pos", "tables", "recipes", "revenue", "crm", "lankaqr"];
 const DEMOS: { kind: SampleKind; name: string; title: string; text: string }[] = [
+  { kind: "colombo-tees", name: "Colombo Tees (demo)", title: "Colombo Tees demo", text: "T-shirt wholesale to shops: styles in sizes and colours, orders with COD and credit, WhatsApp ordering assistant, books." },
   { kind: "noura-kitchen", name: "Noura Kitchen (demo)", title: "Noura Kitchen demo", text: "Restaurant and takeaway, one counter phone with a Bluetooth printer, not VAT registered. POS sign-in: 1001 / PIN 1111." },
   { kind: "spice-lagoon", name: "Spice Lagoon (demo)", title: "Spice Lagoon demo", text: "A larger VAT-registered restaurant with network printers, recipes, stock and full books. POS sign-in: 1001 / PIN 1111." },
 ];
@@ -103,7 +104,12 @@ export function Onboarding() {
   const [different, setDifferent] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [chosen, setChosen] = useState<Partial<Record<ModuleKey, boolean>>>(Object.fromEntries(STARTER.map((k) => [k, true])));
+  const [industry, setIndustry] = useState<IndustryKey>("restaurant");
   const trial = builtInEntitlements("trial");
+  const pickIndustry = (k: IndustryKey) => {
+    setIndustry(k);
+    setChosen(Object.fromEntries(industryModel(k).modules.filter((m) => trial.modules.includes(m)).map((m) => [m, true])));
+  };
   const picked = MODULES.filter((m) => chosen[m.key]).map((m) => m.key);
   const key = businessKey(name);
   const same = name.trim() ? [...tenants.map((t) => ({ name: t.name, archived: t.status === "archived" })), ...requests.filter((r) => r.status === "pending" || r.status === "approved").map((r) => ({ name: r.name, archived: false }))].filter((t) => businessKey(t.name) === key) : [];
@@ -127,20 +133,20 @@ export function Onboarding() {
   async function start(label: string, bname: string, sample: SampleKind | false, modules: ModuleKey[]) {
     await run(label, async () => {
       const id = newBusinessId(bname);
-      const res = await requestBusiness({ id, name: bname, kind: sample ? "demo" : "business", ...(sample ? { sample } : {}), modules });
+      const res = await requestBusiness({ id, name: bname, kind: sample ? "demo" : "business", ...(sample ? { sample } : {}), modules, ...(sample ? {} : { industry }) });
       if (res.required && res.request?.status !== "approved") {
         toast("Sent to Polymath Tech for approval");
         setName("");
         return;
       }
-      await createTenant(bname, sample, sample ? undefined : modules, res.required ? id : undefined);
+      await createTenant(bname, sample, sample ? undefined : modules, res.required ? id : undefined, sample ? undefined : industry);
       if (tenant || mode === "local") navigate("/emc/home");
     });
   }
 
   const openApproved = (r: BusinessRequestDoc) =>
     run("open", async () => {
-      await createTenant(r.name, r.kind === "demo" ? (r.sample ?? (r.name.startsWith("Noura") ? "noura-kitchen" : "spice-lagoon")) : false, r.kind === "demo" ? undefined : (r.modules as ModuleKey[]), r.id);
+      await createTenant(r.name, r.kind === "demo" ? (r.sample ?? (r.name.startsWith("Noura") ? "noura-kitchen" : r.name.startsWith("Colombo Tees") ? "colombo-tees" : "spice-lagoon")) : false, r.kind === "demo" ? undefined : (r.modules as ModuleKey[]), r.id, r.kind === "demo" ? undefined : (r.industry as IndustryKey | undefined));
       navigate("/emc/home");
     });
 
@@ -179,7 +185,19 @@ export function Onboarding() {
             </div>
           ) : null}
           <div className="field">
-            <label>Modules</label>
+            <label>Kind of business</label>
+            <div className="industry-grid" role="radiogroup" aria-label="Kind of business">
+              {INDUSTRY_MODELS.filter((m) => m.status !== "edition").map((m) => (
+                <button key={m.key} type="button" role="radio" aria-checked={industry === m.key} className={`industry-btn${industry === m.key ? " on" : ""}`} onClick={() => pickIndustry(m.key)} title={m.description}>
+                  <span className="industry-ico" aria-hidden="true">{m.icon}</span>
+                  <span>{m.name}{m.status === "preview" ? <span className="tiny muted"> · preview</span> : null}</span>
+                </button>
+              ))}
+            </div>
+            <div className="help">{industryModel(industry).description} Hotels and resorts: the Enterprise Hotel Edition (ask Polymath Tech).</div>
+          </div>
+          <details className="field">
+            <summary className="small">Modules ({picked.length})</summary>
             <div className="chips">
               {MODULES.filter((m) => m.status === "available" && trial.modules.includes(m.key)).map((m) => (
                 <button key={m.key} type="button" className={`chip${chosen[m.key] ? " on" : ""}`} title={m.description} onClick={() => setChosen(setModule(chosen, m.key, !chosen[m.key]))}>
@@ -188,7 +206,7 @@ export function Onboarding() {
               ))}
             </div>
             <div className="help">Starts a 30-day trial. Your licence key sets the final modules.</div>
-          </div>
+          </details>
           <div className="row wrap">
             <button className="btn primary" disabled={!name.trim() || Boolean(busy) || !picked.length || (same.length > 0 && !different)} onClick={() => start("empty", name.trim(), false, picked)}>
               {busy === "empty" ? "Creating…" : "Create business"}
@@ -197,7 +215,7 @@ export function Onboarding() {
         </div>
 
         <details className="card pad demo-box">
-          <summary><strong>Try a demo business</strong> <span className="small muted">— sample menu, stock, sales and books</span></summary>
+          <summary><strong>Try a demo business</strong> <span className="small muted">— sample products, stock, sales and books</span></summary>
           <div className="stack" style={{ marginTop: 10 }}>
             {DEMOS.map((d) => (
               <div key={d.kind} className="row wrap" style={{ alignItems: "flex-start" }}>

@@ -43,6 +43,8 @@ import { NOURA_FINANCE, seedFinance } from "./finance.js";
 export * from "./catalog.js";
 export * from "./finance.js";
 export * from "./starter.js";
+export * from "./wholesale.js";
+import { buildWholesaleSample, teesSettings } from "./wholesale.js";
 
 export const SAMPLE_PROPERTY_ID = "CMB";
 export const SAMPLE_LOCATION_ID = "MAIN";
@@ -188,7 +190,7 @@ function mulberry32(seed: number): () => number {
 }
 
 /** The demo businesses: the full Spice Lagoon restaurant, or a small one set up like Noura Kitchen. */
-export type SampleKind = "spice-lagoon" | "noura-kitchen";
+export type SampleKind = "spice-lagoon" | "noura-kitchen" | "colombo-tees";
 
 export interface SampleOptions {
   /** Business date treated as "today" (YYYY-MM-DD). */
@@ -232,6 +234,7 @@ const NOURA_MODULES = new Set<ModuleKey>(["pos", "tables", "recipes", "inventory
  * journals. The web app copies the result into Firestore or local storage.
  */
 export async function buildSampleStore(opts: SampleOptions): Promise<{ store: MemoryStore; tenant: Omit<Tenant, "ownerUid" | "createdAt"> }> {
+  if (opts.kind === "colombo-tees") return buildWholesaleSample({ today: opts.today, settings: teesSettings(sampleSettings()), tenders: sampleTenders() });
   const store = new MemoryStore();
   const noura = opts.kind === "noura-kitchen";
   const s = noura ? nouraSettings() : sampleSettings();

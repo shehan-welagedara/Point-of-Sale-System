@@ -40,12 +40,12 @@ export const ACTION_ROLES: Record<LedgerRequest["action"], MemberRole[]> = {
   reject: BOOKS,
   reverse: BOOKS,
   // Also the storekeeper: receiving or counting stock posts that day's stock journal.
-  postPosDay: [...BOOKS, "manager", "terminal", "storekeeper"],
+  postPosDay: [...BOOKS, "manager", "terminal", "storekeeper", "sales"],
   // Wholesale: dispatching an order invoices it; a confirmed payment is receipted (ledger posts).
   postSalesOrder: [...BOOKS, "manager", "sales"],
   runDepreciation: BOOKS,
   disposeAsset: BOOKS,
-  ensureFiscalYear: [...BOOKS, "manager", "terminal"],
+  ensureFiscalYear: [...BOOKS, "manager", "terminal", "sales"],
   setPeriodStatus: BOOKS,
   closeFiscalYear: ["owner", "admin"],
   verify: ["owner", "admin", "accountant", "auditor"],

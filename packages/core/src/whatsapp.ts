@@ -606,3 +606,18 @@ export function cloudPayload(to: string, m: WaOutbound): Json {
   if (m.kind === "image") return { ...base, type: "image", image: { link: m.link, ...(m.caption ? { caption: m.caption.slice(0, 1024) } : {}) } };
   return { ...base, type: "template", template: { name: m.name, language: { code: m.language ?? "en" }, ...(m.params.length ? { components: [{ type: "body", parameters: m.params.map((p) => ({ type: "text", text: p })) }] } : {}) } };
 }
+
+// ───────────────────────────── Staff API (whatsappApi callable; the same in the local demo) ─────────────────────────────
+
+/** Requests the inbox, settings and orders make (Cloud Function whatsappApi). */
+export type WhatsappApiRequest =
+  | { action: "status"; tenantId: string }
+  | { action: "connect"; tenantId: string; phoneNumberId: string; accessToken?: string; appSecret?: string; verifyToken?: string }
+  | { action: "disconnect"; tenantId: string }
+  | { action: "send"; tenantId: string; conversationId: string; message: WaOutbound }
+  | { action: "orderMessage"; tenantId: string; orderId: string; kind: OrderMessageKind; link?: string }
+  | { action: "simulate"; tenantId: string; message: Omit<WaInbound, "id" | "at"> }
+  | { action: "syncCatalogue"; tenantId: string; imageBase: string; link: string }
+  | { action: "broadcast"; tenantId: string; name: string; template: string; params: string[]; segment: BroadcastSegment; test?: string }
+  | { action: "media"; tenantId: string; mediaId: string };
+

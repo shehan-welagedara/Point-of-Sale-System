@@ -5,6 +5,7 @@ import {
   type BrandingSettings,
   type BusinessSettings,
   type DocStore,
+  type IndustryKey,
   type IntegrationSettings,
   type MemberRole,
   type ModuleKey,
@@ -96,12 +97,12 @@ interface AppState {
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   /** A new business: empty (with the chosen modules) or one of the demo businesses. `id`: the approved request's id. */
-  createTenant: (name: string, sample: false | SampleKind, modules?: MK[], id?: string) => Promise<void>;
+  createTenant: (name: string, sample: false | SampleKind, modules?: MK[], id?: string, industry?: IndustryKey) => Promise<void>;
   /**
    * On a system linked to Polymath Tech, a new business is approved first (two-step validation):
    * sends the request and says whether to wait. Local and unlinked systems answer `required: false`.
    */
-  requestBusiness: (input: { id: string; name: string; kind: "business" | "demo"; sample?: SampleKind; modules: MK[] }) => Promise<BusinessRequestResult>;
+  requestBusiness: (input: { id: string; name: string; kind: "business" | "demo"; sample?: SampleKind; modules: MK[]; industry?: IndustryKey }) => Promise<BusinessRequestResult>;
   /** Asks Polymath Tech again about a request (check), or withdraws it (cancel). */
   businessRequest: (action: "check" | "cancel", id: string) => Promise<BusinessRequestResult>;
   /** Owner only: archive a business opened by mistake (hidden, closed to the POS, data kept), or restore it. */
@@ -136,6 +137,7 @@ export interface BusinessRequestDoc {
   kind: "business" | "demo";
   sample?: SampleKind;
   modules: MK[];
+  industry?: string;
   status: "pending" | "approved" | "rejected" | "cancelled";
   requestedAt: string;
   decidedAt?: string;
@@ -249,11 +251,11 @@ function applyBrand(branding: BrandingSettings | undefined): void {
   document.title = branding?.displayName ? `${branding.displayName} · ${PRODUCT_NAME}` : PRODUCT_FULL_NAME;
 }
 
-async function sampleOps(kind: SampleKind): Promise<{ ops: WriteOp[]; modules: Tenant["modules"] }> {
-  const { store, tenant } = await buildSampleStore(kind === "noura-kitchen" ? { today: todayColombo(), historyDays: 30, checksPerDay: 12, kind } : { today: todayColombo(), historyDays: 7, checksPerDay: 18 });
+async function sampleOps(kind: SampleKind): Promise<{ ops: WriteOp[]; modules: Tenant["modules"]; industry?: string }> {
+  const { store, tenant } = await buildSampleStore(kind === "noura-kitchen" ? { today: todayColombo(), historyDays: 30, checksPerDay: 12, kind } : { today: todayColombo(), historyDays: 7, checksPerDay: 18, kind });
   const snap = store.snapshot();
   const ops: WriteOp[] = Object.entries(snap).flatMap(([col, docs]) => docs.map((data): WriteOp => ({ op: "set", col, data: data as { id: string } })));
-  return { ops, modules: tenant.modules };
+  return { ops, modules: tenant.modules, ...(tenant.industry ? { industry: tenant.industry } : {}) };
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -505,7 +507,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const createTenant = useCallback(
-    async (name: string, withSample: false | SampleKind, chosen?: MK[], approvedId?: string) => {
+    async (name: string, withSample: false | SampleKind, chosen?: MK[], approvedId?: string, industryKey?: IndustryKey) => {
       const sample = withSample ? await sampleOps(withSample) : null;
       // Demo data runs on the demo edition; a new client business starts a trial with the
       // modules chosen at installation (always within the edition's entitlement).
@@ -523,12 +525,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       const configOps: WriteOp[] = sample?.ops ?? [
         ...Object.values(starter).map((data): WriteOp => ({ op: "set", col: C.settings, data })),
-        ...starterConfig({ name, addressLines: base.business.addressLines, modules: licensing.modules }),
+        ...starterConfig({ name, addressLines: base.business.addressLines, modules: licensing.modules, ...(industryKey ? { industry: industryKey } : {}) }),
       ];
+      const industry = sample?.industry ?? industryKey;
       const openYear = !sample && licensing.modules.accounting;
       const now = new Date().toISOString();
       if (mode === "local") {
-        const t: Tenant = { id: "local", name, ownerUid: "local-owner", ...licensing, status: "active", createdAt: now };
+        const t: Tenant = { id: "local", name, ownerUid: "local-owner", ...licensing, ...(industry ? { industry } : {}), status: "active", createdAt: now };
         const m = new MemoryStore();
         await withStaffSecrets(m).batch(configOps);
         if (openYear) await runLedgerRequest({ runner: storeRunner(m), store: m, now: () => new Date(), sealDelayMs: 0 }, { uid: "local-owner", name, role: "owner" }, { action: "ensureFiscalYear", date: todayColombo() });
@@ -547,7 +550,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // An owner/administrator adding a business (e.g. a training copy) proves it with their current one;
         // the very first business in a new project claims the deployment (see firestore.rules).
         const from = tenant && memberships.some((m) => m.tenantId === tenant.id && (m.role === "owner" || m.role === "admin")) ? tenant.id : undefined;
-        const t = { id, name, ownerUid: user.uid, ...licensing, status: "active", createdAt: now, ...(from ? { createdFromTenant: from } : {}) } as Tenant;
+        const t = { id, name, ownerUid: user.uid, ...licensing, ...(industry ? { industry } : {}), status: "active", createdAt: now, ...(from ? { createdFromTenant: from } : {}) } as Tenant;
         const b = writeBatch(db);
         const deployment = await getDoc(doc(db, "deployment", "config")).catch(() => null);
         if (deployment && !deployment.exists()) b.set(doc(db, "deployment", "config"), { ownerUid: user.uid, openSignup: false, createdAt: now });
@@ -617,7 +620,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const requestBusiness = useCallback(
-    async (input: { id: string; name: string; kind: "business" | "demo"; sample?: SampleKind; modules: MK[] }): Promise<BusinessRequestResult> => {
+    async (input: { id: string; name: string; kind: "business" | "demo"; sample?: SampleKind; modules: MK[]; industry?: IndustryKey }): Promise<BusinessRequestResult> => {
       if (mode !== "firebase") return { required: false };
       try {
         const res = await httpsCallable(firebase().functions, "businessApi", { timeout: 60_000 })({ action: "submit", ...input });
