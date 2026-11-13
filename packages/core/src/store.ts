@@ -40,6 +40,12 @@ export const COLLECTIONS = {
   customers: "customers",
   checks: "checks",
   invoices: "invoices",
+  /** Credit notes for voided, refunded and reopened closed checks (closed-checks.ts). */
+  creditNotes: "creditNotes",
+  /** Changes of payment method on closed checks. */
+  checkAdjustments: "checkAdjustments",
+  /** Cash counts of a drawer (declared against expected). */
+  tillCounts: "tillCounts",
   sequences: "sequences",
   dailyStats: "dailyStats",
   accounts: "accounts",

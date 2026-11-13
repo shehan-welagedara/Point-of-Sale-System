@@ -40,6 +40,7 @@ import {
   PRIVILEGES,
   canPerform,
   lankaQrPayload,
+  mergeChecks,
   newCheck,
   newId,
   processDepletion,
@@ -56,6 +57,8 @@ import { paperWidthFor, queuePrint, routePrinter } from "../../lib/printing";
 import { printBluetooth } from "../../lib/bluetooth-printer";
 import { BluetoothPrinterButton } from "./BluetoothPrinter";
 import { useApp, useCollection, useStore } from "../../state/app";
+import { ClosedChecks } from "./ClosedChecks";
+import { TillCount } from "./TillCount";
 import { AmountDialog, CustomerDialog, DiscountDialog, ManagerAuth, ModifierDialog, ReasonDialog } from "./dialogs";
 import { PayDialog } from "./PayDialog";
 import { PosReports } from "./PosReports";
@@ -377,6 +380,23 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
     });
   }
 
+  /** Brings another open check's items and payments into this one (the other is closed as merged). */
+  function mergeInto(other: Check) {
+    if (!check) return;
+    setDialog(null);
+    withPrivilege("pos.splitCheck", async (by) => {
+      try {
+        const { into, from } = mergeChecks(check, other);
+        await store.set(C.checks, from);
+        await persist(into);
+        void journal.log({ type: "checkMerge", employeeId: user.id, ...(by.id !== user.id ? { authorizedBy: by.id } : {}), ...onCheck(into), detail: `check #${other.checkNo} merged in` });
+        toast(`Check #${other.checkNo} merged into #${into.checkNo}`);
+      } catch (e) {
+        toast((e as Error).message, true);
+      }
+    });
+  }
+
   /** Moves the selected item to a new check (separate bills). */
   function splitLine(line: CheckLine) {
     if (!check) return;
@@ -503,6 +523,14 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
                 </div>
               </>
             ) : null}
+            {openChecks.some((c) => c.id !== check.id) ? (
+              <>
+                <span className="section-title">Merge another check into this one</span>
+                <div className="chips">
+                  {openChecks.filter((c) => c.id !== check.id).map((c) => <button key={c.id} className="chip" onClick={() => mergeInto(c)}>#{c.checkNo}{c.tableId ? ` · ${tableName(c.tableId) ?? c.tableId}` : ""} · {staffName(c.staffId)}</button>)}
+                </div>
+              </>
+            ) : null}
           </div>
         </Modal>
       ) : null}
@@ -551,7 +579,11 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
     </>
   );
 
-  const functionsPanel = <Functions ws={ws} user={user} role={role} roles={roles} staff={staff} printers={printers} ctx={ctx} lastInvoice={lastInvoice} menuItems={menuItems} withPrivilege={withPrivilege} print={print} journal={journal} openAmount={(title, help, then) => setDialog({ t: "amount", title, ...(help ? { help } : {}), then: (c) => { setDialog(null); then(c); } })} onPreview={(doc, title) => setDialog({ t: "receipt", doc, title })} />;
+  const invoiceDoc = (c: Check, inv: Invoice) => {
+    const printer = printers.find((p) => p.id === ws.receiptPrinterId);
+    return buildBill({ kind: "invoice", check: c, totals: inv.totals, business: settings.business, branding: settings.branding, width: paperWidth(printer), staffName: staffName(c.staffId), orderTypeName: orderTypeName(c.orderTypeId), tableName: tableName(c.tableId), tenders: ctx.tenders, invoiceNo: inv.id, issuedAt: inv.issuedAt, ...customerOnBill(c) });
+  };
+  const functionsPanel = <Functions ws={ws} user={user} role={role} roles={roles} staff={staff} printers={printers} ctx={ctx} lastInvoice={lastInvoice} menuItems={menuItems} withPrivilege={withPrivilege} print={print} journal={journal} reasons={reasons} invoiceDoc={invoiceDoc} onReopened={(c) => { setCheck(c); setSel(null); setView("order"); toast(`Check #${c.checkNo} is open again: correct it and take payment`); }} openAmount={(title, help, then) => setDialog({ t: "amount", title, ...(help ? { help } : {}), then: (c) => { setDialog(null); then(c); } })} onPreview={(doc, title) => setDialog({ t: "receipt", doc, title })} />;
   const reportsPanel = <PosReports ws={ws} user={user} role={role} rvcId={rvcId} staff={staff} rvcs={rvcs} ctx={ctx} journal={journal} withPrivilege={withPrivilege} print={print} printers={printers} />;
 
   if (ui !== "terminal") {
@@ -699,7 +731,7 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
             <div className="pos-check-head">
               <div className="row between">
                 <strong>{check ? `Check #${check.checkNo}` : "New check"}{check?.tableId ? ` · Table ${tableName(check.tableId)}` : ""}</strong>
-                {check && check.lines.length ? <button className="btn ghost sm" onClick={() => setDialog({ t: "transfer" })}>Transfer</button> : null}
+                {check && check.lines.length ? <button className="btn ghost sm" onClick={() => setDialog({ t: "transfer" })}>Transfer / merge</button> : null}
                 {check ? (
                   <button className="btn ghost sm" onClick={() => withPrivilege("pos.changeCovers", () => setDialog({ t: "covers", then: (n) => { setCheck({ ...check, covers: n }); setDialog(null); } }))}>{check.covers} pax</button>
                 ) : null}
@@ -769,7 +801,10 @@ export function PosMain({ ws, user, staff, rvcId, journal, onSignOut, onChangeRv
   );
 }
 
-function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, menuItems, withPrivilege, print, journal, openAmount, onPreview }: {
+function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, menuItems, withPrivilege, print, journal, openAmount, onPreview, reasons, invoiceDoc, onReopened }: {
+  reasons: ReasonCode[];
+  invoiceDoc: (check: Check, invoice: Invoice) => ReceiptDoc;
+  onReopened: (check: Check) => void;
   ws: Workstation;
   user: Staff;
   role: Role | undefined;
@@ -788,7 +823,7 @@ function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, m
   const { settings, on, toast, ledger } = useApp();
   const store = useStore();
   const [eod, setEod] = useState<string[] | null>(null);
-  const [panel, setPanel] = useState<"unlock" | "journal" | null>(null);
+  const [panel, setPanel] = useState<"unlock" | "journal" | "closed" | "till" | null>(null);
   const bd = businessDateNow(settings.pos);
   const receiptPrinter = printers.find((p) => p.id === ws.receiptPrinterId);
   const tenders = [...ctx.tenders.values()];
@@ -855,6 +890,17 @@ function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, m
     });
   }
 
+  function pickup() {
+    openAmount("Cash pickup", "Cash taken out of the drawer to the safe or the bank (not an expense).", (cents) => {
+      if (cents <= 0) return;
+      withPrivilege("pos.tillCount", async (by) => {
+        await drawer();
+        await journal.log({ type: "cashPickup", employeeId: user.id, ...authBy(by), amount: cents });
+        toast(`Cash pickup ${money(cents)} (logged)`);
+      });
+    });
+  }
+
   async function clockOut() {
     if (!user.clockedInAt) return toast("You are not clocked in", true);
     const now = new Date().toISOString();
@@ -875,6 +921,9 @@ function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, m
     { label: "Paid in", sub: "Cash into the drawer", privilege: "pos.paidInOut", run: () => paid("paidIn") },
     { label: "Paid out", sub: "Cash out for small purchases", privilege: "pos.paidInOut", run: () => paid("paidOut") },
     { label: "Clock out", sub: user.clockedInAt ? `In since ${timeColombo(user.clockedInAt)}` : "Time and attendance", run: () => void clockOut(), show: Boolean(user.clockedInAt) || Boolean(settings.pos.requireClockIn) },
+    { label: "Closed checks", sub: "Find, reprint, refund, void, reopen, change payment", run: () => setPanel("closed") },
+    { label: "Cash pickup", sub: "Cash from the drawer to the safe", privilege: "pos.tillCount", run: () => pickup() },
+    { label: "Till count", sub: "Count the drawer against expected", privilege: "pos.tillCount", run: () => setPanel("till") },
     { label: "Unlock employee", sub: "After too many wrong PINs", privilege: "pos.unlockEmployee", run: () => setPanel("unlock") },
     { label: "Transaction journal", sub: "This workstation, today", privilege: "pos.journal", run: () => setPanel("journal") },
   ];
@@ -918,6 +967,24 @@ function Functions({ ws, user, role, roles, staff, printers, ctx, lastInvoice, m
         </Modal>
       ) : null}
       {panel === "journal" ? <JournalPanel ws={ws} staff={staff} onClose={() => setPanel(null)} /> : null}
+      {panel === "closed" ? (
+        <ClosedChecks
+          ws={ws}
+          user={user}
+          staff={staff}
+          tenders={tenders}
+          reasons={reasons}
+          ctx={ctx}
+          businessDate={bd}
+          journal={journal}
+          withPrivilege={withPrivilege}
+          printDoc={(doc, kind) => print(kind, doc, receiptPrinter)}
+          invoiceDoc={invoiceDoc}
+          onReopened={(c) => { setPanel(null); onReopened(c); }}
+          onClose={() => setPanel(null)}
+        />
+      ) : null}
+      {panel === "till" ? <TillCount ws={ws} user={user} staff={staff} tenders={tenders} journal={journal} withPrivilege={withPrivilege} onPrint={(doc) => print("report", doc, receiptPrinter)} onClose={() => setPanel(null)} /> : null}
       {eod ? (
         <Modal title={`End of Day · ${bd}`} onClose={() => setEod(null)} footer={<button className="btn primary" onClick={() => setEod(null)}>Done</button>}>
           <ul style={{ margin: 0, paddingLeft: 18 }} className="stack tight">{eod.map((s, i) => <li key={i}>{s}</li>)}</ul>

@@ -38,6 +38,8 @@ export interface Tenant extends Entity {
   supplier?: TenantSupplierLink;
   /** The owner lets yesterday's totals go to the supplier at check-in (default: yes). */
   shareUsage?: boolean;
+  /** Industry model (industries.ts): restaurant, café, retail, wholesale, salon… (absent = restaurant). */
+  industry?: string;
 }
 
 export interface TenantLicence {
@@ -74,6 +76,15 @@ export interface BusinessSettings extends Entity {
   website?: string;
   /** Marks data that is sample-only so the UI can warn before go-live. */
   isSample?: boolean;
+  /**
+   * Global-ready settings (1.11.0): ISO country (LK), currency (LKR), locale (en-LK), time zone
+   * (Asia/Colombo) and tax profile (LK: VAT, SSCL, IRD invoices). Absent = Sri Lanka.
+   */
+  country?: string;
+  currency?: string;
+  locale?: string;
+  timeZone?: string;
+  taxProfile?: string;
 }
 
 export interface BrandingSettings extends Entity {
@@ -794,7 +805,11 @@ export interface Check extends Entity {
   invoiceNo?: string;
   /** Inventory depletion state (inventory module). */
   depletion?: "pending" | "done" | "skipped";
-  channel: "pos" | "qr" | "online";
+  channel: "pos" | "qr" | "online" | "whatsapp";
+  /** A check opened again from a closed one (its credit note cancels the original bill). */
+  reopenedFrom?: { checkId: string; invoiceNo: string; creditNoteId: string };
+  /** Free text on the check (customer name for a takeaway, a note). */
+  name?: string;
 }
 
 /** Immutable fiscal record of an issued bill. Id = invoice number. */
@@ -822,6 +837,11 @@ export interface WorkstationSequence extends Entity {
   checkDate: string;
   checkSeq: number;
   lastInvoiceHash: string;
+  /** Credit note sequence (closed-check voids and refunds), its period and hash chain. */
+  creditYear?: number;
+  creditMonth?: number;
+  creditSeq?: number;
+  lastCreditHash?: string;
 }
 
 // ───────────────────────────── Aggregates, reports, accounting ─────────────────────────────
@@ -858,6 +878,8 @@ export interface DailyStats extends Entity {
   hours: Record<string, MoneyQty>;
   tenders: Record<string, MoneyQty>;
   voids: MoneyQty;
+  /** Credit notes issued this day (voided, refunded or reopened closed checks): count and value. */
+  returns?: MoneyQty;
 }
 
 export type AccountType =

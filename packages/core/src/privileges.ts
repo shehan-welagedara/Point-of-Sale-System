@@ -64,6 +64,7 @@ export const PRIVILEGE_GROUPS = [
       "pos.tender": "Take payments",
       "pos.comp": "Use complimentary / staff meal tenders",
       "pos.refund": "Refund and void closed checks",
+      "pos.adjustClosed": "Change the payment method of a closed check",
     },
   },
   {
@@ -72,6 +73,7 @@ export const PRIVILEGE_GROUPS = [
     privileges: {
       "pos.noSale": "Open the cash drawer without a sale",
       "pos.paidInOut": "Paid in / paid out of the drawer",
+      "pos.tillCount": "Cash pickups and till counts",
       "pos.reprint": "Reprint bills (marked COPY)",
     },
   },
@@ -127,7 +129,7 @@ export const DEFAULT_ROLES: Role[] = [
     id: "finance",
     name: "Finance / Accountant",
     level: 25,
-    privileges: ["pos.signIn", "pos.clockInOut", "pos.changeRvc", "pos.reprint", "pos.paidInOut", "pos.noSale", "pos.reports", "pos.reportsOwn", "pos.journal", "pos.endOfDay"],
+    privileges: ["pos.signIn", "pos.clockInOut", "pos.changeRvc", "pos.reprint", "pos.paidInOut", "pos.noSale", "pos.reports", "pos.reportsOwn", "pos.journal", "pos.endOfDay", "pos.tillCount"],
     limits: {},
     requireAuth: ["pos.noSale"],
     description: "Cash-up and day close: paid in and out, reports, the journal and End of Day. Doesn't take orders or authorise other staff.",

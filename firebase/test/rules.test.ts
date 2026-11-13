@@ -189,6 +189,23 @@ describe("roles", () => {
   });
 });
 
+describe("closed-check corrections", () => {
+  beforeEach(async () => seedTenant());
+  it("lets POS devices and managers issue credit notes and payment changes, which then never change", async () => {
+    const till = as("till");
+    await assertSucceeds(setDoc(doc(till, "tenants", T, "creditNotes", "CN-26NOV_W01_1"), { id: "CN-26NOV_W01_1", hash: "h", reason: "Wrong table", depletion: "pending" }));
+    await assertFails(setDoc(doc(till, "tenants", T, "creditNotes", "CN-26NOV_W01_2"), { id: "CN-26NOV_W01_2", hash: "h", reason: "" }));
+    await assertFails(setDoc(doc(as("acct"), "tenants", T, "creditNotes", "CN-26NOV_W01_3"), { id: "CN-26NOV_W01_3", hash: "h", reason: "x" }));
+    await assertSucceeds(updateDoc(doc(till, "tenants", T, "creditNotes", "CN-26NOV_W01_1"), { depletion: "done" }));
+    await assertFails(updateDoc(doc(as("mgr"), "tenants", T, "creditNotes", "CN-26NOV_W01_1"), { reason: "changed" }));
+    await assertFails(deleteDoc(doc(as("owner"), "tenants", T, "creditNotes", "CN-26NOV_W01_1")));
+    await assertSucceeds(setDoc(doc(till, "tenants", T, "checkAdjustments", "A1"), { id: "A1", reason: "Card, not cash" }));
+    await assertFails(updateDoc(doc(as("mgr"), "tenants", T, "checkAdjustments", "A1"), { amount: 1 }));
+    await assertSucceeds(setDoc(doc(till, "tenants", T, "tillCounts", "TC1"), { id: "TC1", counted: 100 }));
+    await assertFails(updateDoc(doc(till, "tenants", T, "tillCounts", "TC1"), { counted: 999 }));
+  });
+});
+
 describe("module licensing", () => {
   it("blocks ERP and finance writes when the module is off", async () => {
     await seedTenant({ pos: true });

@@ -242,6 +242,24 @@ service cloud.firestore {
         allow create: if canPos(t) && request.resource.data.id == id;
         allow update, delete: if false;
       }
+      // Corrections of closed checks: credit notes (void, refund, reopen) and payment-method changes
+      // are new, permanent records; a credit note only gets its stock-return flag updated.
+      match /creditNotes/{id} {
+        allow read: if isMember(t);
+        allow create: if canPos(t) && request.resource.data.id == id && request.resource.data.hash is string && request.resource.data.reason is string && request.resource.data.reason.size() > 0;
+        allow update: if (canPos(t) || canStock(t)) && onlyChanges(['depletion']);
+        allow delete: if false;
+      }
+      match /checkAdjustments/{id} {
+        allow read: if isMember(t);
+        allow create: if canPos(t) && request.resource.data.id == id && request.resource.data.reason is string && request.resource.data.reason.size() > 0;
+        allow update, delete: if false;
+      }
+      match /tillCounts/{id} {
+        allow read: if isMember(t);
+        allow create: if canPos(t) && request.resource.data.id == id;
+        allow update, delete: if false;
+      }
       match /sequences/{id} { allow read: if isMember(t); allow write: if canPos(t); }
       match /dailyStats/{id} { allow read: if isMember(t); allow write: if canPos(t); }
       match /printJobs/{id} {

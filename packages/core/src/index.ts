@@ -18,3 +18,5 @@ export * from "./brand.js";
 export * from "./link.js";
 export * from "./insights.js";
 export * from "./indexes.js";
+export * from "./closed-checks.js";
+export * from "./industries.js";

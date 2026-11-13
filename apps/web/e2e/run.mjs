@@ -643,6 +643,83 @@ try {
     }
   }
 
+  // ── Manager functions on closed checks (1.11.0): find, change payment, refund items, void, reopen;
+  //    cash pickup and till count. On the app-style POS of a PC (same Functions as the terminal).
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, storageState: await page.context().storageState() });
+    await ctx.addInitScript(() => localStorage.setItem("pos-suite.workstation", "W02"));
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errors.push(`closed checks: ${e.message}`));
+    await p.goto(`${B}/pos?mode=local`);
+    await p.waitForTimeout(900);
+    await p.getByLabel("Employee number or card").fill("1001");
+    await p.getByLabel("PIN", { exact: true }).fill("1111");
+    await p.getByRole("button", { name: "Sign In" }).click();
+    await p.waitForTimeout(800);
+    if (await p.locator(".mauth-list button").count()) await p.locator(".mauth-list button").first().click();
+    await p.waitForTimeout(600);
+    for (const n of [0, 1]) {
+      await p.locator(".w-nav button", { hasText: "Menu" }).click();
+      await p.waitForTimeout(300);
+      for (const k of [0, 1]) {
+        await p.locator(".m-product:not(.out) .m-add").nth(n + k).click();
+        await p.waitForTimeout(250);
+        if (await p.locator(".modal").count()) await p.locator(".modal .btn.primary").last().click();
+      }
+      await p.locator(".w-order .m-btn.cta").click();
+      await p.waitForTimeout(400);
+      await p.getByRole("button", { name: /Pay Now|Complete Payment/ }).click();
+      await p.waitForTimeout(1000);
+      await p.getByRole("button", { name: "Done" }).click();
+      await p.waitForTimeout(300);
+    }
+    const openFunctions = async () => {
+      await p.locator(".w-nav button", { hasText: "More" }).click();
+      await p.waitForTimeout(300);
+      await p.locator(".m-sheet-row", { hasText: "Functions" }).click();
+      await p.waitForTimeout(400);
+    };
+    await openFunctions();
+    await p.locator(".card", { hasText: "Closed checks" }).first().click();
+    await p.waitForTimeout(600);
+    check("Closed checks lists today's paid checks", (await p.locator(".closed-row").count()) >= 2);
+    const toastText = async () => (await p.locator(".toast").allTextContents()).join(" | ");
+    await p.locator(".closed-row").nth(0).click();
+    await p.getByRole("button", { name: "Change payment" }).click();
+    await p.getByPlaceholder("e.g. Paid by card, rung up as cash").fill("Paid by card");
+    await p.getByTestId("credit-tender").getByRole("button", { name: "Change" }).click();
+    await p.waitForTimeout(700);
+    check("a closed check's payment method can be changed", (await toastText()).includes("Payment method changed") && (await p.locator(".closed-row .badge", { hasText: "Payment changed" }).count()) === 1, await toastText());
+    await p.getByRole("button", { name: "Refund items" }).click();
+    await p.getByTestId("credit-refund").getByRole("button", { name: /^More / }).first().click();
+    await p.getByTestId("credit-refund").getByPlaceholder(/Why/).fill("Customer returned it");
+    await p.getByTestId("credit-refund").getByRole("button", { name: "Refund", exact: true }).click();
+    await p.waitForTimeout(900);
+    check("refunding one item issues a credit note", /CN-\d{2}[A-Z]{3}_W02_1: Rs [\d,.]+ refunded/.test(await toastText()) && (await p.locator(".closed-row .badge", { hasText: "Refunded" }).count()) === 1, await toastText());
+    await p.getByRole("button", { name: "Void check" }).click();
+    await p.getByTestId("credit-void").getByPlaceholder(/Why/).fill("Should not have been closed");
+    await p.getByTestId("credit-void").getByRole("button", { name: "Void check" }).click();
+    await p.waitForTimeout(800);
+    check("a partly refunded check can't be voided whole (refund the rest item by item)", (await toastText()).includes("item by item"), await toastText());
+    await p.locator(".closed-row").nth(1).click();
+    await p.getByRole("button", { name: "Reopen" }).first().click();
+    await p.getByTestId("credit-reopen").getByPlaceholder(/Why/).fill("Add a dessert");
+    await p.getByTestId("credit-reopen").getByRole("button", { name: "Reopen" }).click();
+    await p.waitForTimeout(1200);
+    check("reopening a closed check cancels its bill and opens it again to correct", (await toastText()).includes("is open again") && (await p.locator(".w-order .m-line").count()) >= 2, await toastText());
+    await openFunctions();
+    await p.locator(".card", { hasText: "Till count" }).first().click();
+    await p.waitForTimeout(400);
+    await p.getByLabel("Rs 1000").fill("3");
+    await p.waitForTimeout(200);
+    const summary = await p.getByTestId("till-summary").innerText();
+    check("till count compares the drawer with the cash expected", /Counted\s+Rs 3,000\.00/.test(summary) && /Expected/.test(summary), summary.replace(/\n/g, " "));
+    await p.getByRole("button", { name: "Save count" }).click();
+    await p.waitForTimeout(800);
+    check("the till count is saved and logged", /Till (balanced|over|short)/.test(await toastText()), await toastText());
+    await ctx.close();
+  }
+
   // ── The Noura Kitchen demo: their set-up with sample data to explore; the About page.
   {
     const version = JSON.parse((await import("node:fs")).readFileSync(resolve(web, "package.json"), "utf8")).version;
