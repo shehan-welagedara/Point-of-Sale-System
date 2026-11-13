@@ -2,7 +2,7 @@
  * The console's records and the rules about them that don't need the database (so they're unit-tested):
  * roles, health, subscriptions, renewal notices, and check-in validation.
  */
-import type { CheckinRequest, Edition, ModuleKey, SupplierContact, UsageLimits } from "@pos/core";
+import type { CheckinRequest, Edition, ModuleKey, SupplierContact, UpdateNotice, UsageLimits } from "@pos/core";
 
 export const STAFF_ROLES = ["owner", "admin", "sales", "support", "engineer"] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
@@ -184,6 +184,17 @@ export function noticeFor(c: Pick<ConsoleClient, "notice" | "subscription">, sup
   if (s.state === "due") return { text: `Your ${supplierName} subscription renews on ${longDate(sub.paidUntil)}${sub.priceLkr ? ` (${lkr(sub.priceLkr)})` : ""}. Thank you for renewing on time.`, level: "info" };
   if (s.state === "overdue") return { text: `Your ${supplierName} subscription was due on ${longDate(sub.paidUntil)}. Please contact ${supplierName} to renew.`, level: "warn" };
   return null;
+}
+
+/** The maintenance notice as one sentence, for systems older than 1.10.0 (they show it as a message). */
+export function maintenanceText(u: UpdateNotice, now: Date): string {
+  const tz = { timeZone: "Asia/Colombo" } as const;
+  const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { ...tz, hour: "2-digit", minute: "2-digit" });
+  if (u.state === "updating") return `Polymath Tech is updating your system to ${u.version} now. It may pause for a few minutes and comes back by itself.`;
+  if (u.state === "deployed") return `Your system has been updated to ${u.version}. Screens switch to it when they are free.`;
+  const start = u.at ? Date.parse(u.at) : now.getTime();
+  const when = u.at && start > now.getTime() ? `on ${new Date(u.at).toLocaleDateString("en-GB", { ...tz, weekday: "long", day: "numeric", month: "long" })}, ${time(u.at)}${u.until ? `–${time(u.until)}` : ""}` : "shortly";
+  return `Update ${u.version} is scheduled ${when}. The system may pause for a few minutes: please finish open bills before it starts.${u.message ? ` ${u.message}` : ""}`.slice(0, 400);
 }
 
 /** Check-in bodies come from client servers; still, never store unbounded data. */

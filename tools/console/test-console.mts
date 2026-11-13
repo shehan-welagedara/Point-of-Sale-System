@@ -263,6 +263,7 @@ let upd = (await tenant()).supplier?.update;
 let roDoc = (await cdb.doc(`rollouts/${ro1.id}`).get()).data()!;
 check(upd?.version === "1.9.0" && upd.state === "scheduled" && upd.at === roDoc.clients["noura-kitchen"].scheduledFor && Boolean(upd.until) && upd.highlights?.length > 0 && upd.message === "Your back office becomes an app on phones.", "the client's system receives the maintenance notice: version, window, what's new and the message");
 check(Date.parse(upd.at) - Date.now() >= 55 * 60_000, "…at least an hour ahead, so screens see it before the update starts");
+check(/^Update 1\.9\.0 is scheduled on \w+day, \d+ \w+, \d\d:\d\d–\d\d:\d\d\./.test((await tenant()).supplier?.notice?.text ?? ""), "a system older than 1.10.0 gets the same notice as a message it can already show");
 await api(ownerToken, { action: "cancelRollout", rolloutId: ro1.id, clientId: "noura-kitchen" });
 roDoc = (await cdb.doc(`rollouts/${ro1.id}`).get()).data()!;
 await runCheckin(pdb, env(), "scheduled");

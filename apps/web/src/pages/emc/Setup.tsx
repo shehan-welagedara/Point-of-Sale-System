@@ -8,7 +8,7 @@ import {
   lankaQrPayload,
   payhereCheckout,
 } from "./setup-helpers";
-import { Field, Loading, PageHead, Toggle } from "../../components/ui";
+import { Field, Loading, PageHead, Toggle, Explain } from "../../components/ui";
 import { useDraft } from "../../lib/useDraft";
 import { QrCode } from "../../components/Receipt";
 import { money } from "../../lib/format";
@@ -190,7 +190,7 @@ export function IntegrationsPage() {
         </div>
         <div className="card card-body stack">
           <div className="row between"><h3>LankaQR</h3><span className="badge info">{s.lankaqr.mode}</span></div>
-          <p className="small muted">Dynamic LankaQR (EMVCo format) on the customer display or bill. 0% merchant fee up to Rs 5,000. Replace the sample merchant ID with the one from the acquiring bank.</p>
+          <Explain as="p" className="small muted">Dynamic LankaQR (EMVCo format) on the customer display or bill. 0% merchant fee up to Rs 5,000. Replace the sample merchant ID with the one from the acquiring bank.</Explain>
           <Field label="Mode">{modeSel(s.lankaqr.mode, (v) => setS({ ...s, lankaqr: { ...s.lankaqr, mode: v } }))}</Field>
           <div className="grid cols-2">
             <Field label="Merchant name"><input className="input" value={s.lankaqr.merchantName} onChange={(e) => setS({ ...s, lankaqr: { ...s.lankaqr, merchantName: e.target.value } })} /></Field>
@@ -202,7 +202,7 @@ export function IntegrationsPage() {
         </div>
         <div className="card card-body stack">
           <div className="row between"><h3>WhatsApp reports</h3><span className="badge info">{s.whatsapp.mode}</span></div>
-          <p className="small muted">End-of-day report (Daily Revenue, Item-wise, Covers, Sales) to managers. Needs a Meta Business account, a dedicated number and an approved “eod_report” template.</p>
+          <Explain as="p" className="small muted">End-of-day report (Daily Revenue, Item-wise, Covers, Sales) to managers. Needs a Meta Business account, a dedicated number and an approved “eod_report” template.</Explain>
           <Field label="Mode">{modeSel(s.whatsapp.mode, (v) => setS({ ...s, whatsapp: { ...s.whatsapp, mode: v } }))}</Field>
           <Field label="Send at"><input className="input" type="time" value={s.whatsapp.eodTime} onChange={(e) => setS({ ...s, whatsapp: { ...s.whatsapp, eodTime: e.target.value } })} /></Field>
           <Field label="Managers (name, +94 number), one per line">
@@ -211,7 +211,7 @@ export function IntegrationsPage() {
         </div>
         <div className="card card-body stack">
           <h3>Accounting export</h3>
-          <p className="small muted">The books are kept in the built-in ledger (Finance). This setting is only for groups that also consolidate in an external system: export the journal entries and SAF-T file from Finance and the Audit Center, or connect ERPNext/Akaunting later.</p>
+          <Explain as="p" className="small muted">The books are kept in the built-in ledger (Finance). This setting is only for groups that also consolidate in an external system: export the journal entries and SAF-T file from Finance and the Audit Center, or connect ERPNext/Akaunting later.</Explain>
           <Field label="Target">
             <select className="select" value={s.accountingExport.target} onChange={(e) => setS({ ...s, accountingExport: { ...s.accountingExport, target: e.target.value as IntegrationSettings["accountingExport"]["target"] } })}>
               <option value="excel">Excel workbook</option>

@@ -34,7 +34,8 @@ const pin = async (digits, scope = "") => {
 
 try {
   await page.goto(`${B}/?mode=local`);
-  await page.getByText("Load the demo restaurant").click();
+  await page.getByText("Try a demo business").click();
+  await page.getByRole("button", { name: "Load Spice Lagoon" }).click();
   await page.waitForURL(/emc\/home/, { timeout: 90_000 });
   // The launchpad renders its tiles once the business has loaded.
   await page.waitForFunction(() => document.querySelectorAll(".tile-name").length >= 10, null, { timeout: 15_000 }).catch(() => {});
@@ -379,6 +380,50 @@ try {
     await ctx.close();
   }
 
+  // ── Updates from Polymath Tech (1.10.0): the maintenance notice in the back office, the POS sign-in,
+  // Tasks and About; What's new once after an update; a business typed again is flagged as a duplicate.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, storageState: await page.context().storageState() });
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errors.push(`update notice: ${e.message}`));
+    await p.goto(`${B}/emc/home?mode=local`);
+    await p.waitForTimeout(800);
+    const at = new Date(Date.now() + 3 * 3600_000).toISOString();
+    const until = new Date(Date.now() + 4 * 3600_000).toISOString();
+    await p.evaluate(({ at, until }) => {
+      const k = "pos-suite.local.v1";
+      const save = JSON.parse(localStorage.getItem(k));
+      save.tenant.supplier = { ...(save.tenant.supplier ?? {}), update: { version: "99.1.0", state: "scheduled", at, until, highlights: ["Approvals for new businesses"], message: "New: approvals." } };
+      localStorage.setItem(k, JSON.stringify(save));
+      localStorage.setItem("pos-suite.whats-new-seen", "1.0.0");
+    }, { at, until });
+    await p.reload();
+    await p.waitForTimeout(1500);
+    check("after an update, What's new shows the release notes", (await p.getByRole("dialog", { name: /What's new in/ }).count()) === 1);
+    if (await p.getByRole("button", { name: "Got it" }).count()) await p.getByRole("button", { name: "Got it" }).click();
+    const banner = (await p.getByTestId("maintenance-banner").textContent().catch(() => "")) ?? "";
+    check("owners see the maintenance notice with its time", banner.includes("Update 99.1.0") && banner.includes("finish open bills"), banner);
+    await p.reload();
+    await p.waitForTimeout(1000);
+    check("…and What's new shows only once", (await p.getByRole("dialog", { name: /What's new in/ }).count()) === 0);
+    await p.goto(`${B}/emc/about?mode=local`);
+    await p.waitForTimeout(800);
+    check("About shows the coming update and what it brings", ((await p.getByTestId("coming-update").textContent().catch(() => "")) ?? "").includes("Approvals for new businesses"));
+    await p.goto(`${B}/emc/tasks?mode=local`);
+    await p.waitForTimeout(800);
+    check("Tasks lists the update", (await p.getByText("Update 99.1.0").count()) > 0);
+    await p.goto(`${B}/pos?mode=local`);
+    await p.waitForTimeout(1500);
+    check("the POS sign-in warns of an update a few hours away", (await p.getByTestId("pos-maintenance").count()) === 1);
+    await p.goto(`${B}/new-business?mode=local`);
+    await p.waitForTimeout(800);
+    await p.locator("#bname").fill("spice  lagoon");
+    check("typing an existing business's name warns and holds Create", (await p.getByTestId("duplicate-warning").count()) === 1 && (await p.getByRole("button", { name: "Create business" }).isDisabled()));
+    await p.getByLabel("It's a different business").check();
+    check("…until it is confirmed as a different business", await p.getByRole("button", { name: "Create business" }).isEnabled());
+    await ctx.close();
+  }
+
   // ── Accounting without the POS: photos of paper bills, expenses, manual sales, the Excel import.
   {
     // A small photo of a "bill" (drawn on a canvas), as a phone would send it.
@@ -595,7 +640,8 @@ try {
     const p = await ctx.newPage();
     p.on("pageerror", (e) => errors.push(`noura demo: ${e.message}`));
     await p.goto(`${B}/?mode=local`);
-    await p.getByText("Load the Noura Kitchen demo").click();
+    await p.getByText("Try a demo business").click();
+    await p.getByRole("button", { name: "Load Noura Kitchen" }).click();
     await p.waitForURL(/emc\/home/, { timeout: 90_000 });
     await p.waitForFunction(() => document.querySelectorAll(".tile-name").length >= 8, null, { timeout: 15_000 }).catch(() => {});
     const nTiles = await p.locator(".tile-name").allTextContents();

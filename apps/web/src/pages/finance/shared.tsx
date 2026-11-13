@@ -5,7 +5,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { type Account, type Customer, type MemberRole, type Vendor, COLLECTIONS as C } from "@pos/core";
 import { type CostCenter, type FiscalYear, type LedgerEntry, type LedgerSettings, type Voucher, type VoucherType, LEDGER as L } from "@pos/ledger";
-import { ConfirmButton, Drawer, Field, Loading } from "../../components/ui";
+import { ConfirmButton, Drawer, Field, Loading, PageHead } from "../../components/ui";
 import { money, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 
@@ -291,13 +291,7 @@ export function VoucherList({ types, title, subtitle, actions, editor, initialSt
   return (
     <div className={head ? "page fill" : "stack"}>
       {head ? (
-        <div className="page-head">
-          <div>
-            <h1>{title}</h1>
-            {subtitle ? <p>{subtitle}</p> : null}
-          </div>
-          <div className="row wrap">{actions}</div>
-        </div>
+        <PageHead title={title} subtitle={subtitle} actions={actions} />
       ) : null}
       <div className={phone ? "stack tight" : "row wrap"}>
         <input className="input" placeholder="Search number or description" value={q} onChange={(e) => setQ(e.target.value)} style={phone ? undefined : { maxWidth: 260 }} />

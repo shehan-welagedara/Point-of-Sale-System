@@ -6,7 +6,7 @@ pnpm install
 pnpm dev          # http://localhost:5173
 ```
 With no Firebase config, the app runs in **local demo mode**: data is kept in this browser.
-- Choose **Load the demo restaurant** to get "Spice Lagoon", a fictional Colombo restaurant. Everything in it is sample data.
+- Open **Try a demo business** and choose **Load Spice Lagoon** to get "Spice Lagoon", a fictional Colombo restaurant. Everything in it is sample data.
 - The demo is **VAT-registered and not SSCL-liable**.
 - POS staff PINs:
 
@@ -33,7 +33,7 @@ Your own Firebase project for demonstrations and for testing each release before
    pnpm exec firebase login
    pnpm release:deploy --target staging
    ```
-4. Open `https://PROJECT-ID.web.app`, create your account, and choose **Load the demo restaurant** (or the Noura Kitchen demo). To prepare a client's demo, choose **Create with sample data** under the client's name.
+4. Open `https://PROJECT-ID.web.app`, create your account, and open **Try a demo business** and choose **Load Spice Lagoon** (or **Load Noura Kitchen**).
 
 The web app reads the project's Firebase settings from Hosting at run time, so the same build works in every project: don't put a Firebase config in `apps/web/.env.local` for a build you deploy (the release tool refuses one). `.env.local` is only for running `pnpm dev` against a cloud project.
 

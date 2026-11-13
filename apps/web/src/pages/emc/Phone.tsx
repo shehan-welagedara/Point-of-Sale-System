@@ -9,6 +9,7 @@ import { DEMO_PEOPLE } from "@pos/sample-data";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { money, moneyShort, todayColombo } from "../../lib/format";
+import { InsightList, useInsights } from "../../components/Insights";
 import { updateMessage } from "../../components/UpdateNotices";
 import { useApp, useCollection } from "../../state/app";
 import { type Workspace, visibleWorkspaces, workspaceFor } from "../../workspaces";
@@ -134,7 +135,9 @@ export function TodayPage() {
     return Boolean(w && visibleWorkspaces(on, role).some((v) => v.key === w.key));
   };
   const sales = (on("pos") || on("accounting")) && sees("/emc/reports");
-  const stats = useStats(propertyId, addDays(today, -13), today, sales);
+  // Five weeks: the last 14 days for the chart, all of them for the insights ("a usual Friday").
+  const stats = useStats(propertyId, addDays(today, -34), today, sales);
+  const tips = useInsights(stats, sales && ["owner", "admin", "manager"].includes(role ?? ""));
   const menuItems = useCollection<MenuItem>(sales ? C.menuItems : null) ?? [];
   const budgets = useCollection<Budget>(sales ? C.budgets : null) ?? [];
   const open = useCollection<Check>(sales && on("pos") ? C.checks : null, { where: [["status", "==", "open"]] }) ?? [];
@@ -216,6 +219,8 @@ export function TodayPage() {
           </Link>
         </div>
       ) : null}
+
+      <InsightList items={tips} />
 
       <section className="stack tight">
         <div className="row between"><h2 className="p-h2">Needs you</h2>{tasks.length > 3 ? <Link to="/emc/tasks" className="small">See all {tasks.length}</Link> : null}</div>

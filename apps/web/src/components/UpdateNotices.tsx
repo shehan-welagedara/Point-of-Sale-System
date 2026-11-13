@@ -94,7 +94,8 @@ export function WhatsNew() {
   const [open, setOpen] = useState(false);
   const notes = RELEASE_NOTES.find((r) => r.version === APP_VERSION);
   useEffect(() => {
-    const seen = read(SEEN);
+    // Versions before 1.10.0 didn't record what was seen: someone who used the system before is updating.
+    const seen = read(SEEN) ?? (read("pos-suite.activeTenant") ? "1.9.0" : null);
     if (!seen) write(SEEN, APP_VERSION);
     else if (compareVersions(seen, APP_VERSION) < 0) {
       if (notes?.notes.length && role && role !== "terminal") setOpen(true);

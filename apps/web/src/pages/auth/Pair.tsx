@@ -1,3 +1,4 @@
+import { Explain } from "../../components/ui";
 import { useState } from "react";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
@@ -102,7 +103,7 @@ export function DeviceDisconnected() {
     <div className="auth">
       <div className="card auth-card stack" role="alert">
         <h2>This phone is no longer connected</h2>
-        <p className="small muted">A manager removed it from the restaurant's POS, so it can't open the POS or see any data. To use it again, ask the manager for a new code (POS Configuration → Workstations &amp; printers → Connect a phone).</p>
+        <Explain as="p" className="small muted">A manager removed it from the restaurant's POS, so it can't open the POS or see any data. To use it again, ask the manager for a new code (POS Configuration → Workstations &amp; printers → Connect a phone).</Explain>
         <a className="btn primary lg" href="/pair" onClick={() => void signOut()}>Connect with a new code</a>
       </div>
     </div>

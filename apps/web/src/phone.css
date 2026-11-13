@@ -127,6 +127,7 @@ button.p-li, a.p-li { cursor: pointer; }
   .page-head { align-items: stretch; gap: 10px; }
   .page-head h1 { font-size: 23px; }
   .page-head p { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .page-head p.open { display: block; overflow: visible; }
   .page-head > .row { width: 100%; }
   .btn { min-height: 44px; }
   .btn.sm { min-height: 40px; }

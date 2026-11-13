@@ -14,7 +14,7 @@ import {
   roleFor,
   signInDecision,
 } from "@pos/core";
-import { Empty, Loading } from "../../components/ui";
+import { Empty, Loading, Explain } from "../../components/ui";
 import { PosMaintenanceNotice } from "../../components/UpdateNotices";
 import { timeColombo, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
@@ -235,7 +235,7 @@ function DeviceSetup({ workstations, rvcs, onPick }: { workstations: Workstation
     <div className="auth">
       <div className="card auth-card" style={{ width: "min(640px, 100%)" }}>
         <h1>Set up this device</h1>
-        <p className="muted">Choose which workstation this screen is. Each workstation numbers its own bills (IRD invoice series) and keeps its own transaction journal, so use each one on only one device.</p>
+        <Explain as="p" className="muted">Choose which workstation this screen is. Each workstation numbers its own bills (IRD invoice series) and keeps its own transaction journal, so use each one on only one device.</Explain>
         <div className="stack tight">
           {workstations.map((w) => (
             <button key={w.id} className="btn lg block device-btn" style={{ justifyContent: "space-between" }} onClick={() => onPick(w.id)}>

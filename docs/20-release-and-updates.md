@@ -112,7 +112,9 @@ pnpm release:deploy --target kandy-myst
 
 **Redeploy** the current `main` without a new version: Actions → Release → *Run workflow*, target `staging`, `wave:1`, `wave:2` or client ids. Anything other than staging needs the production approval.
 
-**From the Polymath Console** ([22](22-polymath-console.md), setup in [23 Q](23-polymath-console-deployment.md)): Deployments → *New update* (staging, a wave, or chosen clients) runs the same workflow with each client's settings from the console (the `registry` input), so `release/clients.json` doesn't need to be up to date; the console follows the run and shows each client's version after its next check-in. It needs the console's GitHub settings and token (`pnpm console:setup --github-token`), and the repository variable **`CONSOLE_URL`** (the console's check-in address) so client deploys from GitHub check in too.
+**From the Polymath Console** (since 1.10.0, [22 §8](22-polymath-console.md)): **Updates** pushes a version to chosen clients now, at a set time or in each client's maintenance window. Clients see a maintenance notice first (back office, POS sign-in, Tasks) and *What's new* after; a client is done when its own system reports the version. With GitHub connected the console starts the workflow below for each client when it is due (on the tag `vX.Y.Z` if there is one); without it, each client shows the `pnpm release:deploy --target …` command to run from the release PC at that time.
+
+**Deployments** (console, setup in [23 Q](23-polymath-console-deployment.md)): *New update* (staging, a wave, or chosen clients) runs the same workflow with each client's settings from the console (the `registry` input), so `release/clients.json` doesn't need to be up to date; the console follows the run and shows each client's version after its next check-in. It needs the console's GitHub settings and token (`pnpm console:setup --github-token`), and the repository variable **`CONSOLE_URL`** (the console's check-in address) so client deploys from GitHub check in too.
 
 ## 6. How devices update
 
@@ -120,6 +122,7 @@ pnpm release:deploy --target kandy-myst
 - **Newer version live:** a notice *Version x is available, Update now*. Devices where nobody is signed in on the POS reload by themselves within a minute. A signed-in employee's screen never reloads by itself.
 - **Older than `minSupportedVersion`:** the screen is blocked with *Update required* until it reloads.
 - **Administration → System status** lists each POS device with its version and last contact, so you can see who hasn't updated.
+- **Announced updates** (from the Polymath Console, 1.10.0): owners, administrators and managers see *Update x tonight, 23:30–05:00…* in the back office and Tasks; the POS sign-in screen shows it within 12 hours of the start; *Updating to x now* while it runs; **What's new** once after it.
 - **Print Agent:** on the restaurant PC, `git pull`, `pnpm install`, then restart the agent when the release notes say so. The Print Agent protocol stays backward compatible.
 
 ## 7. Data migrations

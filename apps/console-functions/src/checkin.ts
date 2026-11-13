@@ -8,7 +8,7 @@ import type { CheckinResponse, SupplierContact } from "@pos/core";
 import type { Firestore } from "firebase-admin/firestore";
 import { businessRequestsAtCheckin } from "./businesses.js";
 import { serviceAccountProject } from "./identity.js";
-import { type Broadcast, type ClientHealth, type ConsoleClient, DEFAULT_SUPPLIER, noticeFor, validateCheckin } from "./model.js";
+import { type Broadcast, type ClientHealth, type ConsoleClient, DEFAULT_SUPPLIER, compareVersions, maintenanceText, noticeFor, validateCheckin } from "./model.js";
 import { rolloutAtCheckin } from "./releases.js";
 
 export interface CheckinResult {
@@ -114,7 +114,8 @@ export async function handleCheckin(db: Firestore, callerEmail: string, raw: unk
       clientId: client.id,
       licence: client.licence?.token ? { token: client.licence.token } : null,
       directive: client.directive?.token ? { token: client.directive.token } : null,
-      notice: noticeFor(client, supplier.name, now, broadcast),
+      // Systems before 1.10.0 don't know the update notice: they get it as a plain message instead.
+      notice: noticeFor(client, supplier.name, now, broadcast) ?? (update && compareVersions(req.appVersion, "1.10.0") < 0 ? { text: maintenanceText(update, now), level: "info" } : null),
       supplier,
       update,
       approvals,
