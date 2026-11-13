@@ -1,9 +1,33 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useConsole } from "../App";
 import { Icon } from "../icons";
-import { useDocData, useSession } from "../state";
-import { ago, healthState, initials } from "../types";
-import { Loading, PageHead } from "../ui";
+import { useAction, useDocData, useSession } from "../state";
+import { ago, dateTime, healthState, initials } from "../types";
+import { Field, Loading, PageHead } from "../ui";
+
+/** One message for every client at once (a client's own notice takes precedence). */
+function Broadcast() {
+  const { can } = useSession();
+  const { busy, run } = useAction();
+  const current = useDocData<{ text?: string; level?: "info" | "warn"; until?: string; by?: string; at?: string }>("config/broadcast");
+  const [f, setF] = useState<{ text: string; level: "info" | "warn"; until: string } | null>(null);
+  if (current === undefined) return null;
+  const v = f ?? { text: current?.text ?? "", level: current?.level ?? "info", until: current?.until?.slice(0, 10) ?? "" };
+  return (
+    <section className="card card-body stack">
+      <div className="row wrap"><h2 className="grow">Message to all clients</h2>{current?.text ? <span className="small muted">Showing since {dateTime(current.at)} ({current.by})</span> : null}</div>
+      <p className="small muted">Shown in every client's back office from their next check-in (within the hour), unless you set a notice for that client. Use it for support hours, holidays or planned work.</p>
+      <Field label="Message"><textarea className="input" maxLength={400} value={v.text} disabled={!can("clients")} onChange={(e) => setF({ ...v, text: e.target.value })} /></Field>
+      <div className="row wrap">
+        <Field label="Style"><select className="input" value={v.level} disabled={!can("clients")} onChange={(e) => setF({ ...v, level: e.target.value as "info" | "warn" })}><option value="info">Information</option><option value="warn">Warning</option></select></Field>
+        <Field label="Until (optional)"><input className="input" type="date" value={v.until} disabled={!can("clients")} onChange={(e) => setF({ ...v, until: e.target.value })} /></Field>
+        <span className="grow" />
+        {can("clients") ? <button className="btn primary" disabled={busy || !f} onClick={async () => (await run("setBroadcast", v, v.text ? "Message saved" : "Message cleared")) && setF(null)}>{v.text ? "Save message" : "Clear message"}</button> : null}
+      </div>
+    </section>
+  );
+}
 
 export function SupportPage() {
   const { clients, latest, company } = useConsole();
@@ -18,7 +42,8 @@ export function SupportPage() {
   const docs = gh?.owner && gh.repo ? `https://github.com/${gh.owner}/${gh.repo}/blob/${gh.ref || "main"}/docs` : null;
   const guides: [string, string, string][] = [
     ["Deploying and updating clients", "18-deployment-manual.md", "Set up a client's Firebase project, first deploy and updates"],
-    ["Polymath Console", "22-polymath-console.md", "How the console and the daily check-in work"],
+    ["Polymath Console", "22-polymath-console.md", "How the console, the hourly check-in, updates and approvals work"],
+    ["Privacy and data protection", "24-privacy-and-data-protection.md", "What each side holds, agreements, access and erasure"],
     ["Console deployment and configuration", "23-polymath-console-deployment.md", "Set up this console, staff, clients and GitHub"],
     ["User manual", "user-manual.md", "For the client's owner and staff"],
   ];
@@ -54,6 +79,7 @@ export function SupportPage() {
           </ul>
         </section>
       </div>
+      <Broadcast />
       <section className="card">
         <div className="card-head"><h2 className="grow">Systems that need help</h2><Link to="/monitoring" className="small">Monitoring</Link></div>
         <div className="table-wrap">

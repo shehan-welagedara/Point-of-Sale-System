@@ -12,7 +12,7 @@ import {
   trialBalance,
 } from "@pos/ledger";
 import { type TableSheet, tablesToWorkbook } from "../../lib/excel";
-import { Field, Loading, ModuleOff, PageHead, Seg } from "../../components/ui";
+import { Field, Loading, ModuleOff, PageHead, Seg, Explain } from "../../components/ui";
 import { amount, downloadBuffer, money } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 import { AccountSelect, TYPE_LABEL, useAccounts, useCostCenters, useFiscal, useLedgerSettings } from "./shared";
@@ -260,7 +260,7 @@ export function StatementsPage() {
               </tbody>
             </table>
           </div>
-          <p className="small muted">Working figures from the tax ledger accounts for the selected periods. Returns are filed on the IRD's RAMIS portal; keep this export with the return as support.</p>
+          <Explain as="p" className="small muted">Working figures from the tax ledger accounts for the selected periods. Returns are filed on the IRD's RAMIS portal; keep this export with the return as support.</Explain>
         </div>
       ) : null}
     </div>

@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { MobileStyle, RevenueCenter, Staff, Workstation } from "@pos/core";
 import { timeColombo } from "../../../lib/format";
+import { PosMaintenanceNotice } from "../../../components/UpdateNotices";
 import { useApp } from "../../../state/app";
 import { Icon } from "./icons";
 import { initials, mobileVars } from "./ui";
@@ -19,7 +20,10 @@ export function MobileAuthFrame({ style, children }: { style: MobileStyle; child
         <h1>{b.displayName}</h1>
         <p>{b.receiptHeaderLines[0] ?? "Fast. Simple. Secure."}</p>
       </div>
-      <div className="mauth-card">{children}</div>
+      <div className="mauth-card">
+        <PosMaintenanceNotice />
+        {children}
+      </div>
       <p className="mauth-powered">{b.poweredBy ? `Powered by ${b.poweredBy}` : ""}</p>
     </div>
   );

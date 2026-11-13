@@ -14,7 +14,7 @@ export function ClientDetail() {
   const c = useDocData<Client>(`clients/${id}`);
   const gh = useDocData<{ latestVersion?: string }>("config/github");
   const [params, setParams] = useSearchParams();
-  const tabs: [Tab, string][] = [["overview", "Overview"], ["health", "Health"], ["licence", "Licence"], ["subscription", "Subscription"], ["usage", "Usage"], ["status", "Suspend / notice"], ["activity", "Activity"]];
+  const tabs: [Tab, string][] = [["overview", "Overview"], ["health", "Health"], ["licence", "Licence"], ["subscription", "Subscription"], ["usage", "Usage"], ["status", "Controls"], ["activity", "Activity"]];
   const asked = params.get("tab") as Tab | null;
   const tab: Tab = asked && tabs.some(([k]) => k === asked) ? asked : "overview";
   const setTab = (k: Tab) => setParams(k === "overview" ? {} : { tab: k }, { replace: true });
@@ -89,7 +89,7 @@ function Health({ c, latest }: { c: Client; latest?: string }) {
   if (!c.health) {
     return (
       <div className="card card-body stack">
-        <p>No check-in yet. The client's system checks in once a day after it is deployed with POS Suite 1.7.0 or later and the console's address (docs/22 §4). Their owner can also press <strong>About → Check now</strong> in the back office.</p>
+        <p>No check-in yet. The client's system checks in every hour (daily before 1.10.0) after it is deployed with POS Suite 1.7.0 or later and the console's address (docs/22 §4). Their owner can also press <strong>About → Check now</strong> in the back office.</p>
         {c.link?.lastError ? <div className="callout bad">Last check-in refused ({dateTime(c.link.lastErrorAt)}): {c.link.lastError}</div> : null}
       </div>
     );
@@ -97,7 +97,11 @@ function Health({ c, latest }: { c: Client; latest?: string }) {
   return (
     <>
       <div className="grid cols-3">
-        <div className="card stat"><div className="v">{c.health.appVersion}</div><div className="l">Server version{latest && compareVersions(c.health.appVersion, latest) < 0 ? ` (latest ${latest})` : ""}</div></div>
+        <div className="card stat">
+          <div className="v">{c.health.appVersion}</div>
+          <div className="l">Server version{latest && compareVersions(c.health.appVersion, latest) < 0 ? ` (latest ${latest})` : ""}</div>
+          {latest && compareVersions(c.health.appVersion, latest) < 0 ? <Link className="btn sm" style={{ marginTop: 8, alignSelf: "flex-start" }} to={`/updates?client=${c.id}`}>Update to {latest}…</Link> : null}
+        </div>
         <div className="card stat"><div className="v">{ago(c.health.lastCheckinAt)}</div><div className="l">Last check-in ({c.health.reason}) · {dateTime(c.health.lastCheckinAt)}</div></div>
         <div className="card stat"><div className="v">{c.health.tenants.reduce((n, t) => n + t.errors24h, 0)}</div><div className="l">App errors in the last 24 hours</div></div>
       </div>
@@ -109,6 +113,8 @@ function Health({ c, latest }: { c: Client; latest?: string }) {
             <span className="badge brand">{editionInfo(t.plan as never)?.name ?? t.plan}</span>
             {t.licence ? <span className={`badge ${t.licence.status === "valid" ? "good" : "warn"}`}>Licence {t.licence.status} · {date(t.licence.expiresAt)}</span> : <span className="badge warn">No licence</span>}
             {t.shareUsage ? null : <span className="badge">Figures not shared</span>}
+            {t.status === "archived" ? <span className="badge">Archived by the owner</span> : null}
+            {t.approval ? <span className="badge good">Approved {date(t.approval.approvedAt)}</span> : c.approvalsSince && t.createdAt && t.createdAt > c.approvalsSince && c.approvals !== "off" ? <span className="badge bad">Not approved</span> : null}
           </div>
           <div className="card-body stack tight">
             <div className="small muted">Business ID <span className="mono">{t.id}</span> · {t.counts.workstations} workstation(s), {t.counts.employees} employee(s), {t.counts.backOfficeUsers} back-office login(s) · modules: {t.modules.join(", ") || "—"}</div>
@@ -365,7 +371,7 @@ function StatusTab({ c }: { c: Client }) {
           </>
         ) : (
           <>
-            <p className="small muted">The client's system shows your message for the grace period, then stops the licensed modules, as when a licence expires. Their data is kept, and Restore brings everything back. It takes effect at their next check-in (daily, or when they press Check now).</p>
+            <p className="small muted">The client's system shows your message for the grace period, then stops the licensed modules, as when a licence expires. Their data is kept, and Restore brings everything back. It takes effect at their next check-in (within the hour, or when they press Check now).</p>
             {can("suspend") ? (
               <div className="grid cols-2">
                 <Field label="Message the client sees"><textarea className="input" value={message} onChange={(e) => setMessage(e.target.value)} /></Field>
@@ -378,6 +384,17 @@ function StatusTab({ c }: { c: Client }) {
             ) : <p className="small muted">Only an owner or admin can suspend.</p>}
           </>
         )}
+      </div>
+      <div className="card card-body stack">
+        <h2>New businesses</h2>
+        <p className="small muted">With approval on, a business the client opens waits for you under Businesses (who asked, duplicates) before it can be used. Switch it off only for your own demo or training systems.</p>
+        <div className="row wrap">
+          <div className="seg" role="group" aria-label="New businesses">
+            <button className={c.approvals !== "off" ? "on" : ""} disabled={busy || !can("suspend")} onClick={() => void run("setApprovals", { clientId: c.id, approvals: "required" }, "New businesses need approval")}>Need approval</button>
+            <button className={c.approvals === "off" ? "on" : ""} disabled={busy || !can("suspend")} onClick={() => void run("setApprovals", { clientId: c.id, approvals: "off" }, "New businesses open without approval")}>Open without approval</button>
+          </div>
+          {c.approvalsSince ? <span className="small muted">Approvals since {date(c.approvalsSince)}</span> : null}
+        </div>
       </div>
       <form className="card card-body stack" onSubmit={(e) => { e.preventDefault(); void run("setNotice", { clientId: c.id, ...notice }, notice.text ? "Notice saved" : "Notice cleared"); }}>
         <h2>Notice to the client</h2>

@@ -28,7 +28,11 @@ export interface Tenant extends Entity {
   /** Activated licence (written by the server after verifying the vendor's signature). */
   licence?: TenantLicence;
   trialEndsAt?: string;
-  status: "active" | "suspended";
+  /** archived (since 1.10.0): opened by mistake or closed; kept with all its data, hidden from the
+   * business list and closed to the POS. Only the owner archives or restores. */
+  status: "active" | "suspended" | "archived";
+  archivedAt?: string;
+  archivedBy?: string;
   createdAt: string;
   /** From the supplier's console (written only by the server's check-in): suspension, notice, contact. */
   supplier?: TenantSupplierLink;

@@ -9,6 +9,8 @@ import { DEMO_PEOPLE } from "@pos/sample-data";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { money, moneyShort, todayColombo } from "../../lib/format";
+import { InsightList, useInsights } from "../../components/Insights";
+import { updateMessage } from "../../components/UpdateNotices";
 import { useApp, useCollection } from "../../state/app";
 import { type Workspace, visibleWorkspaces, workspaceFor } from "../../workspaces";
 import { Icon, type IconName } from "../pos/mobile/icons";
@@ -75,6 +77,8 @@ export function useTasks(): Task[] {
   const low = reorderSuggestions(items, levels);
   if (low.length) tasks.push({ key: "low-stock", icon: "box", tone: "warn", title: `${low.length} item${low.length === 1 ? "" : "s"} below par level`, detail: low.slice(0, 3).map((x) => x.item.name).join(", ") + (low.length > 3 ? "…" : ""), to: "/emc/inventory/po" });
   if (settings.business.isSample && may(["owner", "admin"])) tasks.push({ key: "sample", icon: "settings", tone: "info", title: "Enter your business details", detail: "Legal name, TIN and VAT status before real bills", to: "/emc/setup/business" });
+  const upd = updateMessage(tenant?.supplier?.update);
+  if (upd && may(["owner", "admin", "manager"])) tasks.push({ key: "update", icon: "bell", tone: upd.tone, title: upd.title, detail: upd.detail, to: "/emc/about" });
   const notice = tenant?.supplier?.notice;
   if (notice && s.state === "none" && may(["owner", "admin"])) tasks.push({ key: "notice", icon: "bell", tone: notice.level === "warn" ? "warn" : "info", title: `Message from ${tenant?.supplier?.contact?.name ?? "your supplier"}`, detail: notice.text, to: "/emc/about" });
   return tasks;
@@ -131,7 +135,9 @@ export function TodayPage() {
     return Boolean(w && visibleWorkspaces(on, role).some((v) => v.key === w.key));
   };
   const sales = (on("pos") || on("accounting")) && sees("/emc/reports");
-  const stats = useStats(propertyId, addDays(today, -13), today, sales);
+  // Five weeks: the last 14 days for the chart, all of them for the insights ("a usual Friday").
+  const stats = useStats(propertyId, addDays(today, -34), today, sales);
+  const tips = useInsights(stats, sales && ["owner", "admin", "manager"].includes(role ?? ""));
   const menuItems = useCollection<MenuItem>(sales ? C.menuItems : null) ?? [];
   const budgets = useCollection<Budget>(sales ? C.budgets : null) ?? [];
   const open = useCollection<Check>(sales && on("pos") ? C.checks : null, { where: [["status", "==", "open"]] }) ?? [];
@@ -213,6 +219,8 @@ export function TodayPage() {
           </Link>
         </div>
       ) : null}
+
+      <InsightList items={tips} />
 
       <section className="stack tight">
         <div className="row between"><h2 className="p-h2">Needs you</h2>{tasks.length > 3 ? <Link to="/emc/tasks" className="small">See all {tasks.length}</Link> : null}</div>
@@ -448,8 +456,32 @@ export function MoreSheet({ onClose }: { onClose: () => void }) {
 }
 
 /** /emc/account: who you are, the business, acting-as (demo), sign out; on every screen size. */
+/** Owner only: archive a business opened by mistake (kept with its data, restored from the business list). */
+function ArchiveBusiness() {
+  const { tenant, setTenantArchived, toast, mode } = useApp();
+  const navigate = useNavigate();
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!tenant || mode === "local") return null;
+  return (
+    <div className="card pad stack" data-testid="archive-business">
+      <div className="row wrap">
+        <span className="grow"><strong>Opened this business by mistake?</strong><span className="muted tiny" style={{ display: "block" }}>Archive it: it disappears from the list and the POS, and all its data is kept.</span></span>
+        {!confirm ? <button className="btn sm" onClick={() => setConfirm(true)}>Archive {tenant.name}…</button> : null}
+      </div>
+      {confirm ? (
+        <div className="callout warn small stack" style={{ gap: 8 }}>
+          <span>Archive <strong>{tenant.name}</strong>? Its POS devices stop working until you restore it (Set up a business → Archived businesses).</span>
+          <div className="row"><button className="btn sm" onClick={() => setConfirm(false)}>Keep it</button><button className="btn sm danger" disabled={busy} onClick={async () => { setBusy(true); try { await setTenantArchived(tenant.id, true); toast(`${tenant.name} archived`); navigate("/emc/home"); } catch (e) { toast((e as Error).message, true); } finally { setBusy(false); } }}>Archive</button></div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function AccountPage() {
-  const { user, role, mode, persona, setPersona, tenants, tenant, switchTenant, signOut, licence } = useApp();
+  const { user, role, mode, persona, setPersona, tenants: all, tenant, switchTenant, signOut, licence } = useApp();
+  const tenants = all.filter((t) => t.status !== "archived");
   const who = mode === "local" ? DEMO_PEOPLE[persona].name : (user?.name ?? "");
   return (
     <div className="page">
@@ -479,8 +511,10 @@ export function AccountPage() {
         ) : null}
         <Link to="/emc/setup/licence" className="p-li"><span className="grow"><strong>Licence</strong><span className="muted tiny">{licence.status === "valid" ? `Valid${licence.daysLeft !== null ? ` · ${licence.daysLeft} days left` : ""}` : licence.status}</span></span><Icon name="chevron" size={18} className="p-chev" /></Link>
         <Link to="/emc/about" className="p-li"><span className="grow"><strong>About and help</strong><span className="muted tiny">Version, updates, your supplier</span></span><Icon name="chevron" size={18} className="p-chev" /></Link>
+        {mode === "firebase" && (role === "owner" || role === "admin") ? <Link to="/new-business" className="p-li"><span className="grow"><strong>Add a business</strong><span className="muted tiny">Another outlet or company{all.length > tenants.length ? `; ${all.length - tenants.length} archived` : ""}</span></span><Icon name="chevron" size={18} className="p-chev" /></Link> : null}
         {mode === "firebase" ? <button className="p-li" onClick={() => void signOut()}><span className="grow"><strong style={{ color: "var(--bad)" }}>Sign out</strong></span><Icon name="logout" size={18} /></button> : null}
       </div>
+      {role === "owner" ? <ArchiveBusiness /> : null}
       <InstallCard />
     </div>
   );

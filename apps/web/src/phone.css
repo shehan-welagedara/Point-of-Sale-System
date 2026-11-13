@@ -126,7 +126,9 @@ button.p-li, a.p-li { cursor: pointer; }
   .p-main > .page { padding: 14px 14px 28px; gap: 14px; }
   .page-head { align-items: stretch; gap: 10px; }
   .page-head h1 { font-size: 23px; }
-  .page-head p { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .page-head p { font-size: 14px; }
+  /* A 40 px tap target that doesn't push the line apart. */
+  .more-info { display: inline-grid; place-items: center; min-width: 40px; min-height: 40px; margin: -12px -6px -12px -8px; vertical-align: middle; }
   .page-head > .row { width: 100%; }
   .btn { min-height: 44px; }
   .btn.sm { min-height: 40px; }

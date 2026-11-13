@@ -208,9 +208,13 @@ Suspensions and restores are signed with your licence key; the client's system c
 
 The trend lines use one set of figures a day, written every morning at 06:15 by the console (the `housekeeping` function), so they fill in over the first days. The bell at the top lists every client that needs attention; **Monitoring** has the details.
 
-## Q. Updates from the console (optional)
+## Q. Updates from the console
 
-You can keep deploying updates from your PC (`pnpm release:deploy`). To start them from **Deployments** instead, GitHub runs the release for you. One-time setup:
+**Updates** (in the menu) is where you push a version to clients: load the release notes, choose the version, tick the clients (those behind are ticked), and choose *In each maintenance window* (default), *Now* or *At a time*. Clients see a maintenance notice from their next check-in (hourly), then *What's new* after the update; a client shows **Done** when its own system reports the version. Docs/22 §8 has the whole flow.
+
+**Without GitHub** (the simplest start): Updates still schedules the update and tells the clients; when a client is due it shows **Run on the release PC** with the command, for example `pnpm release:deploy --target noura-kitchen`. Run it from your PC on the version's code, as you do today; the client's next check-in marks it done (or press *Mark done*).
+
+**With GitHub**, the console starts the release itself when each client is due. One-time setup:
 
 1. **Release pipeline**: the one-time setup in [20 §3](20-release-and-updates.md) (release robot, repository variables, environments with approvals), and the access script for each client ([20 §4](20-release-and-updates.md)).
 2. **GitHub variable** `CONSOLE_URL`: GitHub → repository → Settings → Secrets and variables → Actions → Variables → `CONSOLE_URL` = `https://PROJECT-ID.web.app/api/checkin` (the same as in F.3). Without it, clients updated by GitHub stop checking in.
@@ -228,7 +232,15 @@ You can keep deploying updates from your PC (`pnpm release:deploy`). To start th
    and deploy the console once more (`pnpm console:deploy`) so its functions pick it up.
 4. **Settings → GitHub** in the console: owner (your GitHub account), repository, workflow file `release.yml`, release branch `main`, and your staging project ID.
 
-**Releasing:** Deployments → **New update** → target (staging, wave 1, wave 2, or chosen clients). The console starts the GitHub workflow with its own list of clients, then follows the run; approvals for production waves still happen in GitHub. After each client's next check-in, Monitoring shows the version it runs.
+**Releasing with GitHub:** Updates → choose the version and clients → *Schedule update* or *Update now*. Every 15 minutes the console starts the GitHub workflow for the clients that are due (on the tag `vX.Y.Z` if it exists, else the release branch while it is still that version), follows the run, and waits for the client's check-in. Approvals for production still happen in GitHub if you set reviewers on the environment. **Deployments** keeps the technical history and still lets you start a run to staging or a wave by hand.
+
+## Q2. New businesses: approvals
+
+From 1.10.0 every new business on a linked client system waits for your approval (docs/22 §9). The bell and **Businesses** show each request with who asked, whether that is the client's contact on file, and any business with the same name. **Approve**, or **Decline** with a message the owner sees. Approving a name that already exists in that system needs *It's a different business* ticked. For your own demo or training systems, switch approvals off: Clients → the client → **Controls** → *Open without approval*.
+
+## Q3. Privacy and data
+
+**Privacy & data** lists what the console holds and why, sets how long data is kept (applied every morning), records each client's **data agreement**, exports everything about a client (owners and admins) and, after a contract ends, erases a cancelled client's personal data. Read [24 · Privacy and data protection](24-privacy-and-data-protection.md) before you sign your first data agreement.
 
 ## R. Daily, weekly, monthly
 
@@ -238,11 +250,12 @@ You can keep deploying updates from your PC (`pnpm release:deploy`). To start th
 | When a client pays | Record the payment (N.2) with *Renew the licence* ticked. |
 | Weekly | Subscriptions → *Due* and *Overdue*. Send reminders; suspend (O) only after talking to them. |
 | Monthly | Reports: revenue, growth, versions. Back up the console (section T). |
-| When you release | Staging first, then wave 1, then wave 2 (Deployments or `pnpm release:deploy`). |
+| When you release | Staging first, then Updates: a pilot client, then everyone, in their maintenance windows. |
+| When a client opens a business | Businesses: approve or decline the same day (they are waiting). |
 
 ## S. Notifications to clients, at a glance
 
-Everything you change for a client reaches their system at its **next check-in** (daily at 03:17, or when they press *About → Check now*): licences, suspend and restore, notices, renewal reminders, and your company's contact details. Nothing is pushed into their project from outside: their own server asks, checks what comes back, and applies it.
+Everything you change for a client reaches their system at its **next check-in** (every hour since 1.10.0, daily at 03:17 before; or when they press *About → Check now*): licences, suspend and restore, notices, the message to all clients, renewal reminders, scheduled updates (the maintenance notice), decisions on new businesses, and your company's contact details. A request to open a business checks in at once, and the waiting screen asks again every 20 seconds. Nothing is pushed into their project from outside: their own server asks, checks what comes back, and applies it.
 
 ## T. Backups of the console
 

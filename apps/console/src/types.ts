@@ -34,6 +34,18 @@ export interface HealthTenant {
   errors24h: number;
   counts: { workstations: number; employees: number; backOfficeUsers: number };
   shareUsage: boolean;
+  /** Since 1.10.0. */
+  status?: "active" | "archived";
+  createdAt?: string;
+  approval?: { requestId: string; approvedAt: string };
+}
+
+export interface ClientPrivacy {
+  dpaSignedOn?: string;
+  dpaVersion?: string;
+  contactName?: string;
+  contactEmail?: string;
+  notes?: string;
 }
 
 export interface Client {
@@ -60,6 +72,10 @@ export interface Client {
   notice?: { text: string; level: "info" | "warn"; until?: string };
   health?: { lastCheckinAt: string; appVersion: string; reason: string; tenants: HealthTenant[] };
   link?: { pendingProjectNumber?: string | null; pendingAt?: string | null; lastError?: string | null; lastErrorAt?: string | null };
+  approvals?: "required" | "off";
+  approvalsSince?: string;
+  privacy?: ClientPrivacy;
+  erasedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -145,7 +161,90 @@ export interface UnknownProject {
   callerEmail: string;
   appVersion: string;
   businesses: string[];
+  requests?: string[];
   lastAt: string;
+}
+
+/** releases/{1_10_0}: the catalogue (from CHANGELOG.md, or added by hand). */
+export interface Release {
+  id: string;
+  version: string;
+  date: string;
+  type: string;
+  deploy: string;
+  highlights: string[];
+  changes: string[];
+  source: "changelog" | "manual";
+  syncedAt: string;
+}
+
+export type RolloutState = "scheduled" | "dispatched" | "deployed" | "done" | "failed" | "manual" | "cancelled";
+
+export interface RolloutClient {
+  name: string;
+  projectId: string;
+  from?: string;
+  state: RolloutState;
+  scheduledFor: string;
+  windowEnd?: string;
+  deploymentId?: string;
+  dispatchedAt?: string;
+  doneAt?: string;
+  error?: string;
+}
+
+export interface Rollout {
+  id: string;
+  version: string;
+  mode: "now" | "window" | "at";
+  message?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  status: "active" | "done" | "cancelled";
+  clientIds: string[];
+  clients: Record<string, RolloutClient>;
+}
+
+export const ROLLOUT_STATE: Record<RolloutState, [string, string]> = {
+  scheduled: ["info", "Scheduled"],
+  dispatched: ["info", "Updating"],
+  deployed: ["info", "Deployed · waiting for check-in"],
+  done: ["good", "Done"],
+  failed: ["bad", "Failed"],
+  manual: ["warn", "Run on the release PC"],
+  cancelled: ["", "Cancelled"],
+};
+
+export interface Duplicate {
+  where: "this-system" | "request" | "other-client";
+  name: string;
+  tenantId?: string;
+  clientId?: string;
+  clientName?: string;
+  status?: string;
+}
+
+/** businessRequests/{clientId__requestId}: a client asking to open a business. */
+export interface BusinessRequest {
+  id: string;
+  clientId: string;
+  clientName: string;
+  projectId: string;
+  requestId: string;
+  name: string;
+  kind: "business" | "demo";
+  modules: string[];
+  requestedBy: { uid: string; email: string; name?: string };
+  requestedAt: string;
+  note?: string;
+  receivedAt: string;
+  lastSeenAt: string;
+  status: "pending" | "approved" | "rejected";
+  duplicates: Duplicate[];
+  decidedBy?: string;
+  decidedAt?: string;
+  message?: string;
 }
 
 // ── Rules shared with the server (apps/console-functions/src/model.ts) ──

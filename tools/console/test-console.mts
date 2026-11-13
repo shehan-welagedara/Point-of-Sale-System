@@ -1,14 +1,19 @@
 /**
  * Polymath Console end to end on the emulators (pnpm test:console): staff sign-in and roles, a client
  * system's real check-in code (apps/functions/src/console-link.ts) against the console's check-in
- * function, licence delivery, suspend/restore with signed directives, usage, notices, refusals.
+ * function, licence delivery, suspend/restore with signed directives, usage, notices, refusals; since
+ * 1.10.0 the two-step business validation (apps/functions/src/business.ts), duplicates and archiving,
+ * the release catalogue and update rollouts with the client's maintenance notice, a message to all
+ * clients, and privacy (data agreement, export, erasure rules).
  */
+import { generateKeyPairSync } from "node:crypto";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 // The repository root doesn't depend on the workspace packages, so they are imported by path.
-import { DEMO_LICENCE_PUBLIC_KEY, colomboDate, suspensionInfo } from "../../packages/core/src/index.ts";
+import { DEMO_LICENCE_PUBLIC_KEY, colomboDate, signDirective, suspensionInfo } from "../../packages/core/src/index.ts";
+import { handleBusinessApi } from "../../apps/functions/src/business.ts";
 import { applyResponse, runCheckin } from "../../apps/functions/src/console-link.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -182,6 +187,113 @@ const today = (await api(supportToken, { action: "recordMetrics" })).result as {
 check(today?.clients === 2 && today.mrrLkr === 5000 && today.paid === 1 && (await cdb.doc(`metrics/${today.date}`).get()).exists, "today's dashboard figures are recorded (clients, monthly revenue, paid)");
 check((await api(await stranger.token(), { action: "recordMetrics" })).error?.status === "PERMISSION_DENIED", "…but not for someone outside the staff");
 
+// ── Two-step business validation: the client's system (step 1, above) and each business (step 2) ──
+const ownerCaller = { uid: "o", email: "owner@noura.example", name: "Nuwan Perera" };
+const unthrottle = () => pdb.doc("deployment/link").set({ lastRequestCheckinAt: "2000-01-01T00:00:00Z" }, { merge: true });
+await pdb.doc("deployment/config").set({ ownerUid: "o", openSignup: false });
+check((await pdb.doc("deployment/link").get()).data()?.approvalRequired === true, "after a check-in, the client's system knows new businesses need Polymath Tech's approval (rules read deployment/link)");
+let refused = "";
+try {
+  await handleBusinessApi(pdb, env(), { uid: "mallory", email: "mallory@example.com" }, { action: "submit", id: "mallory-co-ab12c", name: "Mallory Co" });
+} catch (e) {
+  refused = (e as Error).message;
+}
+check(/Only this system's owner/.test(refused), "someone who isn't the system's owner can't ask for a business");
+let br = await handleBusinessApi(pdb, env(), ownerCaller, { action: "submit", id: "noura-kitchen-dup01", name: "Noura  kitchen", kind: "business", modules: ["pos"] });
+check(br.required && br.request?.status === "pending" && br.similar?.[0]?.id === "noura", "the owner opening Noura Kitchen again is told it exists, and the request goes to Polymath Tech at once");
+const dupReq = (await cdb.doc("businessRequests/noura-kitchen__noura-kitchen-dup01").get()).data()!;
+check(dupReq?.status === "pending" && dupReq.duplicates.some((d: { where: string; tenantId?: string }) => d.where === "this-system" && d.tenantId === "noura") && dupReq.requestedBy.email === "owner@noura.example", "the console receives the request with who asked and the business it duplicates");
+check((await api(supportToken, { action: "decideBusiness", id: dupReq.id, decision: "approved" })).error?.status === "PERMISSION_DENIED", "support can't approve businesses");
+check((await api(salesToken, { action: "decideBusiness", id: dupReq.id, decision: "approved" })).error?.status === "FAILED_PRECONDITION", "approving a business that already exists needs a confirmation");
+check((await api(salesToken, { action: "decideBusiness", id: dupReq.id, decision: "rejected" })).error?.status === "INVALID_ARGUMENT", "declining needs a message for the owner");
+await api(salesToken, { action: "decideBusiness", id: dupReq.id, decision: "rejected", message: "You already have Noura Kitchen: open it from your business list." });
+await unthrottle();
+br = await handleBusinessApi(pdb, env(), ownerCaller, { action: "check", id: "noura-kitchen-dup01" });
+check(br.request?.status === "rejected" && /already have/.test(br.request.message ?? ""), "the owner sees the decline with Polymath Tech's message");
+const again2 = await handleBusinessApi(pdb, env(), ownerCaller, { action: "check", id: "noura-kitchen-dup01" });
+check(!again2.checkin, "asking again within seconds doesn't call the console again");
+
+await unthrottle();
+br = await handleBusinessApi(pdb, env(), ownerCaller, { action: "submit", id: "noura-galle-ab12c", name: "Noura Kitchen Galle", kind: "business", modules: ["pos", "tables"] });
+const galle = (await cdb.doc("businessRequests/noura-kitchen__noura-galle-ab12c").get()).data()!;
+check(galle?.duplicates.length === 0, "a new outlet with its own name has no duplicates");
+await api(salesToken, { action: "decideBusiness", id: galle.id, decision: "approved", message: "Welcome, Galle!" });
+check((await api(salesToken, { action: "decideBusiness", id: galle.id, decision: "approved" })).error?.status === "FAILED_PRECONDITION", "a request is decided once");
+await unthrottle();
+br = await handleBusinessApi(pdb, env(), ownerCaller, { action: "check", id: "noura-galle-ab12c" });
+check(br.request?.status === "approved" && typeof br.request.decisionToken === "string" && br.request.message === "Welcome, Galle!", "the signed approval reaches the client's system");
+await pdb.doc("tenants/noura-galle-ab12c").set({ id: "noura-galle-ab12c", name: "Noura Kitchen Galle", ownerUid: "o", plan: "trial", modules: { pos: true }, status: "active", createdAt: new Date().toISOString() });
+await pdb.doc("tenants/noura-galle-ab12c/members/o").set({ uid: "o", role: "owner", tenantId: "noura-galle-ab12c" });
+await runCheckin(pdb, env(), "scheduled");
+let hg = ((await cdb.doc("clients/noura-kitchen").get()).data()!.health.tenants as { id: string; status?: string; approval?: { requestId: string } }[]).find((t) => t.id === "noura-galle-ab12c");
+check(hg?.approval?.requestId === "noura-galle-ab12c" && hg.status === "active", "the console sees the new business, approved");
+// Approvals that Polymath Tech didn't sign are ignored.
+const { privateKey: otherKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+const forged = await signDirective({ v: 1, type: "business", projectId: CLIENT, requestId: "forged-co-ab12c", decision: "approved", ownerUid: "o", name: "Forged", issuedAt: new Date().toISOString() }, otherKey.export({ format: "der", type: "pkcs8" }).toString("base64url"));
+await pdb.doc("businessRequests/forged-co-ab12c").set({ id: "forged-co-ab12c", name: "Forged", kind: "business", modules: [], uid: "o", email: "owner@noura.example", status: "pending", requestedAt: new Date().toISOString() });
+await applyResponse(pdb, { v: 1, ok: true, serverTime: "", businessDecisions: [{ token: forged }] }, { projectId: CLIENT, publicKey: DEMO_LICENCE_PUBLIC_KEY }, new Date());
+check((await pdb.doc("businessRequests/forged-co-ab12c").get()).data()?.status === "pending", "an approval not signed by Polymath Tech is ignored");
+await pdb.doc("businessRequests/forged-co-ab12c").delete();
+// The owner archives a business opened by mistake: the console sees it.
+await pdb.doc("tenants/noura-galle-ab12c").set({ status: "archived" }, { merge: true });
+await runCheckin(pdb, env(), "scheduled");
+hg = ((await cdb.doc("clients/noura-kitchen").get()).data()!.health.tenants as { id: string; status?: string }[]).find((t) => t.id === "noura-galle-ab12c");
+check(hg?.status === "archived", "an archived business shows as archived in the console");
+// Approvals off (Polymath Tech's own demo systems): businesses open straight away.
+check((await api(salesToken, { action: "setApprovals", clientId: "noura-kitchen", approvals: "off" })).error?.status === "PERMISSION_DENIED", "only owners and admins switch approvals off");
+await api(ownerToken, { action: "setApprovals", clientId: "noura-kitchen", approvals: "off" });
+await runCheckin(pdb, env(), "scheduled");
+br = await handleBusinessApi(pdb, env(), ownerCaller, { action: "submit", id: "noura-train-ab12c", name: "Noura Training", kind: "demo" });
+check(!br.required && (await pdb.doc("deployment/link").get()).data()?.approvalRequired === false, "with approvals off, a business opens without waiting");
+await api(ownerToken, { action: "setApprovals", clientId: "noura-kitchen", approvals: "required" });
+await runCheckin(pdb, env(), "scheduled");
+
+// ── Releases and updates pushed from the console ──
+const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
+check((await api(supportToken, { action: "syncReleases", changelog })).error?.status === "PERMISSION_DENIED", "support can't change the release catalogue");
+const synced = (await api(ownerToken, { action: "syncReleases", changelog })).result as { count: number; latest: string };
+const rel = (await cdb.doc("releases/1_9_0").get()).data();
+check(synced?.count > 15 && rel?.highlights?.length > 0 && !String(rel.highlights[0]).includes("**"), "the release catalogue loads from the release notes, with what clients get in plain words");
+const ro1 = (await api(ownerToken, { action: "createRollout", version: "1.9.0", clientIds: ["noura-kitchen"], mode: "window", message: "Your back office becomes an app on phones." })).result as { id: string };
+check(Boolean(ro1?.id), "the owner schedules 1.9.0 for Noura Kitchen in its maintenance window");
+check(/already in the rollout/.test((await api(ownerToken, { action: "createRollout", version: "1.9.0", clientIds: ["noura-kitchen"], mode: "now" })).error?.message ?? ""), "a client is in one rollout at a time");
+check(/already runs/.test((await api(ownerToken, { action: "createRollout", version: "1.6.0", clientIds: ["noura-kitchen"], mode: "now" })).error?.message ?? ""), "a client isn't sent a version it already has");
+await runCheckin(pdb, env(), "scheduled");
+let upd = (await tenant()).supplier?.update;
+let roDoc = (await cdb.doc(`rollouts/${ro1.id}`).get()).data()!;
+check(upd?.version === "1.9.0" && upd.state === "scheduled" && upd.at === roDoc.clients["noura-kitchen"].scheduledFor && Boolean(upd.until) && upd.highlights?.length > 0 && upd.message === "Your back office becomes an app on phones.", "the client's system receives the maintenance notice: version, window, what's new and the message");
+check(Date.parse(upd.at) - Date.now() >= 55 * 60_000, "…at least an hour ahead, so screens see it before the update starts");
+check(/^Update 1\.9\.0 is scheduled on \w+day,? \d+ \w+, \d\d:\d\d–\d\d:\d\d\./.test((await tenant()).supplier?.notice?.text ?? ""), "a system older than 1.10.0 gets the same notice as a message it can already show");
+await api(ownerToken, { action: "cancelRollout", rolloutId: ro1.id, clientId: "noura-kitchen" });
+roDoc = (await cdb.doc(`rollouts/${ro1.id}`).get()).data()!;
+await runCheckin(pdb, env(), "scheduled");
+check(roDoc.status === "cancelled" && !(await tenant()).supplier?.update, "cancelling removes the notice at the next check-in");
+const ro2 = (await api(ownerToken, { action: "createRollout", version: "1.9.0", clientIds: ["noura-kitchen"], mode: "now" })).result as { id: string };
+roDoc = (await cdb.doc(`rollouts/${ro2.id}`).get()).data()!;
+check(roDoc.clients["noura-kitchen"].state === "manual" && /pnpm release:deploy --target noura-kitchen/.test(roDoc.clients["noura-kitchen"].error), "without a GitHub connection, the console shows the command for the release PC");
+await runCheckin(pdb, env(), "scheduled");
+check((await tenant()).supplier?.update?.version === "1.9.0", "…and the client is told the update is coming");
+r = await runCheckin(pdb, { ...env(), appVersion: "1.9.0" }, "scheduled");
+roDoc = (await cdb.doc(`rollouts/${ro2.id}`).get()).data()!;
+check(roDoc.clients["noura-kitchen"].state === "done" && roDoc.status === "done" && !(await tenant()).supplier?.update, "when the system reports 1.9.0, the rollout is done and the notice disappears");
+
+// ── A message to every client ──
+await api(salesToken, { action: "setBroadcast", text: "Support is closed on Poya day, 15 November.", level: "info" });
+await runCheckin(pdb, env(), "scheduled");
+check((await tenant()).supplier?.notice?.text === "Support is closed on Poya day, 15 November.", "a message to all clients reaches each client's back office");
+await api(salesToken, { action: "setBroadcast", text: "" });
+await runCheckin(pdb, env(), "scheduled");
+check(!(await tenant()).supplier?.notice, "…and goes when it is cleared");
+
+// ── Privacy ──
+check(Boolean((await api(salesToken, { action: "savePrivacy", clientId: "noura-kitchen", privacy: { dpaSignedOn: "2026-11-01", dpaVersion: "1.0", contactName: "Nuwan Perera", contactEmail: "owner@noura.example" } })).result?.ok), "sales records the client's data agreement");
+check((await api(salesToken, { action: "exportClient", clientId: "noura-kitchen" })).error?.status === "PERMISSION_DENIED", "only owners and admins export a client's data");
+const exported = (await api(ownerToken, { action: "exportClient", clientId: "noura-kitchen" })).result as { client: { name: string; licence?: { token: string } }; payments: unknown[]; licences: { token: string }[]; businessRequests: unknown[]; audit: unknown[] };
+check(exported?.client.name === "Noura Kitchen" && exported.payments.length >= 1 && exported.licences.length >= 1 && exported.licences.every((l) => l.token === "(withheld)") && exported.client.licence?.token === "(withheld)" && exported.businessRequests.length >= 2 && exported.audit.length > 3, "the export holds everything the console has about the client, without licence keys");
+check((await api(ownerToken, { action: "eraseClient", clientId: "lagoon", confirm: "Lagoon Cafe" })).error?.status === "FAILED_PRECONDITION", "a client's data can't be erased while the contract runs");
+check((await api(ownerToken, { action: "saveRetention", retention: { usageDays: 10 } })).error?.status === "INVALID_ARGUMENT", "retention can't be set below 30 days");
+check(Boolean((await api(ownerToken, { action: "saveRetention", retention: { usageDays: 730, unknownDays: 90 } })).result), "the owner sets how long data is kept");
+
 // Leave a realistic picture for the screen test (ui-smoke.mjs): sharing back on, two weeks of figures.
 await pdb.doc("tenants/noura").set({ shareUsage: true }, { merge: true });
 await runCheckin(pdb, env(), "scheduled");
@@ -246,6 +358,11 @@ for (const id of ["galle-fort", "kandy-mist", "trinco-bay"]) {
     await cdb.doc(`clients/${id}/usage/${date}`).set({ date, checks, covers: Math.round(checks * 1.8), netSales: checks * 3_400_00, total: checks * 3_650_00, tenants: {}, reportedAt: isoAgo(d) });
   }
 }
+
+// For the screens: a business waiting for approval and an update scheduled for two clients.
+await unthrottle();
+await handleBusinessApi(pdb, env(), ownerCaller, { action: "submit", id: "noura-express-ab12c", name: "Noura Express", kind: "business", modules: ["pos", "lankaqr"], note: "Takeaway counter in Nugegoda" });
+await api(ownerToken, { action: "createRollout", version: "1.9.0", clientIds: ["trinco-bay", "galle-fort"], mode: "window", message: "Your back office becomes an app on phones." });
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll console checks passed");
 process.exit(failed ? 1 : 0);

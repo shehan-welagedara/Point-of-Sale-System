@@ -190,7 +190,8 @@ try {
   const setup = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   await setup.goto(`${B}/?mode=local`);
   await audit(setup, "back office · sign-in (light)");
-  await setup.getByText("Load the demo restaurant").click();
+  await setup.getByText("Try a demo business").click();
+  await setup.getByRole("button", { name: "Load Spice Lagoon" }).click();
   await setup.waitForURL(/emc\/home/, { timeout: 90_000 });
   const demo = await setup.context().storageState();
 

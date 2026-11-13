@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { newId } from "@pos/core";
 import { type BankRecon, type BankStatement, type BankStatementLine, type LedgerEntry, LEDGER as L, bankAmount, parseStatementCsv, suggestMatches } from "@pos/ledger";
 import { tablesToWorkbook } from "../../lib/excel";
-import { Field, Modal, ModuleOff, PageHead, Stat } from "../../components/ui";
+import { Field, Modal, ModuleOff, PageHead, Stat, Explain } from "../../components/ui";
 import { amount, downloadBuffer, money, toCents, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 import { AccountSelect, canBooks } from "./shared";
@@ -42,7 +42,7 @@ function ImportStatement({ account, onClose }: { account: string; onClose: () =>
       footer={<button className="btn primary" disabled={!lines.length} onClick={save}>Import {lines.length || ""} lines</button>}
     >
       <div className="stack">
-        <p className="small muted">Download the statement from internet banking as CSV (Commercial Bank, Sampath, HNB, BOC and most others export Date, Description, Reference and Debit/Credit or Amount columns). Imported statements are kept unchanged as audit evidence.</p>
+        <Explain as="p" className="small muted">Download the statement from internet banking as CSV (Commercial Bank, Sampath, HNB, BOC and most others export Date, Description, Reference and Debit/Credit or Amount columns). Imported statements are kept unchanged as audit evidence.</Explain>
         <input
           type="file"
           accept=".csv,text/csv"

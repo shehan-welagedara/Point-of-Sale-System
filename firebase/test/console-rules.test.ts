@@ -47,11 +47,15 @@ describe("Polymath Console rules", () => {
   it("covers every console collection, and nothing else", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
-      for (const p of ["licences/L1", "deployments/D1", "audit/A1", "config/company", "unknownProjects/p", "clients/noura-kitchen/usage/2026-11-10", "clients/noura-kitchen/payments/P1", "other/x"]) await setDoc(doc(db, p), { x: 1 });
+      for (const p of ["licences/L1", "deployments/D1", "audit/A1", "config/company", "unknownProjects/p", "clients/noura-kitchen/usage/2026-11-10", "clients/noura-kitchen/payments/P1", "releases/1_10_0", "rollouts/R1", "businessRequests/noura-kitchen__b1", "other/x"]) await setDoc(doc(db, p), { x: 1 });
     });
     const support = as("u-support", "support");
-    for (const p of ["licences/L1", "deployments/D1", "audit/A1", "config/company", "unknownProjects/p", "clients/noura-kitchen/usage/2026-11-10", "clients/noura-kitchen/payments/P1"]) await assertSucceeds(getDoc(doc(support, p)));
+    for (const p of ["licences/L1", "deployments/D1", "audit/A1", "config/company", "unknownProjects/p", "clients/noura-kitchen/usage/2026-11-10", "clients/noura-kitchen/payments/P1", "releases/1_10_0", "rollouts/R1", "businessRequests/noura-kitchen__b1"]) await assertSucceeds(getDoc(doc(support, p)));
     await assertFails(getDoc(doc(support, "other/x")));
+    for (const p of ["releases/1_10_0", "rollouts/R1", "businessRequests/noura-kitchen__b1"]) {
+      await assertFails(getDoc(doc(as("stranger"), p)));
+      await assertFails(setDoc(doc(as("u-owner", "owner"), p), { status: "approved" }));
+    }
   });
   it("lets staff read the daily figures, and every client's payments and usage at once (revenue, reports), and nobody else", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {

@@ -2,7 +2,8 @@
  * Polymath Console server functions (docs/22-polymath-console.md):
  *  - checkin      HTTPS: a client's daily check-in (Google-signed identity of its project)
  *  - consoleApi   callable: every change staff make (role checked, audited)
- *  - housekeeping daily: follows GitHub release runs and the latest version
+ *  - housekeeping daily: follows GitHub release runs and the latest version, applies retention
+ *  - rollouts     every 15 minutes: starts updates that are due and follows them (releases.ts)
  */
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -13,6 +14,8 @@ import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { ActionError, type Deps, recordMetrics, runAction } from "./actions.js";
 import { handleCheckin } from "./checkin.js";
+import { applyRetention } from "./privacy.js";
+import { runRollouts } from "./releases.js";
 import { IdentityError, verifyGoogleIdToken } from "./identity.js";
 import type { StaffRole } from "./model.js";
 
@@ -91,4 +94,9 @@ export const housekeeping = onSchedule({ schedule: "every day 06:15", timeZone: 
   const system = { uid: "system", email: "system", emailVerified: true, role: "support" };
   await runAction(deps(new Date()), system, { action: "refreshDeployments" }).catch(() => undefined);
   await recordMetrics(db, new Date());
+  await applyRetention(db, new Date());
+});
+
+export const rollouts = onSchedule({ schedule: "every 15 minutes", timeZone: "Asia/Colombo", secrets: [GITHUB_TOKEN] }, async () => {
+  await runRollouts({ ...deps(new Date()), privateKey: () => "" });
 });

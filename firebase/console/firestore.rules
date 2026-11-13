@@ -34,6 +34,10 @@ service cloud.firestore {
     match /config/{id} { allow read: if staff(); allow write: if false; }
     match /unknownProjects/{id} { allow read: if staff(); allow write: if false; }
     match /metrics/{date} { allow read: if staff(); allow write: if false; }
+    // Release catalogue, update rollouts and requests to open businesses (docs/22 §8–9).
+    match /releases/{id} { allow read: if staff(); allow write: if false; }
+    match /rollouts/{id} { allow read: if staff(); allow write: if false; }
+    match /businessRequests/{id} { allow read: if staff(); allow write: if false; }
     // Every client's payments at once (revenue on the dashboard and reports).
     match /{path=**}/payments/{id} { allow read: if staff(); }
     // Every client's daily figures at once (Reports).

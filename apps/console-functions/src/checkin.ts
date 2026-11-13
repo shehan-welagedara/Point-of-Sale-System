@@ -1,11 +1,15 @@
 /**
- * A client's daily check-in (docs/22-polymath-console.md §2): record what it reports, answer with its
- * current licence key, its signed status, a notice and Polymath Tech's contact details.
+ * A client's check-in (docs/22-polymath-console.md §2): record what it reports, answer with its
+ * current licence key, its signed status, a notice and Polymath Tech's contact details; since 1.10.0
+ * also the update scheduled for it (maintenance notice), whether new businesses need approval, and
+ * the decisions on the business requests it reported.
  */
 import type { CheckinResponse, SupplierContact } from "@pos/core";
 import type { Firestore } from "firebase-admin/firestore";
+import { businessRequestsAtCheckin } from "./businesses.js";
 import { serviceAccountProject } from "./identity.js";
-import { type ClientHealth, type ConsoleClient, DEFAULT_SUPPLIER, noticeFor, validateCheckin } from "./model.js";
+import { type Broadcast, type ClientHealth, type ConsoleClient, DEFAULT_SUPPLIER, compareVersions, maintenanceText, noticeFor, validateCheckin } from "./model.js";
+import { rolloutAtCheckin } from "./releases.js";
 
 export interface CheckinResult {
   status: number;
@@ -25,7 +29,14 @@ export async function handleCheckin(db: Firestore, callerEmail: string, raw: unk
   if (found.empty) {
     // Shown on the console's Clients page, so the project can be added in one click.
     await db.collection("unknownProjects").doc(req.projectId).set(
-      { projectId: req.projectId, callerEmail, appVersion: req.appVersion, businesses: req.tenants.map((t) => t.name).slice(0, 10), lastAt: now.toISOString() },
+      {
+        projectId: req.projectId,
+        callerEmail,
+        appVersion: req.appVersion,
+        businesses: req.tenants.map((t) => t.name).slice(0, 10),
+        requests: (Array.isArray(req.businessRequests) ? req.businessRequests : []).slice(0, 5).map((r) => `${String(r?.name ?? "").slice(0, 80)} (${String(r?.requestedBy?.email ?? "").slice(0, 120)})`),
+        lastAt: now.toISOString(),
+      },
       { merge: true },
     );
     return fail(404, "This project isn't registered in the Polymath Console yet.", now);
@@ -66,9 +77,18 @@ export async function handleCheckin(db: Firestore, callerEmail: string, raw: unk
       errors24h: t.errors24h,
       counts: { workstations: Number(t.counts?.workstations) || 0, employees: Number(t.counts?.employees) || 0, backOfficeUsers: Number(t.counts?.backOfficeUsers) || 0 },
       shareUsage: t.shareUsage !== false,
+      ...(t.status ? { status: t.status } : {}),
+      ...(t.createdAt ? { createdAt: t.createdAt } : {}),
+      ...(t.approval ? { approval: t.approval } : {}),
     })),
   };
-  await ref.set({ health, link: { lastError: null, lastErrorAt: null, pendingProjectNumber: null, pendingAt: null } }, { merge: true });
+  const approvals = client.approvals === "off" ? "off" : "required";
+  await ref.set(
+    { health, link: { lastError: null, lastErrorAt: null, pendingProjectNumber: null, pendingAt: null }, ...(approvals === "required" && !client.approvalsSince ? { approvalsSince: now.toISOString() } : {}) },
+    { merge: true },
+  );
+  const businessDecisions = await businessRequestsAtCheckin(db, client, req, now);
+  const update = await rolloutAtCheckin(db, client, req.appVersion, now);
 
   // Yesterday's figures, one document per business date.
   const byDate = new Map<string, Record<string, unknown>>();
@@ -83,6 +103,7 @@ export async function handleCheckin(db: Firestore, callerEmail: string, raw: unk
   }
 
   const company = (await db.doc("config/company").get()).data() as SupplierContact | undefined;
+  const broadcast = (await db.doc("config/broadcast").get()).data() as Broadcast | undefined;
   const supplier: SupplierContact = { ...DEFAULT_SUPPLIER, ...(company ?? {}) };
   return {
     status: 200,
@@ -93,8 +114,12 @@ export async function handleCheckin(db: Firestore, callerEmail: string, raw: unk
       clientId: client.id,
       licence: client.licence?.token ? { token: client.licence.token } : null,
       directive: client.directive?.token ? { token: client.directive.token } : null,
-      notice: noticeFor(client, supplier.name, now),
+      // Systems before 1.10.0 don't know the update notice: they get it as a plain message instead.
+      notice: noticeFor(client, supplier.name, now, broadcast) ?? (update && compareVersions(req.appVersion, "1.10.0") < 0 ? { text: maintenanceText(update, now), level: "info" } : null),
       supplier,
+      update,
+      approvals,
+      ...(businessDecisions.length ? { businessDecisions } : {}),
     },
   };
 }

@@ -293,10 +293,10 @@ The system is now live at **https://PROJECT-ID.web.app** (also `.firebaseapp.com
 
 1. Open the site → **Create account** with the client's email and a strong password. This person becomes the **owner**, and creating the first business **claims the deployment**: from then on only they, owners and administrators of a business, and the people listed in `deployment/config.creators` can create businesses here. Strangers who sign up can't. (On your own demo project, set `openSignup: true` in that document in the Firestore console.)
 2. **Set up a business:**
-   1. Under **New client business**, type the business name.
+   1. Under **New business**, type the business name.
    2. Choose the **modules** the client bought.
-   3. Click **Create business**. It starts as a 30-day trial.
-3. **Training copy (recommended).** Click **+ Business** in the top bar → **Load the demo restaurant**. Staff can practise there without touching real data or invoice numbers.
+   3. Click **Create business**. It starts as a 30-day trial. On a system linked to the Polymath Console (1.10.0 and later, docs/22 §9), it first shows *Waiting for approval*: approve it in the console under **Businesses** (check the person and that the business doesn't already exist), then the owner presses **Open**.
+3. **Training copy (recommended).** Account → **Add a business** → **Try a demo business** → **Load Spice Lagoon** (or **Load Noura Kitchen**). Staff can practise there without touching real data or invoice numbers. On a linked system it is approved first like any business.
    - Switch between businesses with the selector in the top bar.
    - In a client deployment the demo business works for 30 days, which is enough for training. It can't be used to trade without a licence.
 

@@ -2,7 +2,7 @@
  * The console's records and the rules about them that don't need the database (so they're unit-tested):
  * roles, health, subscriptions, renewal notices, and check-in validation.
  */
-import type { CheckinRequest, Edition, ModuleKey, SupplierContact, UsageLimits } from "@pos/core";
+import type { CheckinRequest, Edition, ModuleKey, SupplierContact, UpdateNotice, UsageLimits } from "@pos/core";
 
 export const STAFF_ROLES = ["owner", "admin", "sales", "support", "engineer"] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
@@ -62,7 +62,22 @@ export interface ClientHealth {
     errors24h: number;
     counts: { workstations: number; employees: number; backOfficeUsers: number };
     shareUsage: boolean;
+    /** Since 1.10.0. */
+    status?: "active" | "archived";
+    createdAt?: string;
+    approval?: { requestId: string; approvedAt: string };
   }[];
+}
+
+/** What Polymath Tech has agreed with the client about their data (docs/24). */
+export interface ClientPrivacy {
+  /** Data processing agreement signed on (YYYY-MM-DD) and its version. */
+  dpaSignedOn?: string;
+  dpaVersion?: string;
+  /** The client's contact for data protection questions. */
+  contactName?: string;
+  contactEmail?: string;
+  notes?: string;
 }
 
 export interface ConsoleClient {
@@ -90,6 +105,13 @@ export interface ConsoleClient {
   notice?: { text: string; level: "info" | "warn"; until?: string };
   health?: ClientHealth;
   link?: { pendingProjectNumber?: string; pendingAt?: string; lastError?: string; lastErrorAt?: string };
+  /** Whether opening a business needs approval (default: required). */
+  approvals?: "required" | "off";
+  /** When the client's system was first told approvals are required (businesses opened before are "before approvals"). */
+  approvalsSince?: string;
+  privacy?: ClientPrivacy;
+  /** Set when the client's data was erased after the contract ended. */
+  erasedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -145,15 +167,34 @@ export function compareVersions(a: string, b: string): number {
 const lkr = (n: number) => `Rs ${n.toLocaleString("en-LK")}`;
 const longDate = (d: string) => new Date(dayStart(d) + DAY / 2).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Colombo" });
 
-/** The notice the client's owner sees: the staff's own message, else a renewal reminder. */
-export function noticeFor(c: Pick<ConsoleClient, "notice" | "subscription">, supplierName: string, now: Date): { text: string; level: "info" | "warn" } | null {
+/** A message for every client at once (Support → Message to all clients). */
+export interface Broadcast {
+  text: string;
+  level: "info" | "warn";
+  until?: string;
+}
+
+/** The notice the client's owner sees: the staff's own message, else one for all clients, else a renewal reminder. */
+export function noticeFor(c: Pick<ConsoleClient, "notice" | "subscription">, supplierName: string, now: Date, broadcast?: Broadcast | null): { text: string; level: "info" | "warn" } | null {
   if (c.notice?.text && (!c.notice.until || Date.parse(c.notice.until) >= now.getTime())) return { text: c.notice.text, level: c.notice.level };
+  if (broadcast?.text && (!broadcast.until || Date.parse(broadcast.until) >= now.getTime())) return { text: broadcast.text, level: broadcast.level === "warn" ? "warn" : "info" };
   const s = subscriptionState(c.subscription, now);
   const sub = c.subscription;
   if (!sub?.paidUntil) return null;
   if (s.state === "due") return { text: `Your ${supplierName} subscription renews on ${longDate(sub.paidUntil)}${sub.priceLkr ? ` (${lkr(sub.priceLkr)})` : ""}. Thank you for renewing on time.`, level: "info" };
   if (s.state === "overdue") return { text: `Your ${supplierName} subscription was due on ${longDate(sub.paidUntil)}. Please contact ${supplierName} to renew.`, level: "warn" };
   return null;
+}
+
+/** The maintenance notice as one sentence, for systems older than 1.10.0 (they show it as a message). */
+export function maintenanceText(u: UpdateNotice, now: Date): string {
+  const tz = { timeZone: "Asia/Colombo" } as const;
+  const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { ...tz, hour: "2-digit", minute: "2-digit" });
+  if (u.state === "updating") return `Polymath Tech is updating your system to ${u.version} now. It may pause for a few minutes and comes back by itself.`;
+  if (u.state === "deployed") return `Your system has been updated to ${u.version}. Screens switch to it when they are free.`;
+  const start = u.at ? Date.parse(u.at) : now.getTime();
+  const when = u.at && start > now.getTime() ? `on ${new Date(u.at).toLocaleDateString("en-GB", { ...tz, weekday: "long", day: "numeric", month: "long" })}, ${time(u.at)}${u.until ? `–${time(u.until)}` : ""}` : "shortly";
+  return `Update ${u.version} is scheduled ${when}. The system may pause for a few minutes: please finish open bills before it starts.${u.message ? ` ${u.message}` : ""}`.slice(0, 400);
 }
 
 /** Check-in bodies come from client servers; still, never store unbounded data. */
@@ -173,7 +214,11 @@ export function validateCheckin(b: unknown): CheckinRequest {
     }));
     t.modules = (Array.isArray(t.modules) ? t.modules : []).slice(0, 40).map(String);
     t.errors24h = Math.max(0, Math.min(Number(t.errors24h) || 0, 1_000_000));
+    t.status = t.status === "archived" ? "archived" : "active";
+    if (t.createdAt !== undefined) t.createdAt = String(t.createdAt).slice(0, 40);
+    if (t.approval) t.approval = { requestId: String(t.approval.requestId ?? "").slice(0, 64), approvedAt: String(t.approval.approvedAt ?? "").slice(0, 40) };
   }
+  if (r.businessRequests !== undefined && !Array.isArray(r.businessRequests)) throw new Error("bad businessRequests");
   return r;
 }
 

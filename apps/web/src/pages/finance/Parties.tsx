@@ -13,7 +13,7 @@ import {
   aging,
 } from "@pos/ledger";
 import { tablesToWorkbook } from "../../lib/excel";
-import { Field, Modal, ModuleOff, Seg, Stat } from "../../components/ui";
+import { Field, Modal, ModuleOff, PageHead, Seg, Stat } from "../../components/ui";
 import { amount, downloadBuffer, money, toCents, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 import { type SubmitOutcome, AccountSelect, VoucherList, canBooks, newDraftBase, useLedgerAction, useLedgerSettings, useParties } from "./shared";
@@ -471,22 +471,18 @@ function PartyPage({ side }: { side: Side }) {
     v.type === "purchaseInvoice" ? <PurchaseInvoiceEditor voucher={v} onClose={close} /> : v.type === "salesInvoice" ? <SalesInvoiceEditor voucher={v} onClose={close} /> : v.type === "payment" ? <PaymentEditor side={side} voucher={v} onClose={close} /> : null;
   return (
     <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>{supplier ? "Payables" : "Receivables"}</h1>
-          <p>
-            {supplier
-              ? "Supplier invoices matched to goods receipts and purchase orders, payments with allocation to open invoices, and aging."
-              : "Credit sales to corporate and house-account customers, receipts and aging. POS bills settled on the day are posted by the POS day journal."}
-          </p>
-        </div>
-        {books ? (
-          <div className="row wrap">
-            <button className="btn" onClick={() => setCreating("payment")}>{supplier ? "Pay supplier" : "Record receipt"}</button>
-            <button className="btn primary" onClick={() => setCreating("invoice")}>{supplier ? "New supplier invoice" : "New customer invoice"}</button>
-          </div>
-        ) : null}
-      </div>
+      <PageHead
+        title={supplier ? "Payables" : "Receivables"}
+        subtitle={supplier ? "Supplier invoices, payments and aging. Invoices are matched to goods receipts and purchase orders; payments are allocated to open invoices." : "Credit sales, receipts and aging. POS bills settled on the day are posted by the POS day journal."}
+        actions={
+          books ? (
+            <>
+              <button className="btn" onClick={() => setCreating("payment")}>{supplier ? "Pay supplier" : "Record receipt"}</button>
+              <button className="btn primary" onClick={() => setCreating("invoice")}>{supplier ? "New supplier invoice" : "New customer invoice"}</button>
+            </>
+          ) : null
+        }
+      />
       <Seg value={tab} onChange={setTab} options={[{ value: "invoices", label: "Invoices" }, { value: "payments", label: supplier ? "Payments" : "Receipts" }, { value: "aging", label: "Aging" }]} />
       {tab === "invoices" ? <VoucherList head={false} title="" types={[supplier ? "purchaseInvoice" : "salesInvoice"]} editor={editor} /> : null}
       {tab === "payments" ? <PaymentsList side={side} editor={editor} /> : null}

@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MEMBER_ROLE_INFO, editionInfo } from "@pos/core";
 import { DEMO_PEOPLE } from "@pos/sample-data";
+import { InsightList, insightRange, useInsights } from "../../components/Insights";
 import { Loading } from "../../components/ui";
+import { MaintenanceBanner, WhatsNew } from "../../components/UpdateNotices";
 import { useApp } from "../../state/app";
 import { type Workspace, WORKSPACES, visibleWorkspaces, workspaceFor } from "../../workspaces";
 import { BottomNav, MoreSheet, PhoneTopBar, SectionPills, TodayPage, phoneTitle, useIsPhone } from "./Phone";
+import { useProperty, useStats } from "./Reports";
 
 function LicenceBadge() {
   const { licence } = useApp();
@@ -83,9 +86,9 @@ function TopBar({ workspace, onMenu }: { workspace?: Workspace; onMenu?: () => v
       ) : null}
       <span className="grow" />
       <LicenceBadge />
-      {tenants.length > 1 ? (
+      {tenants.filter((t) => t.status !== "archived").length > 1 ? (
         <select className="select hide-sm" style={{ minHeight: 30, width: "auto", padding: "2px 8px", fontSize: 13 }} value={tenant?.id} onChange={(e) => switchTenant(e.target.value)} aria-label="Business">
-          {tenants.map((t) => (
+          {tenants.filter((t) => t.status !== "archived").map((t) => (
             <option key={t.id} value={t.id}>
               {t.name}
             </option>
@@ -123,6 +126,17 @@ export function Launchpad() {
   return phone ? <TodayPage /> : <LaunchpadTiles />;
 }
 
+/** Owners, administrators and managers: what is worth noticing today, above the modules. */
+function HomeInsights() {
+  const { on, role } = useApp();
+  const { propertyId } = useProperty();
+  const may = (on("pos") || on("accounting")) && ["owner", "admin", "manager"].includes(role ?? "") && visibleWorkspaces(on, role).some((w) => w.key === "insights");
+  const { from, to } = insightRange();
+  const stats = useStats(propertyId, from, to, may);
+  const items = useInsights(stats, may);
+  return <InsightList items={items} />;
+}
+
 function LaunchpadTiles() {
   const { on, role, licence, settings } = useApp();
   const navigate = useNavigate();
@@ -137,6 +151,7 @@ function LaunchpadTiles() {
           <p>{settings.business.tradingName} · choose a module</p>
         </div>
       </div>
+      <HomeInsights />
       <div className="launch-groups">
       {groups.map((g) => {
         const ws = visible.filter((w) => w.group === g);
@@ -200,6 +215,8 @@ function PhoneShell() {
           </NavLink>
         ) : null}
         <SupplierBanner />
+        <MaintenanceBanner />
+        <WhatsNew />
         {settingsReady ? <Outlet /> : <Loading />}
       </div>
       <BottomNav onMore={() => setMore((m) => !m)} moreOpen={more} />
@@ -268,6 +285,8 @@ function DesktopShell() {
           </div>
         ) : null}
         <SupplierBanner />
+        <MaintenanceBanner />
+        <WhatsNew />
         {/* Pages wait for the business's settings, so no form starts from (and could save) the defaults. */}
         {settingsReady ? <Outlet /> : <Loading />}
       </div>

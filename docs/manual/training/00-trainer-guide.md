@@ -4,7 +4,7 @@ How to train a client's team before go-live: the plan, the training environment,
 
 ## 1. Before training
 
-1. **Training business.** In the client's back office, an owner or administrator chooses **+ Business → Load the demo restaurant**. This creates a separate business with a full sample menu, staff, tables and seven days of sales. Sales made there never touch the real business. In a client deployment the demo works for 30 days, which covers training. (For a laptop demo without the cloud, open the system with `?mode=local`.)
+1. **Training business.** In the client's back office, an owner or administrator chooses **+ Business → Try a demo business → Load Spice Lagoon** (approved by Polymath Tech first on a linked system). This creates a separate business with a full sample menu, staff, tables and seven days of sales. Sales made there never touch the real business. In a client deployment the demo works for 30 days, which covers training. (For a laptop demo without the cloud, open the system with `?mode=local`.)
 2. **Devices.** Have at least one terminal (or PC) and two phones ready, signed in to the training business, with the mobile style the client chose (POS Configuration → Mobile app style). Connect a bill printer if you have one; otherwise set the workstations to *On-screen only* printing.
 3. **Logins.** Trainees use the demo employees below. Give back-office trainees a back-office login on the training business with their real role.
 4. **Copies.** Print the trainee's role manual and the quick-reference card. PDFs: `pnpm manual:pdf`.
