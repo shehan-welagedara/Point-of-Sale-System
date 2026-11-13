@@ -11,10 +11,10 @@ const OPEN: RolloutState[] = ["scheduled", "dispatched", "deployed", "manual"];
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit" });
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { timeZone: "Asia/Colombo", weekday: "short", day: "numeric", month: "short" });
 
-/** The maintenance notice as the client's owner reads it. */
-export function noticeText(version: string, at: string | null, until?: string): string {
-  const when = at ? `${day(at)}, ${time(at)}${until ? `–${time(until)}` : ""}` : "shortly";
-  return `Update ${version} is scheduled for ${when}. The system may pause for a few minutes during the update: please finish open bills first.`;
+/** The maintenance notice as the client's owner reads it (`at` null: in their window, or now). */
+export function noticeText(version: string, at: string | null, mode: "window" | "now" | "at", until?: string): string {
+  const when = at ? `for ${day(at)}, ${time(at)}${until ? `–${time(until)}` : ""}` : mode === "now" ? "now" : "in your maintenance window";
+  return `Update ${version} is scheduled ${when}. The system may pause for a few minutes during the update: please finish open bills first.`;
 }
 
 function ClientVersion({ c, version }: { c: Client; version: string }) {
@@ -209,7 +209,7 @@ export function ReleasesPage() {
                     {mode === "at" ? <Field label="Date and time (Sri Lanka)"><input className="input" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} /></Field> : null}
                     <Field label="Message to clients (optional)" hint="Shown with the maintenance notice."><input className="input" maxLength={400} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. New: approvals for new businesses" /></Field>
                     <div className="callout small" data-testid="notice-preview">
-                      Clients see: “{noticeText(release.version, mode === "now" ? null : atIso, undefined)}”
+                      Clients see: “{noticeText(release.version, mode === "at" ? atIso : null, mode)}”
                       {mode === "window" ? " (with each client's own window)" : ""}
                       {mode === "now" ? " The update starts now; clients that check in first see the notice." : ""}
                     </div>
