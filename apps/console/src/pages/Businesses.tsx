@@ -3,7 +3,7 @@ import { limit, orderBy } from "firebase/firestore";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAction, useCol, useSession } from "../state";
-import { type BusinessRequest, type Client, date, dateTime } from "../types";
+import { type BusinessRequest, type Client, MODEL_NAMES, date, dateTime } from "../types";
 import { Field, Loading, PageHead } from "../ui";
 
 const WHERE: Record<string, string> = { "this-system": "already in this system", request: "also requested", "other-client": "at another client" };
@@ -19,7 +19,7 @@ function RequestCard({ r, client, canDecide }: { r: BusinessRequest; client?: Cl
     <div className="card card-body stack" data-request={r.name}>
       <div className="row wrap">
         <h3 className="grow" style={{ margin: 0 }}>
-          {r.name} {r.kind === "demo" ? <span className="badge">Demo</span> : null}
+          {r.name} {r.kind === "demo" ? <span className="badge">Demo</span> : null} {r.industry ? <span className="badge">{MODEL_NAMES[r.industry] ?? r.industry}</span> : null}
         </h3>
         <span className="small muted">{dateTime(r.receivedAt)}</span>
       </div>

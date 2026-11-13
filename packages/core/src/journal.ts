@@ -36,6 +36,13 @@ export type PosEventType =
   | "checkReopen"
   | "checkTransfer"
   | "checkSplit"
+  | "checkMerge"
+  | "checkVoid"
+  | "refund"
+  | "tenderAdjust"
+  | "closedReprint"
+  | "cashPickup"
+  | "tillCount"
   | "noSale"
   | "paidIn"
   | "paidOut"
@@ -68,6 +75,13 @@ export const POS_EVENT_LABEL: Record<PosEventType, string> = {
   checkReopen: "Reopened closed check",
   checkTransfer: "Transferred check",
   checkSplit: "Split check",
+  checkMerge: "Merged checks",
+  checkVoid: "Voided closed check",
+  refund: "Refund",
+  tenderAdjust: "Changed payment method",
+  closedReprint: "Reprinted closed check",
+  cashPickup: "Cash pickup",
+  tillCount: "Till count",
   noSale: "No sale (drawer opened)",
   paidIn: "Paid in",
   paidOut: "Paid out",
@@ -79,7 +93,7 @@ export const POS_EVENT_LABEL: Record<PosEventType, string> = {
 };
 
 /** Events auditors look at first (exception reporting). */
-export const EXCEPTION_EVENTS: PosEventType[] = ["itemVoid", "discount", "priceOverride", "checkCancel", "checkReopen", "noSale", "paidOut", "reprint", "managerAuth", "signInFailed", "lockout"];
+export const EXCEPTION_EVENTS: PosEventType[] = ["itemVoid", "discount", "priceOverride", "checkCancel", "checkReopen", "checkVoid", "refund", "tenderAdjust", "closedReprint", "noSale", "paidOut", "reprint", "managerAuth", "signInFailed", "lockout", "tillCount"];
 
 export interface PosEvent extends Entity {
   at: string;
@@ -274,14 +288,24 @@ export function employeeActivity(checks: readonly Check[], events: readonly PosE
   return [...by.values()].sort((x, y) => y.netSales - x.netSales);
 }
 
-/** Cash expected in a drawer: cash tenders taken − change is already netted in `applied`, plus paid in − paid out. */
-export function expectedCash(checks: readonly Check[], events: readonly PosEvent[], cashTenderIds: ReadonlySet<string>, employeeId?: string): Cents {
+/**
+ * Cash expected in a drawer: cash tenders taken (change is already netted in `applied`), plus paid
+ * in, minus paid out, cash pickups to the safe and cash given back on credit notes.
+ */
+export function expectedCash(
+  checks: readonly Check[],
+  events: readonly PosEvent[],
+  cashTenderIds: ReadonlySet<string>,
+  employeeId?: string,
+  creditNotes: readonly { by: string; refunds: { tenderId: string; amount: Cents }[] }[] = [],
+): Cents {
   let cash = 0;
   for (const c of checks) for (const p of c.status === "closed" ? c.payments : []) if (cashTenderIds.has(p.tenderId) && (!employeeId || p.by === employeeId)) cash += p.applied;
   for (const e of events) {
     if (employeeId && e.employeeId !== employeeId) continue;
     if (e.type === "paidIn") cash += e.amount ?? 0;
-    if (e.type === "paidOut") cash -= e.amount ?? 0;
+    if (e.type === "paidOut" || e.type === "cashPickup") cash -= e.amount ?? 0;
   }
+  for (const n of creditNotes) if (!employeeId || n.by === employeeId) for (const r of n.refunds) if (cashTenderIds.has(r.tenderId)) cash -= r.amount;
   return cash;
 }

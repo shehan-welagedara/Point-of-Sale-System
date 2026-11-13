@@ -22,6 +22,8 @@ export interface CheckinTenant {
   plan: Edition;
   licence?: { licenceId: string; issuedAt?: string; expiresAt: string; status: LicenceStatus | "suspended" };
   modules: string[];
+  /** Since 1.11.0: the business's industry model (restaurant, wholesale, salon…). */
+  industry?: string;
   devices: { id: string; appVersion?: string; lastSeenAt?: string }[];
   /** App errors reported by devices in the last 24 hours. */
   errors24h: number;
@@ -44,6 +46,8 @@ export interface BusinessRequest {
   /** "demo": a demo or training business filled with sample data. */
   kind: "business" | "demo";
   modules: string[];
+  /** Since 1.11.0: the industry model chosen. */
+  industry?: string;
   requestedBy: { uid: string; email: string; name?: string };
   requestedAt: string;
   note?: string;

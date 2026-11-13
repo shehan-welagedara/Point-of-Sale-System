@@ -64,6 +64,7 @@ export const PRIVILEGE_GROUPS = [
       "pos.tender": "Take payments",
       "pos.comp": "Use complimentary / staff meal tenders",
       "pos.refund": "Refund and void closed checks",
+      "pos.adjustClosed": "Change the payment method of a closed check",
     },
   },
   {
@@ -72,6 +73,7 @@ export const PRIVILEGE_GROUPS = [
     privileges: {
       "pos.noSale": "Open the cash drawer without a sale",
       "pos.paidInOut": "Paid in / paid out of the drawer",
+      "pos.tillCount": "Cash pickups and till counts",
       "pos.reprint": "Reprint bills (marked COPY)",
     },
   },
@@ -127,7 +129,7 @@ export const DEFAULT_ROLES: Role[] = [
     id: "finance",
     name: "Finance / Accountant",
     level: 25,
-    privileges: ["pos.signIn", "pos.clockInOut", "pos.changeRvc", "pos.reprint", "pos.paidInOut", "pos.noSale", "pos.reports", "pos.reportsOwn", "pos.journal", "pos.endOfDay"],
+    privileges: ["pos.signIn", "pos.clockInOut", "pos.changeRvc", "pos.reprint", "pos.paidInOut", "pos.noSale", "pos.reports", "pos.reportsOwn", "pos.journal", "pos.endOfDay", "pos.tillCount"],
     limits: {},
     requireAuth: ["pos.noSale"],
     description: "Cash-up and day close: paid in and out, reports, the journal and End of Day. Doesn't take orders or authorise other staff.",
@@ -246,6 +248,7 @@ export const MEMBER_ROLE_INFO: Record<MemberRole, { label: string; description: 
   owner: { label: "Owner", description: "Everything, including licence, modules and logins.", canWrite: ["*"] },
   admin: { label: "Administrator", description: "All configuration and logins, except removing the owner.", canWrite: ["*"] },
   manager: { label: "Manager", description: "Menu, prices, staff, reports, stock and POS operations.", canWrite: ["menu", "people", "inventory", "purchasing", "crm", "pos", "reports"] },
+  sales: { label: "Sales", description: "Quotations, orders, deliveries, customers, payments received and the WhatsApp inbox; prices and stock read-only.", canWrite: ["sales", "crm", "whatsapp"] },
   accountant: { label: "Accountant", description: "Accounting, journals and reports; read-only elsewhere.", canWrite: ["accounting"] },
   storekeeper: { label: "Storekeeper", description: "Stock, receiving, counts, waste and purchase orders.", canWrite: ["inventory", "purchasing"] },
   auditor: { label: "Auditor", description: "Read-only access to everything, including the audit trail, integrity checks and audit exports.", canWrite: [] },

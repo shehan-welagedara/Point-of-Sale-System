@@ -40,6 +40,12 @@ export const COLLECTIONS = {
   customers: "customers",
   checks: "checks",
   invoices: "invoices",
+  /** Credit notes for voided, refunded and reopened closed checks (closed-checks.ts). */
+  creditNotes: "creditNotes",
+  /** Changes of payment method on closed checks. */
+  checkAdjustments: "checkAdjustments",
+  /** Cash counts of a drawer (declared against expected). */
+  tillCounts: "tillCounts",
   sequences: "sequences",
   dailyStats: "dailyStats",
   accounts: "accounts",
@@ -86,6 +92,8 @@ export interface DocStore {
   merge(col: string, id: string, data: Record<string, unknown>): Promise<void>;
   /** Atomically add numbers (creating the document from `base` if needed). */
   increment(col: string, id: string, inc: Increments, base?: Record<string, unknown>): Promise<void>;
+  /** Atomically adds 1 to a counter document's `seq` and returns the new value (a transaction where the backend has them). */
+  nextSequence?(col: string, id: string): Promise<number>;
   remove(col: string, id: string): Promise<void>;
   /** Apply several writes atomically (adapters chunk to the backend's batch limit). */
   batch(ops: WriteOp[]): Promise<void>;
@@ -190,6 +198,13 @@ export class MemoryStore implements DocStore {
 
   async merge(col: string, id: string, data: Record<string, unknown>): Promise<void> {
     this.apply([{ op: "merge", col, id, data }]);
+  }
+
+  async nextSequence(col: string, id: string): Promise<number> {
+    // One thread: read and write happen together.
+    const seq = (Number(this.colMap(col).get(id)?.seq) || 0) + 1;
+    this.apply([{ op: "merge", col, id, data: { id, seq } }]);
+    return seq;
   }
 
   async increment(col: string, id: string, inc: Increments, base?: Record<string, unknown>): Promise<void> {

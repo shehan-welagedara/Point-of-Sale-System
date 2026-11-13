@@ -80,15 +80,32 @@ describe("Firestore indexes", () => {
 import { DEFAULT_ROLES } from "../src/index.js";
 // @ts-expect-error a plain JavaScript migration of the release tool
 import { ROLES as MIGRATION_ROLES } from "../../../tools/release/migrations/0005-it-finance-roles.mjs";
+// @ts-expect-error a plain JavaScript migration of the release tool
+import { upgradeRole } from "../../../tools/release/migrations/0006-closed-check-privileges.mjs";
 
 describe("IT and Finance roles", () => {
   it("are standard roles, and the 1.10.1 data update adds exactly them to existing businesses", () => {
-    for (const r of MIGRATION_ROLES as { id: string }[]) expect(DEFAULT_ROLES.find((d) => d.id === r.id)).toEqual(r);
+    // 0005 added them as in 1.10.1; 0006 brings them (and every role) up to 1.11.0's privileges.
+    for (const r of MIGRATION_ROLES as { id: string; privileges: string[] }[]) expect(DEFAULT_ROLES.find((d) => d.id === r.id)).toEqual(upgradeRole(r) ?? r);
     const it = DEFAULT_ROLES.find((r) => r.id === "itadmin")!;
     const fin = DEFAULT_ROLES.find((r) => r.id === "finance")!;
     expect(it.privileges).toContain("pos.unlockEmployee");
     expect(it.privileges.some((p) => ["pos.tender", "pos.refund", "pos.discount", "pos.managerOverride"].includes(p))).toBe(false);
     expect(fin.privileges).toEqual(expect.arrayContaining(["pos.paidInOut", "pos.endOfDay", "pos.reports", "pos.journal"]));
     expect(fin.privileges.some((p) => ["pos.openCheck", "pos.tender", "pos.managerOverride", "pos.voidSent"].includes(p))).toBe(false);
+  });
+});
+
+describe("1.11.0 privileges for existing roles", () => {
+  it("gives change-payment to roles that refund, and till counts to roles that close the day or approve", () => {
+    const old = (id: string) => {
+      const r = DEFAULT_ROLES.find((d) => d.id === id)!;
+      return { ...r, privileges: r.privileges.filter((p) => p !== "pos.adjustClosed" && p !== "pos.tillCount") };
+    };
+    for (const id of ["owner", "manager", "supervisor", "finance", "cashier", "server", "itadmin"]) {
+      const up = upgradeRole(old(id));
+      const now = DEFAULT_ROLES.find((d) => d.id === id)!;
+      expect(new Set(up?.privileges ?? old(id).privileges)).toEqual(new Set(now.privileges));
+    }
   });
 });

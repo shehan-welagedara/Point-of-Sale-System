@@ -1,5 +1,5 @@
 import { type CheckTotals, formatAmount } from "@pos/engine";
-import type { BillLayout, BrandingSettings, BusinessSettings, Check, CheckLine, DailyStats, MenuItem, TenderMedia } from "@pos/core";
+import type { BillLayout, BrandingSettings, BusinessSettings, Check, CheckLine, CreditNote, DailyStats, MenuItem, TenderMedia } from "@pos/core";
 import { isTaxInvoice, resolveBillLayout } from "./bill-layout.js";
 import type { Block, ReceiptDoc } from "./doc.js";
 
@@ -253,6 +253,47 @@ export function buildDaySummary(a: { stats: DailyStats; kind: "X" | "Z"; width: 
     ...Object.entries(s.tenders).map(([id, v]): Block => ({ t: "pair", left: `${names.get(id) ?? id} (${v.qty})`, right: amt(v.amount) })),
     { t: "rule" },
     { t: "pair", left: `Voids (${s.voids.qty})`, right: amt(s.voids.amount) },
+    ...(s.returns?.qty ? [{ t: "pair", left: `Credit notes (${s.returns.qty})`, right: `-${amt(s.returns.amount)}` } as Block] : []),
+    { t: "cut" },
+  ];
+  return { width: a.width, blocks };
+}
+
+/** A credit note slip (void, refund or reopen of a closed check), for the customer and the file. */
+export function buildCreditNote(a: {
+  note: Pick<CreditNote, "id" | "kind" | "invoiceNo" | "checkNo" | "issuedAt" | "reason" | "lines" | "totals" | "refunds">;
+  business: BusinessSettings;
+  width: number;
+  staffName: string;
+  approvedBy?: string;
+  tenders: ReadonlyMap<string, TenderMedia>;
+}): ReceiptDoc {
+  const n = a.note;
+  const b = a.business;
+  const title = n.kind === "refund" ? "CREDIT NOTE (REFUND)" : n.kind === "reopen" ? "CREDIT NOTE (REOPENED)" : "CREDIT NOTE (VOID)";
+  const blocks: Block[] = [
+    { t: "text", text: b.tradingName || b.legalName, align: "center", bold: true },
+    ...b.addressLines.map((l): Block => ({ t: "text", text: l, align: "center" })),
+    ...(b.vatRegistered && b.tin ? [{ t: "text", text: `TIN ${b.tin}`, align: "center" } as Block] : []),
+    { t: "rule", char: "=" },
+    { t: "text", text: title, align: "center", bold: true },
+    { t: "pair", left: "Credit note", right: n.id },
+    { t: "pair", left: "Against invoice", right: n.invoiceNo },
+    { t: "pair", left: "Check", right: `#${n.checkNo}` },
+    { t: "pair", left: "Date", right: colomboTime(n.issuedAt) },
+    { t: "rule" },
+    ...n.lines.map((l): Block => ({ t: "pair", left: `${l.qty} x ${l.name}`, right: `-${amt(l.gross)}` })),
+    { t: "rule" },
+    ...(n.totals.discounts ? [{ t: "pair", left: "Discounts", right: amt(n.totals.discounts) } as Block] : []),
+    ...n.totals.charges.filter((c) => c.amount).map((c): Block => ({ t: "pair", left: c.name, right: `-${amt(c.amount)}` })),
+    ...(n.totals.vat ? [{ t: "pair", left: "VAT", right: `-${amt(n.totals.vat)}` } as Block] : []),
+    { t: "pair", left: n.kind === "reopen" ? "CANCELLED" : "REFUND", right: `-${amt(n.totals.total)}`, bold: true },
+    ...n.refunds.map((r): Block => ({ t: "pair", left: `  ${a.tenders.get(r.tenderId)?.name ?? r.tenderId}`, right: amt(r.amount) })),
+    { t: "rule" },
+    { t: "text", text: `Reason: ${n.reason}` },
+    { t: "text", text: `By ${a.staffName}${a.approvedBy ? `, approved by ${a.approvedBy}` : ""}` },
+    { t: "feed", lines: 2 },
+    { t: "text", text: "Customer signature: ________________" },
     { t: "cut" },
   ];
   return { width: a.width, blocks };

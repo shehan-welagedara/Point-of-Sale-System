@@ -163,7 +163,69 @@ export function theoreticalUsage(checks: readonly Check[], ctx: UsageContext): M
  * Depletes stock for closed checks waiting for it, oldest lots first (FIFO). Usage is aggregated
  * per business date so a run costs one read and one write per ingredient, not per sale line.
  */
-export async function processDepletion(store: DocStore, args: { locationId: string; by: string; limit?: number }): Promise<{ checks: number; movements: StockMovement[] }> {
+export async function processDepletion(store: DocStore, args: { locationId: string; by: string; limit?: number }): Promise<{ checks: number; movements: StockMovement[]; returns: number }> {
+  const sold = await depleteChecks(store, args);
+  const back = await restockCreditNotes(store, args);
+  return { checks: sold.checks, movements: [...sold.movements, ...back.movements], returns: back.notes };
+}
+
+/** Pseudo-checks for the items on credit notes (to reuse the recipe and modifier usage). */
+function creditNoteChecks(notes: readonly CreditNoteLike[]): Check[] {
+  return notes.map((n) => ({ id: n.id, lines: n.lines.map((l) => ({ id: l.lineId, menuItemId: l.menuItemId, name: l.name, qty: l.qty, unitPrice: 0, modifiers: l.modifiers, taxClass: "", kotRoute: "kitchen", categoryId: l.categoryId, discountIds: [], sentRound: 1 })) }) as unknown as Check);
+}
+
+interface CreditNoteLike {
+  id: string;
+  businessDate: string;
+  lines: { lineId: string; menuItemId: string; name: string; categoryId: string; qty: number; modifiers: Check["lines"][number]["modifiers"] }[];
+}
+
+/**
+ * Puts the goods of credit notes marked "back into stock" back, as new lots at the item's current
+ * cost, and reduces that day's cost of sales by the same amount.
+ */
+export async function restockCreditNotes(store: DocStore, args: { locationId: string; limit?: number }): Promise<{ notes: number; movements: StockMovement[] }> {
+  const pending = await store.list<CreditNoteLike>(C.creditNotes, { where: [["depletion", "==", "pending"]], limit: args.limit ?? 400 });
+  if (!pending.length) return { notes: 0, movements: [] };
+  const [menuItems, modifierGroups, recipes, items] = await Promise.all([store.list<MenuItem>(C.menuItems), store.list<ModifierGroup>(C.modifierGroups), store.list<Recipe>(C.recipes), store.list<InventoryItem>(C.inventoryItems)]);
+  const ctx: UsageContext = { menuItems: new Map(menuItems.map((m) => [m.id, m])), modifierGroups: new Map(modifierGroups.map((g) => [g.id, g])), recipes: new Map(recipes.map((r) => [r.id, r])), items: new Map(items.map((i) => [i.id, i])) };
+  const costing = costingContext(items, recipes);
+  const byDate = new Map<string, CreditNoteLike[]>();
+  for (const n of pending) byDate.set(n.businessDate, [...(byDate.get(n.businessDate) ?? []), n]);
+  const ids = new Set<string>();
+  const usageByDate = new Map<string, Map<string, number>>();
+  for (const [date, notes] of byDate) {
+    const usage = theoreticalUsage(creditNoteChecks(notes), ctx);
+    usageByDate.set(date, usage);
+    for (const id of usage.keys()) ids.add(id);
+  }
+  const levels = await loadLevels(store, args.locationId, ids);
+  const ops: WriteOp[] = [];
+  const movements: StockMovement[] = [];
+  for (const date of [...usageByDate.keys()].sort()) {
+    const lines: StockMovementLine[] = [];
+    const costByMajorGroup: Record<string, number> = {};
+    for (const [itemId, qty] of usageByDate.get(date)!) {
+      const unitCost = itemUnitCost(itemId, costing).cost;
+      const at = nowIso();
+      levels.set(itemId, addLot(levels.get(itemId)!, { lotId: newId(), receivedAt: at, qty, unitCost, source: "return" }));
+      const cost = Math.round(qty * unitCost);
+      lines.push({ itemId, qty, cost });
+      const group = ctx.items.get(itemId)?.majorGroup ?? "Other";
+      costByMajorGroup[group] = (costByMajorGroup[group] ?? 0) - cost;
+    }
+    const notes = byDate.get(date)!;
+    const movement: StockMovement = { id: newId(), type: "sale", locationId: args.locationId, businessDate: date, at: nowIso(), ref: `returns: ${notes.map((n) => n.id).join(", ")}`.slice(0, 200), lines, costByMajorGroup };
+    movements.push(movement);
+    ops.push({ op: "set", col: C.stockMovements, data: movement });
+    for (const n of notes) ops.push({ op: "merge", col: C.creditNotes, id: n.id, data: { depletion: "done" } });
+  }
+  for (const level of levels.values()) ops.push({ op: "set", col: C.stockLevels, data: level });
+  await store.batch(ops);
+  return { notes: pending.length, movements };
+}
+
+async function depleteChecks(store: DocStore, args: { locationId: string; by: string; limit?: number }): Promise<{ checks: number; movements: StockMovement[] }> {
   const pending = await store.list<Check>(C.checks, { where: [["depletion", "==", "pending"]], limit: args.limit ?? 400 });
   if (pending.length === 0) return { checks: 0, movements: [] };
   const [menuItems, modifierGroups, recipes, items] = await Promise.all([
@@ -225,6 +287,25 @@ export async function processDepletion(store: DocStore, args: { locationId: stri
   for (const level of levels.values()) ops.push({ op: "set", col: C.stockLevels, data: level });
   await store.batch(ops);
   return { checks: pending.length, movements };
+}
+
+/** Stock out for a sale outside the POS (a wholesale delivery): FIFO cost, cost of sales on that day. */
+export function issueStock(store: DocStore, args: { locationId: string; lines: { itemId: string; qty: number }[]; businessDate: string; ref: string }): Promise<StockMovement> {
+  return simpleMovement(store, "sale", { ...args, lines: args.lines.filter((l) => l.qty > 0).map((l) => ({ itemId: l.itemId, qty: -l.qty })) });
+}
+
+/** Goods coming back from a customer (a returned delivery): new lots at current cost, less cost of sales. */
+export async function returnStock(store: DocStore, args: { locationId: string; lines: { itemId: string; qty: number }[]; businessDate: string; ref: string }): Promise<StockMovement> {
+  const m = await simpleMovement(store, "sale", { ...args, lines: args.lines.filter((l) => l.qty > 0) });
+  const costByMajorGroup: Record<string, number> = {};
+  const items = new Map((await store.list<InventoryItem>(C.inventoryItems)).map((i) => [i.id, i]));
+  for (const l of m.lines) {
+    const g = items.get(l.itemId)?.majorGroup ?? "Other";
+    costByMajorGroup[g] = (costByMajorGroup[g] ?? 0) - l.cost;
+  }
+  const fixed = { ...m, costByMajorGroup };
+  await store.set(C.stockMovements, fixed);
+  return fixed;
 }
 
 async function simpleMovement(

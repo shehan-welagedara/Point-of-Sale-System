@@ -50,8 +50,8 @@ async function count(q: Query): Promise<number> {
 async function pendingRequests(db: Firestore): Promise<BusinessRequest[]> {
   const snap = await db.collection("businessRequests").where("status", "==", "pending").limit(20).get();
   return snap.docs.map((d) => {
-    const r = d.data() as { id: string; name: string; kind: "business" | "demo"; modules?: string[]; uid: string; email: string; userName?: string; requestedAt: string; note?: string };
-    return { id: r.id, name: r.name, kind: r.kind, modules: r.modules ?? [], requestedBy: { uid: r.uid, email: r.email, ...(r.userName ? { name: r.userName } : {}) }, requestedAt: r.requestedAt, ...(r.note ? { note: r.note } : {}) };
+    const r = d.data() as { id: string; name: string; kind: "business" | "demo"; modules?: string[]; industry?: string; uid: string; email: string; userName?: string; requestedAt: string; note?: string };
+    return { id: r.id, name: r.name, kind: r.kind, modules: r.modules ?? [], ...(r.industry ? { industry: r.industry } : {}), requestedBy: { uid: r.uid, email: r.email, ...(r.userName ? { name: r.userName } : {}) }, requestedAt: r.requestedAt, ...(r.note ? { note: r.note } : {}) };
   });
 }
 
@@ -87,6 +87,7 @@ export async function buildReport(db: Firestore, env: Pick<LinkEnv, "projectId" 
       plan: t.plan,
       ...(t.licence ? { licence: { licenceId: t.licence.licenceId, ...(t.licence.issuedAt ? { issuedAt: t.licence.issuedAt } : {}), expiresAt: t.licence.expiresAt, status: susp.state === "blocked" ? "suspended" : licenceStatus(t.licence, now).status } } : {}),
       modules: Object.entries(t.modules ?? {}).filter(([, on]) => on).map(([k]) => k),
+      ...(t.industry ? { industry: t.industry } : {}),
       devices,
       errors24h: await count(ref.collection("clientErrors").where("at", ">=", since)),
       counts: {

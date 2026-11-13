@@ -61,9 +61,11 @@ describe("MemoryStore", () => {
 describe("modules", () => {
   it("switches dependencies on and dependants off", () => {
     let m = setModule({}, "purchasing", true);
-    expect(m).toMatchObject({ purchasing: true, inventory: true, recipes: true });
-    m = setModule(m, "recipes", false);
-    expect(m).toMatchObject({ purchasing: false, inventory: false, recipes: false });
+    expect(m).toMatchObject({ purchasing: true, inventory: true });
+    expect(m.recipes).toBeUndefined();
+    m = setModule(m, "inventory", false);
+    expect(m).toMatchObject({ purchasing: false, inventory: false });
+    expect(setModule({}, "wholesale", true)).toMatchObject({ wholesale: true, inventory: true, crm: true });
     expect(allModulesOn().website).toBe(false);
   });
 });

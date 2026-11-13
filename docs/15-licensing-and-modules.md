@@ -6,11 +6,13 @@ Clients buy an **edition** plus optional **add-on modules**, with **usage limits
 
 | Edition | Modules | Limits (properties / revenue centres / workstations / employees / back-office users) | Add-ons |
 |---|---|---|---|
-| **Starter** | POS, tables, customers, LankaQR, PayHere, sales reports | 1 / 2 / 3 / 40 / 3 | Recipes, inventory, purchasing, loyalty, WhatsApp, accounting |
-| **Professional** | Starter + recipes and costing, inventory, purchasing, loyalty, WhatsApp | 2 / 8 / 12 / 200 / 10 | Accounting |
+| **Starter** | POS, tables, customers, LankaQR, PayHere, sales reports | 1 / 2 / 3 / 40 / 3 | Recipes, inventory, purchasing, loyalty, WhatsApp, accounting, wholesale, WhatsApp Business |
+| **Professional** | Starter + recipes and costing, inventory, purchasing, loyalty, WhatsApp | 2 / 8 / 12 / 200 / 10 | Accounting, wholesale, WhatsApp Business |
 | **Enterprise** | Everything, including the general ledger and audit | 25 / 150 / 300 / 5,000 / 250 | — |
 | Trial | Everything, 30 days | 1 / 3 / 3 / 25 / 3 | — |
 | Demo | Everything, for your demonstrations (not for live trading) | 5 / 20 / 20 / 500 / 20 | — |
+
+*WhatsApp* is the end-of-day report to managers; **WhatsApp Business** (1.11.0) is selling to customers on WhatsApp (assistant, inbox, broadcasts, catalogue). **Wholesale** (1.11.0) needs inventory and customers. A wholesaler without a counter licenses Starter for its customers and reports and simply leaves the POS off ([docs/25](25-industry-models-wholesale-whatsapp.md)).
 
 Limits can be raised for an individual licence (`--limits workstations=20`). The editions are defined in `packages/core/src/licensing.ts` and are easy to adjust to your price list.
 

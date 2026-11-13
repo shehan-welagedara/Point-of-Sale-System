@@ -45,6 +45,10 @@ import { BrandingPage, BusinessTaxPage, IntegrationsPage } from "./pages/emc/Set
 import { DataPage, LoginsPage, PrintQueuePage } from "./pages/emc/Admin";
 import { PosApp } from "./pages/pos/SignIn";
 import { DeviceDisconnected, PairDevice, isDeviceLogin } from "./pages/auth/Pair";
+import { SalesOrdersPage } from "./pages/sales/Orders";
+import { CouriersPage, PriceListsPage, StylesPage } from "./pages/sales/Catalogue";
+import { SalesMoneyPage } from "./pages/sales/Money";
+import { WhatsAppBroadcastsPage, WhatsAppInboxPage, WhatsAppSettingsPage } from "./pages/sales/WhatsApp";
 
 export function App() {
   const { ready, mode, user, tenant, role } = useApp();
@@ -86,6 +90,15 @@ export function App() {
         <Route path="inventory/adjust" element={<AdjustPage />} />
         <Route path="inventory/movements" element={<MovementsPage />} />
         <Route path="crm/customers" element={<CustomersPage />} />
+        <Route path="sales/orders" element={<SalesOrdersPage />} />
+        <Route path="sales/money" element={<SalesMoneyPage />} />
+        <Route path="sales/styles" element={<StylesPage />} />
+        <Route path="sales/price-lists" element={<PriceListsPage />} />
+        <Route path="sales/couriers" element={<CouriersPage />} />
+        <Route path="sales/customers" element={<CustomersPage />} />
+        <Route path="whatsapp/inbox" element={<WhatsAppInboxPage />} />
+        <Route path="whatsapp/broadcasts" element={<WhatsAppBroadcastsPage />} />
+        <Route path="whatsapp/settings" element={<WhatsAppSettingsPage />} />
         <Route path="finance" element={<FinanceOverview />} />
         <Route path="finance/approvals" element={<ApprovalsPage />} />
         <Route path="finance/journals" element={<JournalsPage />} />

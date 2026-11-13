@@ -133,9 +133,14 @@ export function MobilePos({ style, api, children }: { style: MobileStyle; api: P
   const lastCheckId = useRef<string | null>(null);
 
   // Opening a table or picking up a check moves on to the menu (new check) or the order (existing).
+  // A check reopened from Functions (closed checks) closes Functions and shows that order.
   useEffect(() => {
     const id = api.check?.id ?? null;
-    if (id && id !== lastCheckId.current && (tab === "tables" || tab === "orders" || tab === "home")) setTab(api.check?.lines.length ? "cart" : "menu");
+    const fromFunctions = overlay?.t === "functions";
+    if (id && id !== lastCheckId.current && (tab === "tables" || tab === "orders" || tab === "home" || fromFunctions)) {
+      if (fromFunctions) setOverlay(null);
+      setTab(api.check?.lines.length ? "cart" : "menu");
+    }
     lastCheckId.current = id;
   }, [api.check?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -714,7 +719,7 @@ function More({ api, go, onFunctions, onReports, onDetailed, onRvc }: { api: Pos
         </div>
         <div className="m-card m-list">
           {api.myRvcs.length > 1 ? <button className="m-sheet-row" onClick={onRvc}><Icon name="tables" /> <span className="grow">Change revenue centre</span><Icon name="chevron" size={18} /></button> : null}
-          <button className="m-sheet-row" onClick={onFunctions}><Icon name="bolt" /> <span className="grow">Functions: X/Z report, cash, 86, clock out</span><Icon name="chevron" size={18} /></button>
+          <button className="m-sheet-row" onClick={onFunctions}><Icon name="bolt" /> <span className="grow">Functions: closed checks and refunds, cash, X/Z, 86</span><Icon name="chevron" size={18} /></button>
           <button className="m-sheet-row" onClick={onReports}><Icon name="reports" /> <span className="grow">Sales dashboard</span><Icon name="chevron" size={18} /></button>
           <button className="m-sheet-row" onClick={onDetailed}><Icon name="orders" /> <span className="grow">Detailed reports</span><Icon name="chevron" size={18} /></button>
           <button className="m-sheet-row" onClick={() => go("orders")}><Icon name="clock" /> <span className="grow">Today's orders</span><Icon name="chevron" size={18} /></button>

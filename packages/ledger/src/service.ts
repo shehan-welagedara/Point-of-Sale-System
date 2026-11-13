@@ -6,6 +6,7 @@ import {
   disposeAsset,
   ensureFiscalYear,
   postPosDay,
+  postSalesOrder,
   rejectVoucher,
   reverseVoucher,
   runDepreciation,
@@ -21,6 +22,7 @@ export type LedgerRequest =
   | { action: "reject"; voucherId: string; reason: string }
   | { action: "reverse"; voucherId: string; date: string; reason: string }
   | { action: "postPosDay"; propertyId: string; businessDate: string }
+  | { action: "postSalesOrder"; orderId: string; event: "invoice" | "payment"; paymentId?: string; date: string; fees?: number; bankAccount?: string }
   | { action: "runDepreciation"; period: string }
   | { action: "disposeAsset"; assetId: string; date: string; proceeds: number; proceedsAccount: string }
   | { action: "ensureFiscalYear"; date: string }
@@ -38,10 +40,12 @@ export const ACTION_ROLES: Record<LedgerRequest["action"], MemberRole[]> = {
   reject: BOOKS,
   reverse: BOOKS,
   // Also the storekeeper: receiving or counting stock posts that day's stock journal.
-  postPosDay: [...BOOKS, "manager", "terminal", "storekeeper"],
+  postPosDay: [...BOOKS, "manager", "terminal", "storekeeper", "sales"],
+  // Wholesale: dispatching an order invoices it; a confirmed payment is receipted (ledger posts).
+  postSalesOrder: [...BOOKS, "manager", "sales"],
   runDepreciation: BOOKS,
   disposeAsset: BOOKS,
-  ensureFiscalYear: [...BOOKS, "manager", "terminal"],
+  ensureFiscalYear: [...BOOKS, "manager", "terminal", "sales"],
   setPeriodStatus: BOOKS,
   closeFiscalYear: ["owner", "admin"],
   verify: ["owner", "admin", "accountant", "auditor"],
@@ -130,6 +134,9 @@ export async function runLedgerRequest(deps: { runner: TxRunner; store: DocStore
     case "postPosDay":
       await ensureFiscalYear(runner, { date: req.businessDate });
       return postPosDay(runner, { propertyId: req.propertyId, businessDate: req.businessDate, actor, now });
+    case "postSalesOrder":
+      await ensureFiscalYear(runner, { date: req.date });
+      return postSalesOrder(runner, { orderId: req.orderId, event: req.event, date: req.date, actor, now, ...(req.paymentId ? { paymentId: req.paymentId } : {}), ...(req.fees ? { fees: req.fees } : {}), ...(req.bankAccount ? { bankAccount: req.bankAccount } : {}) });
     case "runDepreciation":
       return runDepreciation(runner, { period: req.period, actor, now });
     case "disposeAsset":

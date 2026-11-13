@@ -31,6 +31,7 @@ export interface Workspace {
 
 const BOOKS: MemberRole[] = ["owner", "admin", "accountant", "auditor", "manager"];
 const ADMINS: MemberRole[] = ["owner", "admin"];
+const SELLERS: MemberRole[] = ["owner", "admin", "manager", "sales"];
 
 export const WORKSPACES: Workspace[] = [
   {
@@ -43,6 +44,33 @@ export const WORKSPACES: Workspace[] = [
     modules: ["pos"],
     external: "/pos",
     sections: [],
+  },
+  {
+    key: "sales",
+    name: "Sales & Orders",
+    tagline: "Quotations, orders, packing, dispatch, COD and cheques",
+    ico: "🧾",
+    tone: "#0d9488",
+    group: "Operations",
+    modules: ["wholesale"],
+    roles: ["owner", "admin", "manager", "sales", "storekeeper", "accountant", "auditor"],
+    sections: [
+      { items: [{ to: "/emc/sales/orders", label: "Orders", ico: "🧾" }, { to: "/emc/sales/money", label: "Payments & COD", ico: "₨" }, { to: "/emc/sales/customers", label: "Customers", ico: "☺" }] },
+      { label: "Catalogue", items: [{ to: "/emc/sales/styles", label: "Styles & stock", ico: "👕" }, { to: "/emc/sales/price-lists", label: "Price lists", ico: "%" }, { to: "/emc/sales/couriers", label: "Couriers", ico: "🚚" }] },
+    ],
+  },
+  {
+    key: "whatsapp",
+    name: "WhatsApp Business",
+    tagline: "Inbox, ordering assistant, broadcasts and catalogue",
+    ico: "💬",
+    tone: "#16a34a",
+    group: "Operations",
+    modules: ["whatsappCommerce"],
+    roles: SELLERS,
+    sections: [
+      { items: [{ to: "/emc/whatsapp/inbox", label: "Inbox", ico: "💬" }, { to: "/emc/whatsapp/broadcasts", label: "Broadcasts", ico: "📣" }, { to: "/emc/whatsapp/settings", label: "Connection & assistant", ico: "⚙" }] },
+    ],
   },
   {
     key: "posconfig",

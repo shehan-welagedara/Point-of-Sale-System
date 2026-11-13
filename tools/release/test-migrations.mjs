@@ -30,6 +30,7 @@ await db.doc("tenants/later-co/settings/branding").set({ id: "branding", display
 await db.doc("tenants/old-co/roles/owner").set({ id: "owner", name: "Owner / General Manager", level: 1, privileges: ["pos.signIn"] });
 await db.doc("tenants/later-co/roles/owner").set({ id: "owner", name: "Owner / General Manager", level: 1, privileges: ["pos.signIn"] });
 await db.doc("tenants/later-co/roles/it-team").set({ id: "it-team", name: "IT / System administrator", level: 12, privileges: ["pos.signIn"] });
+await db.doc("tenants/later-co/roles/manager").set({ id: "manager", name: "Outlet Manager", level: 10, privileges: ["pos.signIn", "pos.refund", "pos.endOfDay", "pos.managerOverride"] });
 
 const migrate = () => execFileSync("node", ["tools/release/migrate.mjs", "--project", PROJECT], { cwd: root, env: process.env, encoding: "utf8" });
 console.log(migrate());
@@ -48,4 +49,7 @@ check((await db.doc("tenants/old-co/settings/branding").get()).data()?.poweredBy
 check((await db.doc("tenants/later-co/settings/branding").get()).data()?.poweredBy === "Cafe IT Services", "bills: a name the business chose is kept");
 check((await db.doc("tenants/old-co/roles/itadmin").get()).data()?.privileges?.includes("pos.unlockEmployee") && (await db.doc("tenants/old-co/roles/finance").get()).data()?.privileges?.includes("pos.endOfDay"), "roles: IT / System administrator and Finance / Accountant added");
 check(!(await db.doc("tenants/later-co/roles/itadmin").get()).exists && (await db.doc("tenants/later-co/roles/it-team").get()).data()?.level === 12 && (await db.doc("tenants/later-co/roles/finance").get()).exists, "roles: a role the business already made with that name is kept, not duplicated");
-check((await db.collection("deployment/config/migrations").get()).size === 5, "every migration recorded");
+const mgr = (await db.doc("tenants/later-co/roles/manager").get()).data();
+check(mgr.privileges.includes("pos.adjustClosed") && mgr.privileges.includes("pos.tillCount") && mgr.privileges.filter((p) => p === "pos.tillCount").length === 1, "roles: a manager gets change-payment and till counts (once)");
+check(!(await db.doc("tenants/later-co/roles/owner").get()).data().privileges.includes("pos.tillCount"), "roles: a role without End of Day or approvals doesn't");
+check((await db.collection("deployment/config/migrations").get()).size === 6, "every migration recorded");

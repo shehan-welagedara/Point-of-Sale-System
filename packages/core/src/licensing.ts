@@ -74,7 +74,7 @@ export const EDITIONS: readonly EditionInfo[] = [
     description: "One outlet: POS, tables, customers, LankaQR/PayHere and sales reports.",
     modules: POS_CORE,
     limits: { properties: 1, revenueCenters: 2, workstations: 3, employees: 40, backOfficeUsers: 3 },
-    addOns: ["kds", "recipes", "inventory", "purchasing", "loyalty", "whatsapp", "accounting"],
+    addOns: ["kds", "recipes", "inventory", "purchasing", "loyalty", "whatsapp", "accounting", "wholesale", "whatsappCommerce"],
   },
   {
     key: "professional",
@@ -82,7 +82,7 @@ export const EDITIONS: readonly EditionInfo[] = [
     description: "Restaurants and small hotels: adds kitchen display, recipes and costing, inventory, purchasing, loyalty and WhatsApp reports.",
     modules: [...POS_CORE, ...BACK_OF_HOUSE],
     limits: { properties: 2, revenueCenters: 8, workstations: 12, employees: 200, backOfficeUsers: 10 },
-    addOns: ["accounting"],
+    addOns: ["accounting", "wholesale", "whatsappCommerce"],
   },
   {
     key: "enterprise",

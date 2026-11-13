@@ -2,6 +2,70 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.11.0 — 2026-11-13
+
+**Type:** Minor (POS manager functions; one platform for every kind of business; wholesale; WhatsApp Business) · **Deploy:** clients (`pnpm release:deploy`, or Updates in the console); the console (`pnpm console:deploy`, for the industry shown per business). New security rules and two new functions (`whatsappWebhook`, `whatsappApi`). One data update (closed-check privileges for existing managers).
+
+### For clients
+
+- **Manager functions on closed checks** (POS → Functions, also on phones): find any check of the day, then reprint it, change its payment method, refund some items, void it, or reopen it to correct it. The original bill is never changed: each correction prints a numbered credit note.
+- **Merge checks, cash pickups and till counts** by note and coin against the expected cash.
+- **Every kind of business:** when you open a business you choose its kind (restaurant, café, bar, bakery, retail shop, clothing, wholesale, and salon, tattoo studio and services in preview). It starts with the right modules, words and settings; see it under Business & tax.
+- **Wholesale (new module):** styles in sizes and colours with stock and barcodes. Quantity prices, customer price lists, size and colour extras, custom printing. Quotations and orders through packing, dispatch and delivery. Credit limits, bank slips, courier cash on delivery and cheques. Printable quotations and invoices.
+- **WhatsApp Business (new module):** an ordering assistant that takes orders and payment slips around the clock, a shared inbox, automatic order and dispatch messages, broadcasts to customers who agreed, and your catalogue in WhatsApp.
+- **Colombo Tees demo:** a T-shirt wholesaler to explore all of this.
+
+### Changes
+
+- **Closed checks** (`@pos/core` `closed-checks.ts`):
+  - credit notes (void, refund, reopen), hash-chained per workstation (`CN-<invoice series>_<n>`), with negative day totals on the day issued and `returns` in the day stats;
+  - restock at the next stock run when ticked;
+  - payment-method changes move tenders in the check's own day;
+  - merge checks.
+- Journal events: `checkMerge`, `checkVoid`, `refund`, `tenderAdjust`, `closedReprint`, `cashPickup`, `tillCount`. Expected cash allows for pickups and cash refunds.
+- New privileges `pos.adjustClosed` and `pos.tillCount`; data update **0006** grants them (refund or manager override → adjust closed; end of day or override → till count). Printing: credit note slip; the day summary lists credit notes.
+- **Industry models** (`industries.ts`): POS mode, default modules, words, demo and status per model. Global-ready business settings (country, currency, locale, time zone, tax profile).
+- `Tenant.industry` is set when a business opens:
+  - the onboarding picker;
+  - industry-aware starter data;
+  - the Business & tax card;
+  - reported at check-in and with approval requests.
+
+  Console: the industry shows per business and per request; the client industry list is extended.
+- **Wholesale** (`wholesale.ts`):
+  - styles → variant stock items (SKU, EAN-13, packs);
+  - pricing (tiers per style, price lists, extras, print jobs);
+  - order totals, credit check, payment state, COD settlement, document numbers;
+  - available-to-promise; `issueStock` / `returnStock`.
+- Ledger action **`postSalesOrder`** (sales staff may run it): an invoice on dispatch, receipts for confirmed payments (courier fees as bank charges). Sales may also post the day (cost of sales).
+- Screens: Sales & Orders (orders, payments & COD, customers, styles & stock, price lists, couriers).
+- New back-office role **Sales**.
+- **WhatsApp Business** (`whatsapp.ts`):
+  - the assistant (state machine with buttons and lists);
+  - inbound handling (customer, draft order, slip, opt-out, retries);
+  - order messages within the 24-hour rule or by template;
+  - catalogue feed, broadcast audience, Cloud API webhook parsing and payloads.
+- Functions: `whatsappWebhook` (Meta verification; only signed deliveries, X-Hub-Signature-256) and `whatsappApi` (status, connect/disconnect, send, order messages, simulate, catalogue sync, broadcast, slip photo). Secrets in `integrationSecrets/{tenantId}`, routing in `waRouting/{phoneNumberId}`, both server-only. Screens: Inbox (with the simulator), Broadcasts, Connection & assistant.
+- **Rules:**
+  - `canSell` (owner, admin, manager, sales);
+  - styles, price lists and couriers (managers, stock staff);
+  - orders (the invoice link only from the ledger);
+  - COD settlements, cheques;
+  - WhatsApp messages and conversations (written by the server; staff change only mode, unread, assignment);
+  - secrets and routing denied to apps;
+  - sales staff may take stock out on dispatch.
+- **Demo:** *Colombo Tees* (`@pos/sample-data` `wholesale.ts`), built through the real services. Spice Lagoon and Noura Kitchen stay restaurants (the new trade modules are off).
+- **Tests:**
+  - core: closed checks, wholesale, WhatsApp assistant and webhook formats;
+  - ledger: wholesale invoice and receipts;
+  - functions: webhook signature; on the Functions emulator, connect, Meta verification, unsigned deliveries refused, a signed message answered once, staff reply and simulator, secrets hidden from apps;
+  - rules: wholesale and WhatsApp;
+  - sample data: Colombo Tees balances, stock in packs;
+  - migrations: six data updates;
+  - e2e: closed checks, and wholesale end to end with the WhatsApp simulator, COD settlement and phones.
+- Launchpad: upgrades offered under *Not in your licence* are the ones that fit the business's kind; a single insight uses the whole row (short 16:9 screens stay without scrolling).
+- Docs: [25](docs/25-industry-models-wholesale-whatsapp.md), the Zevix client plan ([clients/zevix.md](docs/clients/zevix.md)), user manual 3.8 (new functions), 9A (Sales & Orders) and 9B (WhatsApp Business).
+
 ## 1.10.1 — 2026-11-13
 
 **Type:** Patch (POS sign-in on live systems; IT and Finance roles) · **Deploy:** clients (`pnpm release:deploy`, or Updates in the console). It deploys a new **database index** (built by Google within a few minutes) and one data update (two new roles). **Urgent for every client using the POS.**
