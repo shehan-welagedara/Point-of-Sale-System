@@ -2,7 +2,7 @@ rules_version = '2';
 
 // Multi-tenant POS Suite rules.
 // - Every business is a tenant: tenants/{tenantId}/... ; only its members can read it.
-// - A member's role (owner, admin, manager, accountant, storekeeper, viewer, terminal) decides writes.
+// - A member's role (owner, admin, manager, sales, accountant, storekeeper, auditor, viewer, terminal) decides writes.
 // - Licensed modules (tenants/{id}.modules) gate writes to ERP / finance / CRM collections.
 // - Closed checks and issued invoices are immutable (tax records).
 service cloud.firestore {
@@ -72,6 +72,15 @@ service cloud.firestore {
       allow update: if docId == 'config' && signedIn() && (resource.data.ownerUid == request.auth.uid || isPlatformAdmin())
                     && request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if false;
+    }
+
+    // WhatsApp Business: the access token and app secret, and which business owns a number.
+    // Only the whatsappApi function and the webhook read or write them; no app ever sees a token.
+    match /integrationSecrets/{t} {
+      allow read, write: if false;
+    }
+    match /waRouting/{phoneNumberId} {
+      allow read, write: if false;
     }
 
     // One-time codes that connect phones and tablets: only the deviceApi function reads or writes them.
@@ -274,9 +283,47 @@ service cloud.firestore {
       // ── Customers (CRM module) ──
       match /customers/{id} {
         allow read: if isMember(t);
-        // Guest profiles (CRM), and credit customers for receivables (accounting).
-        allow write: if (moduleOn(t, 'crm') && (isManager(t) || canPos(t))) || (moduleOn(t, 'accounting') && canBooks(t));
+        // Guest profiles (CRM), credit customers for receivables (accounting), and shops buying wholesale.
+        allow write: if (moduleOn(t, 'crm') && (isManager(t) || canPos(t))) || (moduleOn(t, 'accounting') && canBooks(t))
+                     || ((moduleOn(t, 'wholesale') || moduleOn(t, 'whatsappCommerce')) && canSell());
       }
+
+      // ── Wholesale (Sales workspace) ──
+      function canSell() { return hasRole(t, ['owner', 'admin', 'manager', 'sales']); }
+      function canSeeSales() { return hasRole(t, ['owner', 'admin', 'manager', 'sales', 'storekeeper', 'accountant', 'auditor']); }
+      match /styles/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'wholesale') && canStock(t) && idMatches(id); }
+      match /styleImages/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'wholesale') && canStock(t) && idMatches(id); }
+      match /priceLists/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'wholesale') && isManager(t) && idMatches(id); }
+      match /couriers/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'wholesale') && isManager(t) && idMatches(id); }
+      match /docSequences/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'wholesale') && (canSell() || canStock(t)); }
+      // Quotations and orders. The invoice link is written only by the ledger (accounting function).
+      match /salesOrders/{id} {
+        allow read: if canSeeSales();
+        allow create: if moduleOn(t, 'wholesale') && canSell() && idMatches(id) && !('invoiceId' in request.resource.data);
+        allow update: if moduleOn(t, 'wholesale') && (canSell() || canStock(t)) && idMatches(id)
+                      && request.resource.data.get('invoiceId', '') == resource.data.get('invoiceId', '')
+                      && request.resource.data.get('invoiceNo', '') == resource.data.get('invoiceNo', '');
+        allow delete: if false;
+      }
+      match /codSettlements/{id} {
+        allow read: if canSeeSales();
+        allow create: if moduleOn(t, 'wholesale') && (canSell() || canBooks(t)) && idMatches(id);
+        allow update, delete: if false;
+      }
+      match /cheques/{id} {
+        allow read: if canSeeSales();
+        allow write: if moduleOn(t, 'wholesale') && (canSell() || canBooks(t)) && idMatches(id);
+      }
+
+      // ── WhatsApp Business inbox: messages are written by the server (webhook, whatsappApi) ──
+      match /waConversations/{id} {
+        allow read: if canSell();
+        // Staff mark a chat read, take it over from the assistant or hand it back, assign it.
+        allow update: if canSell() && onlyChanges(['mode', 'unread', 'assignedTo', 'customerId', 'step']);
+        allow create, delete: if false;
+      }
+      match /waMessages/{id} { allow read: if canSell(); allow write: if false; }
+      match /waBroadcasts/{id} { allow read: if canSell(); allow write: if false; }
 
       // ── Inventory & purchasing (ERP modules) ──
       match /inventoryItems/{id} { allow read: if isMember(t); allow write: if (moduleOn(t, 'inventory') || moduleOn(t, 'recipes')) && canStock(t) && idMatches(id); }
@@ -291,10 +338,11 @@ service cloud.firestore {
         allow update: if moduleOn(t, 'purchasing') && canStock(t) && resource.data.status != 'posted';
         allow delete: if moduleOn(t, 'purchasing') && canStock(t) && resource.data.status != 'posted';
       }
-      match /stockLevels/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'inventory') && (canStock(t) || canPos(t)); }
+      // Sales staff take stock out when they dispatch a wholesale order (and back on a return).
+      match /stockLevels/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'inventory') && (canStock(t) || canPos(t) || (moduleOn(t, 'wholesale') && hasRole(t, ['sales']))); }
       match /stockMovements/{id} {
         allow read: if isMember(t);
-        allow create: if moduleOn(t, 'inventory') && (canStock(t) || canPos(t));
+        allow create: if moduleOn(t, 'inventory') && (canStock(t) || canPos(t) || (moduleOn(t, 'wholesale') && hasRole(t, ['sales'])));
         allow update, delete: if false;
       }
       match /stockCounts/{id} { allow read: if isMember(t); allow write: if moduleOn(t, 'inventory') && canStock(t); }

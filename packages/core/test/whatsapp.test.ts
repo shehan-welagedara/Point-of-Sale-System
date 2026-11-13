@@ -41,6 +41,8 @@ let n = 0;
 const msg = (m: Partial<WaInbound>): WaInbound => ({ id: `wamid.${++n}`, from: "94771234567", at: "2026-11-13T10:00:00Z", type: m.replyId ? "interactive" : "text", ...m });
 const ctx = (over: Partial<BotContext> = {}): BotContext => ({ businessName: "Zevix", styles: [tee], available: new Map([["ZX-OVS01-BLACK-M", 40], ["ZX-OVS01-BLACK-L", 5]]), orders: [], paymentLink: false, bankDetails: "BOC 0001234567, Zevix (Pvt) Ltd", ...over });
 
+const say = (r: { replies: { kind: string; text?: string }[] }) => r.replies[0]?.text ?? "";
+
 describe("WhatsApp ordering assistant", () => {
   it("takes an order: design, colour, size, quantity with stock and tier prices, address, payment", () => {
     let r = botReply(conv0, msg({ text: "Hi" }), ctx());
@@ -48,7 +50,7 @@ describe("WhatsApp ordering assistant", () => {
     r = botReply(r.conv, msg({ replyId: "m:order" }), ctx());
     expect(r.replies[0]).toMatchObject({ kind: "list", rows: [{ id: "s:OVS01", title: "Oversized tee" }] });
     r = botReply(r.conv, msg({ replyId: "s:OVS01" }), ctx());
-    expect(r.replies[0]!.kind === "text" && r.replies[0].text).toContain("12+ pcs: Rs 1,250.00");
+    expect(say(r)).toContain("12+ pcs: Rs 1,250.00");
     expect(r.replies[1]).toMatchObject({ kind: "buttons", buttons: [{ id: "c:Black" }, { id: "c:White" }] });
     r = botReply(r.conv, msg({ replyId: "c:Black" }), ctx());
     expect(r.replies[0]).toMatchObject({ kind: "list", rows: [{ id: "z:M", description: "40 in stock" }, { id: "z:L", description: "5 in stock" }] });
@@ -59,21 +61,21 @@ describe("WhatsApp ordering assistant", () => {
     expect(short.conv.cart).toHaveLength(0);
     r = botReply(r.conv, msg({ text: "5 pcs" }), ctx());
     expect(r.conv.cart).toEqual([{ styleId: "OVS01", colour: "Black", size: "L", qty: 5 }]);
-    expect(r.replies[0]!.kind === "buttons" && r.replies[0].text).toContain("Tip: 7 more of this design gets Rs 1,250.00");
+    expect(say(r)).toContain("Tip: 7 more of this design gets Rs 1,250.00");
     // Add 10 in M: 15 of the design, so the 12+ tier applies to all lines.
     r = botReply(r.conv, msg({ replyId: "c:more" }), ctx());
     r = botReply(r.conv, msg({ replyId: "s:OVS01" }), ctx());
     r = botReply(r.conv, msg({ replyId: "c:Black" }), ctx());
     r = botReply(r.conv, msg({ replyId: "z:M" }), ctx());
     r = botReply(r.conv, msg({ text: "10" }), ctx());
-    expect(r.replies[0]!.kind === "buttons" && r.replies[0].text).toContain("*Total Rs 18,750.00* (15 pcs)");
+    expect(say(r)).toContain("*Total Rs 18,750.00* (15 pcs)");
     r = botReply(r.conv, msg({ replyId: "c:checkout" }), ctx());
     expect(r.conv.step).toBe("address");
     r = botReply(r.conv, msg({ text: "No 5, Main St, Kandy. 0771234567" }), ctx());
     expect(r.replies[0]).toMatchObject({ kind: "buttons", buttons: [{ id: "p:bank" }, { id: "p:cod" }] });
     r = botReply(r.conv, msg({ replyId: "p:bank" }), ctx());
     expect(r.order).toEqual({ lines: [{ styleId: "OVS01", colour: "Black", size: "L", qty: 5 }, { styleId: "OVS01", colour: "Black", size: "M", qty: 10 }], address: "No 5, Main St, Kandy. 0771234567", payment: "bank" });
-    expect(r.replies[0]!.kind === "text" && r.replies[0].text).toContain("BOC 0001234567");
+    expect(say(r)).toContain("BOC 0001234567");
     expect(r.conv).toMatchObject({ step: "idle", cart: [] });
   });
 
@@ -155,5 +157,34 @@ describe("WhatsApp on the store", () => {
     ];
     expect(broadcastAudience(people, {}).map((c) => c.id)).toEqual(["a", "d"]);
     expect(broadcastAudience(people, { tags: ["shops"], area: "kandy" }).map((c) => c.id)).toEqual(["d"]);
+  });
+});
+
+describe("Meta Cloud API formats", () => {
+  it("reads messages, replies, catalogue orders, photos and delivery statuses from a webhook", async () => {
+    const { parseWebhook, cloudPayload } = await import("../src/index.js");
+    const body = {
+      object: "whatsapp_business_account",
+      entry: [{ id: "WABA", changes: [{ field: "messages", value: {
+        messaging_product: "whatsapp",
+        metadata: { display_phone_number: "94770000000", phone_number_id: "PN1" },
+        contacts: [{ profile: { name: "Nimal" }, wa_id: "94771234567" }],
+        messages: [
+          { from: "94771234567", id: "wamid.A", timestamp: "1794571200", type: "text", text: { body: "Hi" } },
+          { from: "94771234567", id: "wamid.B", timestamp: "1794571201", type: "interactive", interactive: { type: "list_reply", list_reply: { id: "s:OVS01", title: "Oversized tee" } } },
+          { from: "94771234567", id: "wamid.C", timestamp: "1794571202", type: "order", order: { catalog_id: "CAT", product_items: [{ product_retailer_id: "ZX-OVS01-BLACK-M", quantity: 12, item_price: 1450, currency: "LKR" }] } },
+          { from: "94771234567", id: "wamid.D", timestamp: "1794571203", type: "image", image: { id: "MEDIA", mime_type: "image/jpeg", caption: "slip" } },
+        ],
+        statuses: [{ id: "wamid.OUT", status: "failed", recipient_id: "94771234567", errors: [{ code: 131047, title: "Re-engagement message", message: "More than 24 hours have passed" }] }],
+      } }] }],
+    };
+    const [b] = parseWebhook(body);
+    expect(b!.phoneNumberId).toBe("PN1");
+    expect(b!.messages.map((m) => [m.type, m.replyId ?? m.text ?? m.image?.mediaId ?? m.order?.items[0]?.sku])).toEqual([["text", "Hi"], ["interactive", "s:OVS01"], ["order", "ZX-OVS01-BLACK-M"], ["image", "MEDIA"]]);
+    expect(b!.messages[1]).toMatchObject({ replyId: "s:OVS01", name: "Nimal" });
+    expect(b!.statuses).toEqual([{ wamid: "wamid.OUT", status: "failed", recipient: "94771234567", error: "More than 24 hours have passed" }]);
+    expect(parseWebhook({ entry: [{ changes: [{ value: {} }] }] })).toEqual([]);
+    expect(cloudPayload("9477", { kind: "buttons", text: "Pay?", buttons: [{ id: "p:cod", title: "💵 Cash on delivery, please" }] })).toMatchObject({ type: "interactive", interactive: { type: "button", action: { buttons: [{ reply: { id: "p:cod", title: "💵 Cash on delivery…" } }] } } });
+    expect(cloudPayload("9477", { kind: "template", name: "payment_due", params: ["Rs 10"], language: "en" })).toMatchObject({ type: "template", template: { name: "payment_due", language: { code: "en" }, components: [{ type: "body", parameters: [{ type: "text", text: "Rs 10" }] }] } });
   });
 });

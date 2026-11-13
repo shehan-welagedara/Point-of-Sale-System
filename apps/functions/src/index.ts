@@ -8,12 +8,13 @@
  *  - licenceApi   callable: verifies a vendor licence key and applies the entitlement
  *  - posAuth      callable: checks employee PINs and cards (hashes are unreadable to clients)
  *  - deviceApi    callable: connects phones and tablets with one-time codes, and removes them
+ *  - whatsappWebhook / whatsappApi: WhatsApp Business for selling (whatsapp.ts)
  */
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWrittenWithAuthContext } from "firebase-functions/v2/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { type Member, type StaffAuthRequest, type Tenant, DEMO_LICENCE_PUBLIC_KEY, LicenceError, TRIAL_DAYS, builtInEntitlements, clampModules, isOn, licenceStatus, newId, runStaffAuth, suspensionInfo, verifyLicence } from "@pos/core";
 import { type Actor, type LedgerRequest, LedgerError, PermissionError, UNAUDITED, makeAuditEvent, runLedgerRequest, sealPending } from "@pos/ledger";
@@ -21,6 +22,7 @@ import { AdminStore, adminRunner, collectionRef } from "./admin-store.js";
 import { type DeviceRequest, handleDeviceRequest, prunePairings } from "./devices.js";
 import { type BusinessApiRequest, BusinessApiError, handleBusinessApi } from "./business.js";
 import { metadataIdentity, runCheckin } from "./console-link.js";
+import { type WhatsappApiRequest, WhatsappError, handleWhatsappApi, webhookReceive, webhookVerify } from "./whatsapp.js";
 
 initializeApp();
 const db = getFirestore();
@@ -163,6 +165,41 @@ export const businessApi = onCall<BusinessApiRequest>({ maxInstances: 3 }, async
 
 /** Phones and tablets: one-time pairing codes instead of shared passwords (see devices.ts). */
 export const deviceApi = onCall<DeviceRequest>({ maxInstances: 5 }, async (request) => handleDeviceRequest(db, request.auth?.uid, request.data));
+
+/**
+ * WhatsApp Business (whatsapp.ts). The webhook URL goes into Meta's app (WhatsApp > Configuration):
+ * https://<region>-<project>.cloudfunctions.net/whatsappWebhook. It only acts on deliveries signed
+ * with the business's app secret.
+ */
+const waDeps = () => ({ fetch: globalThis.fetch, now: () => new Date() });
+export const whatsappWebhook = onRequest({ maxInstances: 5, invoker: "public" }, async (req, res) => {
+  try {
+    if (req.method === "GET") {
+      const r = await webhookVerify(db, req.query as Record<string, unknown>);
+      res.status(r.status).send(r.body);
+      return;
+    }
+    if (req.method !== "POST") {
+      res.status(405).send("method not allowed");
+      return;
+    }
+    const status = await webhookReceive(db, req.rawBody, req.get("x-hub-signature-256"), req.body, waDeps());
+    res.status(status).send(status === 200 ? "ok" : "invalid signature");
+  } catch (e) {
+    console.error("whatsapp webhook failed", e);
+    // 500 makes Meta retry later; repeated messages are recognised by id and answered once.
+    res.status(500).send("error");
+  }
+});
+
+export const whatsappApi = onCall<WhatsappApiRequest>({ maxInstances: 5, timeoutSeconds: 300 }, async (request) => {
+  try {
+    return await handleWhatsappApi(db, request.auth?.uid, request.data, waDeps());
+  } catch (e) {
+    if (e instanceof WhatsappError) throw new HttpsError(e.code, e.message);
+    throw e;
+  }
+});
 
 function actorType(authType: string): "user" | "service" | "system" | "unknown" {
   if (authType === "app_user") return "user";

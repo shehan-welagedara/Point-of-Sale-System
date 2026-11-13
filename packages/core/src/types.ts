@@ -297,6 +297,8 @@ export interface IntegrationSettings extends Entity {
     /** Approved message template names (Meta) for messages outside the 24-hour window. */
     templates?: Partial<Record<"order_confirmed" | "order_dispatched" | "order_delivered" | "invoice_ready" | "payment_received" | "payment_reminder" | "quotation" | "new_arrivals", string>>;
     templateLanguage?: string;
+    /** Last catalogue sync to Meta Commerce Manager. */
+    catalogSyncedAt?: string;
   };
   accountingExport: { target: "excel" | "erpnext" | "akaunting"; baseUrl?: string };
 }

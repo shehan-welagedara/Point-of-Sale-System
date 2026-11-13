@@ -530,3 +530,79 @@ export interface Broadcast {
   failed: number;
   simulated: boolean;
 }
+
+// ───────────────────────────── Meta Cloud API formats ─────────────────────────────
+
+export interface WaStatusUpdate {
+  wamid: string;
+  status: "sent" | "delivered" | "read" | "failed";
+  recipient: string;
+  error?: string;
+}
+
+export interface WebhookBatch {
+  phoneNumberId: string;
+  messages: WaInbound[];
+  statuses: WaStatusUpdate[];
+}
+
+type Json = Record<string, unknown>;
+const obj = (v: unknown): Json => (v && typeof v === "object" ? (v as Json) : {});
+const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+
+/** Reads a Cloud API webhook body (messages and delivery statuses), ignoring anything else. */
+export function parseWebhook(body: unknown): WebhookBatch[] {
+  const out: WebhookBatch[] = [];
+  for (const entry of arr(obj(body).entry)) {
+    for (const change of arr(obj(entry).changes)) {
+      const value = obj(obj(change).value);
+      const phoneNumberId = str(obj(value.metadata).phone_number_id);
+      if (!phoneNumberId) continue;
+      const names = new Map(arr(value.contacts).map((c) => [str(obj(c).wa_id) ?? "", str(obj(obj(c).profile).name) ?? ""]));
+      const messages: WaInbound[] = [];
+      for (const raw of arr(value.messages)) {
+        const m = obj(raw);
+        const from = str(m.from);
+        const id = str(m.id);
+        if (!from || !id) continue;
+        const at = new Date(Number(m.timestamp ?? 0) * 1000 || Date.now()).toISOString();
+        const base = { id, from, at, ...(names.get(from) ? { name: names.get(from)! } : {}) };
+        const type = str(m.type);
+        if (type === "text") messages.push({ ...base, type: "text", text: str(obj(m.text).body) ?? "" });
+        else if (type === "interactive") {
+          const i = obj(m.interactive);
+          const reply = obj(i.button_reply ?? i.list_reply);
+          messages.push({ ...base, type: "interactive", replyId: str(reply.id) ?? "", text: str(reply.title) ?? "" });
+        } else if (type === "button") messages.push({ ...base, type: "text", text: str(obj(m.button).payload) ?? str(obj(m.button).text) ?? "" });
+        else if (type === "image") {
+          const img = obj(m.image);
+          messages.push({ ...base, type: "image", image: { mediaId: str(img.id) ?? "", ...(str(img.caption) ? { caption: str(img.caption)! } : {}) } });
+        } else if (type === "order") {
+          const items = arr(obj(m.order).product_items).map((p) => ({ sku: str(obj(p).product_retailer_id) ?? "", qty: Number(obj(p).quantity ?? 0) }));
+          messages.push({ ...base, type: "order", order: { items } });
+        } else messages.push({ ...base, type: "other", text: `(${type ?? "unknown"} message)` });
+      }
+      const statuses: WaStatusUpdate[] = [];
+      for (const raw of arr(value.statuses)) {
+        const s = obj(raw);
+        const status = str(s.status);
+        if (!str(s.id) || !["sent", "delivered", "read", "failed"].includes(status ?? "")) continue;
+        const err = obj(arr(s.errors)[0]);
+        statuses.push({ wamid: str(s.id)!, status: status as WaStatusUpdate["status"], recipient: str(s.recipient_id) ?? "", ...(err.title || err.message ? { error: String(err.message ?? err.title) } : {}) });
+      }
+      out.push({ phoneNumberId, messages, statuses });
+    }
+  }
+  return out;
+}
+
+/** The Cloud API request body for sending a message (limits: buttons 3 × 20 chars, list rows 10 × 24). */
+export function cloudPayload(to: string, m: WaOutbound): Json {
+  const base = { messaging_product: "whatsapp", recipient_type: "individual", to };
+  if (m.kind === "text") return { ...base, type: "text", text: { body: m.text.slice(0, 4096), preview_url: true } };
+  if (m.kind === "buttons") return { ...base, type: "interactive", interactive: { type: "button", body: { text: m.text.slice(0, 1024) || "…" }, action: { buttons: m.buttons.slice(0, 3).map((b) => ({ type: "reply", reply: { id: b.id.slice(0, 256), title: clip(b.title, 20) } })) } } };
+  if (m.kind === "list") return { ...base, type: "interactive", interactive: { type: "list", body: { text: m.text.slice(0, 1024) }, action: { button: clip(m.button, 20), sections: [{ title: clip(m.button, 24), rows: m.rows.slice(0, 10).map((r) => ({ id: r.id.slice(0, 200), title: clip(r.title, 24), ...(r.description ? { description: clip(r.description, 72) } : {}) })) }] } } };
+  if (m.kind === "image") return { ...base, type: "image", image: { link: m.link, ...(m.caption ? { caption: m.caption.slice(0, 1024) } : {}) } };
+  return { ...base, type: "template", template: { name: m.name, language: { code: m.language ?? "en" }, ...(m.params.length ? { components: [{ type: "body", parameters: m.params.map((p) => ({ type: "text", text: p })) }] } : {}) } };
+}
