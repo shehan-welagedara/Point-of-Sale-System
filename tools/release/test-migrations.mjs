@@ -27,6 +27,9 @@ await db.doc("tenants/old-co/accounts/3000").set({ id: "3000", code: "3000", nam
 await db.doc("tenants/old-co/staff/1002").set({ id: "1002", name: "Nimali", pinSet: true, status: "active" });
 await db.doc("tenants/old-co/settings/branding").set({ id: "branding", displayName: "Old Co", poweredBy: "POS Suite (demo)" });
 await db.doc("tenants/later-co/settings/branding").set({ id: "branding", displayName: "Later Co", poweredBy: "Cafe IT Services" });
+await db.doc("tenants/old-co/roles/owner").set({ id: "owner", name: "Owner / General Manager", level: 1, privileges: ["pos.signIn"] });
+await db.doc("tenants/later-co/roles/owner").set({ id: "owner", name: "Owner / General Manager", level: 1, privileges: ["pos.signIn"] });
+await db.doc("tenants/later-co/roles/it-team").set({ id: "it-team", name: "IT / System administrator", level: 12, privileges: ["pos.signIn"] });
 
 const migrate = () => execFileSync("node", ["tools/release/migrate.mjs", "--project", PROJECT], { cwd: root, env: process.env, encoding: "utf8" });
 console.log(migrate());
@@ -43,4 +46,6 @@ check((await db.doc("tenants/old-co/accounts/3900").get()).data()?.name === "Ope
 check(!(await db.doc("tenants/later-co/accounts/3900").get()).exists, "businesses without books untouched");
 check((await db.doc("tenants/old-co/settings/branding").get()).data()?.poweredBy === "Polymath Tech", "bills: 'POS Suite (demo)' becomes 'Polymath Tech'");
 check((await db.doc("tenants/later-co/settings/branding").get()).data()?.poweredBy === "Cafe IT Services", "bills: a name the business chose is kept");
-check((await db.collection("deployment/config/migrations").get()).size === 4, "every migration recorded");
+check((await db.doc("tenants/old-co/roles/itadmin").get()).data()?.privileges?.includes("pos.unlockEmployee") && (await db.doc("tenants/old-co/roles/finance").get()).data()?.privileges?.includes("pos.endOfDay"), "roles: IT / System administrator and Finance / Accountant added");
+check(!(await db.doc("tenants/later-co/roles/itadmin").get()).exists && (await db.doc("tenants/later-co/roles/it-team").get()).data()?.level === 12 && (await db.doc("tenants/later-co/roles/finance").get()).exists, "roles: a role the business already made with that name is kept, not duplicated");
+check((await db.collection("deployment/config/migrations").get()).size === 5, "every migration recorded");

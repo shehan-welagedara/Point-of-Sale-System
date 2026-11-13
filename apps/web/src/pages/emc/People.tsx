@@ -102,7 +102,7 @@ export function EmployeesPage() {
         { key: "employeeNo", label: "Employee number (sign-in ID)", type: "text", required: true, readOnlyOnEdit: true, help: "Digits only." },
         { key: "name", label: "Name", type: "text", required: true },
         { key: "jobTitle", label: "Job title", type: "text" },
-        { key: "department", label: "Department", type: "select", options: ["Front of house", "Kitchen", "Bar", "Management", "Finance", "Housekeeping", "Room service"].map((v) => ({ value: v, label: v })) },
+        { key: "department", label: "Department", type: "select", options: ["Front of house", "Kitchen", "Bar", "Management", "Finance", "IT / Administration", "Housekeeping", "Room service"].map((v) => ({ value: v, label: v })) },
         { key: "roleId", label: "Role (default at every property)", type: "select", optionsFrom: { col: C.roles }, required: true },
         { key: "propertyIds", label: "Properties", type: "multi", optionsFrom: { col: C.properties }, help: "Empty = every property." },
         { key: "rvcIds", label: "Revenue centres (operator records)", type: "multi", optionsFrom: { col: C.revenueCenters }, help: "Empty = every revenue centre of their properties." },

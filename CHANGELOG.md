@@ -2,6 +2,25 @@
 
 Every release, newest first. The "For clients" part is what you send to clients as release notes.
 
+## 1.10.1 — 2026-11-13
+
+**Type:** Patch (POS sign-in on live systems; IT and Finance roles) · **Deploy:** clients (`pnpm release:deploy`, or Updates in the console). It deploys a new **database index** (built by Google within a few minutes) and one data update (two new roles). **Urgent for every client using the POS.**
+
+### For clients
+
+- **Fixed: signing in to the POS did nothing on live systems.** After the employee number and PIN, the screen stayed on *Enter your PIN*. The sign-in now opens the POS. (A few minutes after the update, while Google builds the new index, the screen says so instead.)
+- If signing in ever fails, the POS now says why (for example no connection) instead of doing nothing.
+- **New roles for employees:** **IT / System administrator** (sets up and tests devices and printers, unlocks employees, reads the journal and reports; no payments, refunds or discounts) and **Finance / Accountant** (cash-up and day close: paid in and out, reports, the journal, End of Day; no orders). New department **IT / Administration**. Existing businesses get both roles automatically.
+
+### Changes
+
+- **Cause:** the POS transaction journal finds its last entry for the workstation (`posJournal` where `workstationId ==`, newest first) before writing the sign-in event. That query needs a composite index, which was never declared; Firestore refuses it in production (the emulator and the local demo don't), the error was swallowed, and the sign-in stopped after the PIN check (the employee's *Last sign-in* was still updated). Added the index to `firebase/firestore.indexes.json`.
+- **POS sign-in** (`pages/pos/SignIn.tsx`): employee lookup, PIN check and clock-in report any failure on screen and to System status (a missing index, no connection, or the server's message).
+- **Guard:** `@pos/core` `indexes.ts` models which queries need a composite index; every store reports its queries to `queryAudit` when the end-to-end suite asks, and the suite fails if any query the app ran has no declared index (68 query shapes today). Unit tests for the model and the journal's index.
+- **Roles:** `itadmin` (level 15) and `finance` (level 25) in `DEFAULT_ROLES`, with *no sale* needing a second person; data update `0005-it-finance-roles` adds them to businesses that have roles (a role with the same id or name is kept, not duplicated).
+- Tests: migrations (roles added, a business's own role kept), the update rehearsal (five data updates; only the bill footer and the two roles change), core (roles match the data update; IT and Finance can't take payments or authorise), e2e (87 checks).
+- Docs: user manual 13.1–13.2 (departments, the new roles, which back-office login to give them).
+
 ## 1.10.0 — 2026-11-13
 
 **Type:** Minor (updates pushed from the Polymath Console, approval of new businesses, insights, calmer screens) · **Deploy:** clients (`pnpm release:deploy`, or from the console's new **Updates**); the console (`pnpm console:deploy`); security rules change (new businesses on linked systems need an approval). The first update meant to be pushed from the console.

@@ -14,6 +14,8 @@ Follow the [deployment manual](../18-deployment-manual.md) for the technical ste
 
 **Status (13 November 2026): a second "Noura Kitchen" opened by mistake.** The owner created the business again. Nothing is lost: 1.10.0 lets the owner **archive** the one opened by mistake (Account → *Archive this business*; it keeps its data and can be restored), and from 1.10.0 every new business on their system waits for Polymath Tech's approval (docs/22 §9), so it can't happen again unnoticed.
 
+**Status (13 November 2026, evening): on 1.10.0; POS sign-in fixed in 1.10.1.** Two phones are connected (P01 Sujith, P02 Shehan's phone). Signing in to the POS stopped after the PIN: a database index the POS journal needs was missing on every live system. **Deploy 1.10.1** (`git pull`, `pnpm install`, `pnpm release:deploy --target noura-kitchen`, or Updates in the console): it adds the index (Google builds it in a few minutes) and the roles **IT / System administrator** and **Finance / Accountant**. Then sign in on a phone again.
+
 **Next: 1.10.0, the first update pushed from the Polymath Console.**
 
 1. Make sure Noura Kitchen is a client in the console and its system checks in (step 2 below). A system on 1.5.8 can't check in yet: then this one update is deployed from the release PC and you tell the owner yourself; from 1.10.0 on, every update announces itself.

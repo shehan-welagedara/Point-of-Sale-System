@@ -57,6 +57,8 @@ const seed = {
   [`tenants/${T}/accounts/1000`]: { id: "1000", code: "1000", name: "Cash", type: "asset", parentId: "1", isGroup: false },
   [`tenants/${T}/accounts/3900`]: { id: "3900", code: "3900", name: "Opening balances (temporary)", type: "equity", parentId: "3", isGroup: false },
   [`tenants/${T}/staff/1001`]: { id: "1001", name: "Kasun", status: "active", pinSet: true, roleIds: ["cashier"] },
+  [`tenants/${T}/roles/owner`]: { id: "owner", name: "Owner / General Manager", level: 1, privileges: ["pos.signIn"] },
+  [`tenants/${T}/roles/cashier`]: { id: "cashier", name: "Cashier", level: 40, privileges: ["pos.signIn", "pos.tender"] },
   [`tenants/${T}/staffSecrets/1001`]: { id: "1001", pinHash: "h".repeat(64), pinSalt: "s".repeat(32), pinChangedAt: at },
   [`tenants/${T}/menuItems/m1`]: { id: "m1", name: "Chicken kottu", price: 1_450_00, active: true },
   [`tenants/${T}/checks/c1`]: { id: "c1", number: 1, status: "closed", total: 1_450_00, closedAt: at },
@@ -269,17 +271,18 @@ try {
   const fnDeploy = r1.fb.find((e) => only([e])[0]?.includes("functions"));
   check(Array.isArray(fnDeploy?.functions) && ["consoleCheckin", "consoleLinkNow", "auditSealer", "ledgerApi", "licenceApi", "posAuth", "deviceApi"].every((f) => fnDeploy.functions.includes(f)), `the server functions load and include the new ones (${Array.isArray(fnDeploy?.functions) ? fnDeploy.functions.length : 0} functions)`, JSON.stringify(fnDeploy?.functions));
   check(/^LOCATION=asia-south1$/m.test(fnDeploy?.env ?? "") && new RegExp(`^APP_VERSION=${version.replace(/\./g, "\\.")}$`, "m").test(fnDeploy?.env ?? "") && !/CONSOLE_URL/.test(fnDeploy?.env ?? ""), "the functions' settings name the region and the release (no console address until one is set up)", fnDeploy?.env);
-  check(/0001-deployment-owner/.test(r1.out) && /0004-powered-by/.test(r1.out) && /4 applied/.test(r1.out), "all four data updates run once", r1.out.match(/migrations: .*/)?.[0] ?? r1.out.split("\n").filter((l) => /UNAVAILABLE|stopped/.test(l)).join(" "));
+  check(/0001-deployment-owner/.test(r1.out) && /0005-it-finance-roles/.test(r1.out) && /5 applied/.test(r1.out), "all five data updates run once", r1.out.match(/migrations: .*/)?.[0] ?? r1.out.split("\n").filter((l) => /UNAVAILABLE|stopped/.test(l)).join(" "));
   check(relayed.ok > 0 && relayed.refused === 0, "the data updates use plain HTTPS (HTTP/1.1): no HTTP/2 needed, so antivirus scanning or a proxy can't break them", `${relayed.ok} relayed, ${relayed.refused} refused`);
   const after = await snapshot();
   const changed = Object.keys({ ...before, ...after }).filter((p) => JSON.stringify(before[p]) !== JSON.stringify(after[p]));
-  const expected = [`tenants/${T}/settings/branding`, `tenants/${D}/settings/branding`];
+  const expected = [`tenants/${T}/settings/branding`, `tenants/${D}/settings/branding`, `tenants/${T}/roles/itadmin`, `tenants/${T}/roles/finance`];
   const records = changed.filter((p) => p.startsWith("deployment/config/migrations/"));
   check(after[`tenants/${T}/settings/branding`]?.poweredBy === "Polymath Tech" && after[`tenants/${D}/settings/branding`]?.poweredBy === "Polymath Tech", 'bills now say "Powered by Polymath Tech" (both businesses)');
   check(JSON.stringify(after["deployment/config"]) === JSON.stringify(before["deployment/config"]), "the deployment owner recorded at sign-up is kept (0001 skips)");
-  check(records.length === 4, "each data update is recorded");
+  check(after[`tenants/${T}/roles/itadmin`]?.name === "IT / System administrator" && after[`tenants/${T}/roles/finance`]?.name === "Finance / Accountant" && !after[`tenants/${D}/roles/itadmin`], "the IT and Finance roles are added where the business has roles");
+  check(records.length === 5, "each data update is recorded");
   const other = changed.filter((p) => !expected.includes(p) && !records.includes(p));
-  check(other.length === 0, "nothing else in the client's data changed (sales, staff, PINs, accounts, menu)", other.join(", "));
+  check(other.length === 0, "nothing else in the client's data changed (sales, staff, PINs, accounts, menu, existing roles)", other.join(", "));
   check(JSON.stringify({ ...after[`tenants/${T}/settings/branding`], poweredBy: "x" }) === JSON.stringify({ ...before[`tenants/${T}/settings/branding`], poweredBy: "x" }), "the rest of the bill settings untouched");
   if (tls) check([...state.auth].join() === "Bearer stand-in-access", "the backup used the Firebase CLI sign-in (no Google Cloud CLI)", [...state.auth].join());
   if (process.platform !== "win32") {
@@ -295,7 +298,7 @@ try {
   const r2 = await deploy();
   check(r2.status === 0 && r2.out.includes(`live now: ${version}`), "finishes, seeing the new version live");
   check(!state.calls.slice(calls).some((c) => c.startsWith("POST /storage")), "the existing backup bucket is reused");
-  check(/0 applied, 4 known/.test(r2.out), "no data update runs twice");
+  check(/0 applied, 5 known/.test(r2.out), "no data update runs twice");
   const again = await snapshot();
   check(Object.keys(again).every((p) => p.startsWith("deployment/config/migrations/") || JSON.stringify(again[p]) === JSON.stringify(after[p])), "the client's data is unchanged");
 

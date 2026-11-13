@@ -24,6 +24,16 @@ const check = (name, ok, detail = "") => {
 const server = await createServer({ root: web, server: { port: PORT, strictPort: true }, logLevel: "error" });
 await server.listen();
 const browser = await chromium.launch();
+// Every query the app runs is reported here, then checked against firebase/firestore.indexes.json
+// (production Firestore refuses a query whose composite index isn't declared; the demo doesn't).
+const queryShapes = new Set();
+const newContext = browser.newContext.bind(browser);
+browser.newContext = async (opts) => {
+  const ctx = await newContext(opts);
+  await ctx.exposeFunction("__posQueryAudit", (shape) => queryShapes.add(shape));
+  return ctx;
+};
+browser.newPage = async (opts) => (await browser.newContext(opts)).newPage();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
@@ -719,6 +729,19 @@ try {
   }
 
   check("no browser errors", errors.length === 0, errors.slice(0, 5).join(" | "));
+
+  // ── Every query has the Firestore index it needs in production.
+  {
+    const { compositeIndexNeeded, indexDeclared, firestoreCollection } = await server.ssrLoadModule(resolve(root, "packages/core/src/indexes.ts"));
+    const declared = JSON.parse((await import("node:fs")).readFileSync(resolve(root, "firebase/firestore.indexes.json"), "utf8")).indexes;
+    const missing = [];
+    for (const shape of queryShapes) {
+      const q = JSON.parse(shape);
+      const need = compositeIndexNeeded({ where: q.where.map(([f, op]) => [f, op, null]), orderBy: q.orderBy });
+      if (need && !indexDeclared(firestoreCollection(q.collection), need, declared)) missing.push(`${q.collection}: ${[...need.equality, ...need.then.map((t) => `${t.field} ${t.order}`)].join(", ")}`);
+    }
+    check(`every query the app ran (${queryShapes.size} shapes) has its Firestore index`, queryShapes.size > 20 && missing.length === 0, missing.join(" | "));
+  }
 } catch (e) {
   for (const c of browser.contexts()) for (const pg of c.pages()) await pg.screenshot({ path: resolve(root, `e2e-failure-${browser.contexts().indexOf(c)}.png`) }).catch(() => {});
   check("run completed", false, `${e.message.split("\n")[0]} (screenshots: e2e-failure-*.png)`);
