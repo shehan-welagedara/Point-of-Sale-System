@@ -1,3 +1,4 @@
+import { queryAudit } from "@pos/core";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
@@ -11,6 +12,11 @@ import "./styles.css";
 import "./phone.css";
 
 installGlobalErrorHandlers();
+// The end-to-end suite exposes __posQueryAudit to check that every query has its Firestore index.
+queryAudit.record = (collection, q) => {
+  const report = (window as unknown as { __posQueryAudit?: (shape: string) => void }).__posQueryAudit;
+  if (typeof report === "function") report(JSON.stringify({ collection, where: (q?.where ?? []).map(([f, op]) => [f, op]), ...(q?.orderBy ? { orderBy: q.orderBy } : {}) }));
+};
 // The client's Firebase project comes from the site it is served from (one build for every client).
 await loadFirebaseConfig();
 

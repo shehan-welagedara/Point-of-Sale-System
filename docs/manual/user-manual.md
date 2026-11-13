@@ -749,7 +749,7 @@ The configuration guide explains the accounts, approval limits, opening balances
 | Field | Meaning |
 |---|---|
 | Employee number (sign-in ID) | The ID typed on the POS. |
-| Name, job title, department, mobile, email | Employee details. |
+| Name, job title, department, mobile, email | Employee details. Departments: Front of house, Kitchen, Bar, Management, Finance, IT / Administration, Housekeeping, Room service. |
 | Role (default at every property) | What the employee may do; can differ per property. |
 | Properties, revenue centres | Where the employee may sign in and keep operator records (empty = all). |
 | Staff card (mag stripe / RFID) | Card number for card sign-in and approvals. |
@@ -757,13 +757,15 @@ The configuration guide explains the accounts, approval limits, opening balances
 | Start date, end date | Outside these dates the employee cannot sign in. |
 | Status | Active, Suspended, or Terminated (access removed; history is kept). |
 
+The employee record is for the POS. For the back office, give the IT person an **Administrator** login and the finance person an **Accountant** login (13.4).
+
 ### 13.2 Roles & privileges
 
 ![Roles](img/people-roles.jpg)
 
 A grid of privileges (rows) by role (columns). Click a cell to cycle: **—** not allowed → **✓** allowed → **✓ approval** allowed but a senior employee must approve each time. Under the grid, set each role's **level** and **limits** (max discount, max single void, max price change, max refund, max paid out).
 
-The standard roles are Owner/General Manager (level 1), Outlet Manager (10), Supervisor (20), Cashier (40), Server/Steward (50), Bartender (50), Kitchen (70) and Trainee (90). Add your own with **Add role**. A person can only approve for roles at their own level or below.
+The standard roles are Owner/General Manager (level 1), Outlet Manager (10), **IT / System administrator** (15: sets up and tests devices and printers, test checks, reprints, unlocks employees, reads the journal and reports; no payments, refunds or discounts), Supervisor (20), **Finance / Accountant** (25: cash-up and day close, paid in and out, reports, the journal and End of Day; no orders, and can't approve for others), Cashier (40), Server/Steward (50), Bartender (50), Kitchen (70) and Trainee (90). Opening the cash drawer without a sale needs a second person for the IT and Finance roles. Add your own with **Add role**. A person can only approve for roles at their own level or below.
 
 ### 13.3 Time cards and sign-in policy
 

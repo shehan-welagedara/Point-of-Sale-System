@@ -16,7 +16,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import type { DocData, DocStore, Increments, Query, WriteOp } from "@pos/core";
+import { type DocData, type DocStore, type Increments, type Query, type WriteOp, queryAudit } from "@pos/core";
 import { reportError } from "./errors";
 
 /**
@@ -74,6 +74,7 @@ export class FirestoreStore implements DocStore {
   }
 
   private build(name: string, q?: Query): FsQuery {
+    queryAudit.record?.(name, q);
     const parts = [];
     for (const [field, op, value] of q?.where ?? []) parts.push(where(field, op, value));
     if (q?.orderBy) parts.push(orderBy(q.orderBy[0], q.orderBy[1] ?? "asc"));

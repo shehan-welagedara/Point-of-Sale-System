@@ -52,3 +52,43 @@ describe("insights", () => {
     expect(r.filter((i) => i.tone !== "info").every((i) => i.action?.to.startsWith("/emc/"))).toBe(true);
   });
 });
+
+import { compositeIndexNeeded, firestoreCollection, indexDeclared } from "../src/index.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+describe("Firestore indexes", () => {
+  const declared = JSON.parse(readFileSync(resolve(__dirname, "../../../firebase/firestore.indexes.json"), "utf8")).indexes;
+  it("knows which queries need a composite index", () => {
+    expect(compositeIndexNeeded(undefined)).toBeNull();
+    expect(compositeIndexNeeded({ where: [["status", "==", "open"]] })).toBeNull();
+    expect(compositeIndexNeeded({ where: [["status", "==", "open"], ["rvcId", "==", "R"]] })).toBeNull();
+    expect(compositeIndexNeeded({ where: [["at", ">=", "a"], ["at", "<", "b"]], orderBy: ["at", "asc"] })).toBeNull();
+    expect(compositeIndexNeeded({ orderBy: ["at", "desc"], limit: 5 })).toBeNull();
+    expect(compositeIndexNeeded({ where: [["workstationId", "==", "W"]], orderBy: ["at", "desc"] })).toEqual({ equality: ["workstationId"], then: [{ field: "at", order: "DESCENDING" }] });
+    expect(compositeIndexNeeded({ where: [["account", "==", "A"], ["postingDate", ">=", "x"]] })).toEqual({ equality: ["account"], then: [{ field: "postingDate", order: "ASCENDING" }] });
+  });
+  it("finds the declared index, including the POS journal's (sign-in on live systems)", () => {
+    const journal = compositeIndexNeeded({ where: [["workstationId", "==", "W"]], orderBy: ["at", "desc"] })!;
+    expect(indexDeclared("posJournal", journal, declared)).toBe(true);
+    expect(indexDeclared("posJournal", { equality: ["workstationId"], then: [{ field: "at", order: "ASCENDING" }] }, declared)).toBe(false);
+    expect(indexDeclared("dailyStats", compositeIndexNeeded({ where: [["propertyId", "==", "P"], ["businessDate", ">=", "a"], ["businessDate", "<=", "b"]], orderBy: ["businessDate", "asc"] })!, declared)).toBe(true);
+    expect(firestoreCollection("auditEvents")).toBe("events");
+  });
+});
+
+import { DEFAULT_ROLES } from "../src/index.js";
+// @ts-expect-error a plain JavaScript migration of the release tool
+import { ROLES as MIGRATION_ROLES } from "../../../tools/release/migrations/0005-it-finance-roles.mjs";
+
+describe("IT and Finance roles", () => {
+  it("are standard roles, and the 1.10.1 data update adds exactly them to existing businesses", () => {
+    for (const r of MIGRATION_ROLES as { id: string }[]) expect(DEFAULT_ROLES.find((d) => d.id === r.id)).toEqual(r);
+    const it = DEFAULT_ROLES.find((r) => r.id === "itadmin")!;
+    const fin = DEFAULT_ROLES.find((r) => r.id === "finance")!;
+    expect(it.privileges).toContain("pos.unlockEmployee");
+    expect(it.privileges.some((p) => ["pos.tender", "pos.refund", "pos.discount", "pos.managerOverride"].includes(p))).toBe(false);
+    expect(fin.privileges).toEqual(expect.arrayContaining(["pos.paidInOut", "pos.endOfDay", "pos.reports", "pos.journal"]));
+    expect(fin.privileges.some((p) => ["pos.openCheck", "pos.tender", "pos.managerOverride", "pos.voidSent"].includes(p))).toBe(false);
+  });
+});
