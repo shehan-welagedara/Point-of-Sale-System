@@ -24,6 +24,7 @@ import { resolveTheme, themeStyle } from "./theme";
 import { MobileDeviceSetup, MobileRvcPicker, MobileSignIn } from "./mobile/MobileSignIn";
 import { type UiStyle, useUiStyle } from "./mobile/ui";
 import { APP_VERSION, setBusy } from "../../lib/version";
+import { reportError } from "../../lib/errors";
 
 interface DeviceStatus {
   id: string;
@@ -272,6 +273,15 @@ function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevic
 
   /** Employee number (looked up here) or card (checked on the server: card numbers aren't readable). */
   async function identify(text: string): Promise<Staff | null> {
+    try {
+      return await identifyInner(text);
+    } catch (e) {
+      failed(e);
+      return null;
+    }
+  }
+
+  async function identifyInner(text: string): Promise<Staff | null> {
     const t = text.trim();
     if (!t) return null;
     let s = staff.find((x) => x.employeeNo === t) ?? null;
@@ -294,7 +304,26 @@ function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevic
     return s;
   }
 
+  /** Sign-in must never just stop: say what went wrong, and keep it in System status. */
+  function failed(e: unknown) {
+    reportError(e, { workstationId: ws.id });
+    const msg = (e as Error)?.message ?? String(e);
+    setErr(/requires an index|FAILED_PRECONDITION|failed-precondition/i.test(msg)
+      ? "The system's database is missing an update (a search index). Please ask Polymath Tech to run the latest update; it takes a few minutes."
+      : /offline|unavailable|network/i.test(msg)
+        ? "No connection to the server. Check the internet and try again."
+        : `Couldn't sign in: ${msg.replace(/^.*?:\s*/, "").slice(0, 160)}`);
+  }
+
   async function checkPin(pin: string, person: Staff | null = who) {
+    try {
+      await checkPinInner(pin, person);
+    } catch (e) {
+      failed(e);
+    }
+  }
+
+  async function checkPinInner(pin: string, person: Staff | null = who) {
     if (!person || !store) return;
     const current = staff.find((s) => s.id === person.id) ?? person;
     const d = signInDecision(current, roleFor(current, ws.propertyId, roles), ws, propertyRvcIds, todayColombo());
@@ -313,6 +342,14 @@ function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevic
   }
 
   async function clockIn() {
+    try {
+      await clockInInner();
+    } catch (e) {
+      failed(e);
+    }
+  }
+
+  async function clockInInner() {
     if (!clockFor || !store) return;
     const now = new Date().toISOString();
     const card: TimeCard = { id: newId(), staffId: clockFor.s.id, propertyId: ws.propertyId, rvcId: clockFor.rvcIds[0] ?? ws.rvcId, businessDate: businessDateNow(settings.pos), clockIn: now, workstationId: ws.id };

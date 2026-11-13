@@ -62,6 +62,12 @@ export interface Query {
   limit?: number;
 }
 
+/**
+ * Test hook: when set, every query a store runs is reported (the end-to-end suite checks that each
+ * has the Firestore index it needs; see indexes.ts). Never set in production.
+ */
+export const queryAudit: { record?: (collection: string, query: Query | undefined) => void } = {};
+
 /** Nested object whose number leaves are added to the stored values. */
 export type Increments = { [key: string]: number | Increments };
 
@@ -174,6 +180,7 @@ export class MemoryStore implements DocStore {
   }
 
   async list<T>(col: string, query?: Query): Promise<T[]> {
+    queryAudit.record?.(col, query);
     return runQuery<T>([...this.colMap(col).values()], query);
   }
 
@@ -198,6 +205,7 @@ export class MemoryStore implements DocStore {
   }
 
   watch<T>(col: string, query: Query | undefined, cb: (docs: T[]) => void): () => void {
+    queryAudit.record?.(col, query);
     const l: Listener = { col, query, cb: cb as (docs: unknown[]) => void };
     this.listeners.add(l);
     queueMicrotask(() => {
