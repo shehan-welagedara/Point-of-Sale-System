@@ -876,7 +876,12 @@ Invite people by email and give them a back-office role (see [section 2](#2-sign
 
 ![New business](img/bo-new-business.jpg)
 
-**Account → Add a business** (owners and administrators) creates another business in the same system: give it a name and choose its modules, or open **Try a demo business** for a training copy.
+**Account → Add a business** (owners and administrators) creates another business in the same system:
+
+1. Give it a name.
+2. Choose the **kind of business**: restaurant, café, retail shop, clothing, wholesale and others. It sets the modules and the starter set-up; *Modules* adjusts them.
+
+Or open **Try a demo business** for a training copy. The kind can be changed later under Business & tax.
 
 **Approval by Polymath Tech.** On a system looked after by Polymath Tech, a new business is approved first (it protects you from businesses opened by mistake or by someone who shouldn't). After *Create business* the screen shows **Waiting for approval**; you can leave it and come back. Polymath Tech checks who asked and whether the business already exists, usually within minutes in working hours. When it is **Approved**, press **Open** and the business is set up; if it is **Declined**, their message says why (for example *You already have Noura Kitchen: open it from your business list*).
 

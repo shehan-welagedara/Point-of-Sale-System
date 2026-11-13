@@ -50,6 +50,8 @@ try {
   // ── 1. The owner creates the business (deployment manual section H, Noura plan section 2).
   await page.goto(`${B}/?mode=local`);
   await page.locator("#bname").fill("Noura Kitchen");
+  await page.getByRole("radio", { name: /^.?\s*Restaurant/ }).click();
+  await page.locator("details.field summary").click();
   for (const m of ["Accounting", "Inventory", "Purchasing", "Recipes & Costing", "Point of Sale"]) {
     const chip = page.locator(".chip", { hasText: new RegExp(`^${m}$`) });
     if (!(await chip.getAttribute("class")).includes(" on")) await chip.click();
