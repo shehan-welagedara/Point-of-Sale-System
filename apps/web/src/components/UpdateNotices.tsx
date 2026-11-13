@@ -79,6 +79,12 @@ export function PosMaintenanceNotice({ className = "" }: { className?: string })
 }
 
 const SEEN = "pos-suite.whats-new-seen";
+/**
+ * Whether this browser was already used before this page load (a business was open last time).
+ * Read once when the app loads, so someone who creates their first business now isn't taken for
+ * someone updating.
+ */
+const USED_BEFORE = read("pos-suite.activeTenant") !== null;
 
 /** Bold (**…**) and code (`…`) in release notes, without HTML. */
 function rich(text: string): ReactNode[] {
@@ -95,7 +101,7 @@ export function WhatsNew() {
   const notes = RELEASE_NOTES.find((r) => r.version === APP_VERSION);
   useEffect(() => {
     // Versions before 1.10.0 didn't record what was seen: someone who used the system before is updating.
-    const seen = read(SEEN) ?? (read("pos-suite.activeTenant") ? "1.9.0" : null);
+    const seen = read(SEEN) ?? (USED_BEFORE ? "1.9.0" : null);
     if (!seen) write(SEEN, APP_VERSION);
     else if (compareVersions(seen, APP_VERSION) < 0) {
       if (notes?.notes.length && role && role !== "terminal") setOpen(true);
