@@ -15,6 +15,7 @@ import {
   signInDecision,
 } from "@pos/core";
 import { Empty, Loading } from "../../components/ui";
+import { PosMaintenanceNotice } from "../../components/UpdateNotices";
 import { timeColombo, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 import { Keypad, PinEntry } from "./dialogs";
@@ -348,6 +349,7 @@ function SignIn({ ws, ui, staff, roles, rvcs, journal, onSignedIn, onChangeDevic
     <div className="auth">
       <div className="card auth-card" style={{ width: "min(760px, 100%)" }}>
         <Brand ws={ws} rvcs={rvcs} />
+        <PosMaintenanceNotice />
         {clockFor ? (
           <div className="stack" style={{ alignItems: "center" }}>
             <h2>Hello {clockFor.s.name.split(" ")[0]}</h2>
@@ -413,6 +415,7 @@ function RvcPicker({ ws, rvcs, user, onPick, onCancel }: { ws: Workstation; rvcs
     <div className="auth">
       <div className="card auth-card" style={{ width: "min(760px, 100%)" }}>
         <Brand ws={ws} rvcs={rvcs} />
+        <PosMaintenanceNotice />
         <h2>Choose a revenue centre</h2>
         <p className="muted">{user.name}, you work in more than one outlet on this workstation.</p>
         <div className="rvc-list">

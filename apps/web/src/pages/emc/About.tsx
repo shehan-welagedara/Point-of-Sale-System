@@ -5,6 +5,7 @@ import { PageHead } from "../../components/ui";
 import { firebaseConfig } from "../../lib/firebase";
 import { dateColombo, dateTimeColombo } from "../../lib/format";
 import { APP_BUILT_AT, APP_COMMIT, APP_VERSION, type LiveVersion, RELEASE_NOTES, compareVersions, fetchLiveVersion } from "../../lib/version";
+import { updateMessage } from "../../components/UpdateNotices";
 import { useApp, useCollection } from "../../state/app";
 
 interface DeviceStatus {
@@ -126,6 +127,8 @@ export function AboutPage() {
         </div>
       </div>
 
+      <ComingUpdate />
+
       <div className="card">
         <div className="card-head"><h3>What's new</h3><span className="small muted">Release notes of the latest versions</span></div>
         <div className="card-body stack">
@@ -196,7 +199,7 @@ function SupplierCard({ link, mode, shareUsage, busy, onCheck, onShare }: { link
       {mode === "firebase" ? (
         <>
           <span className="small">
-            {link?.lastCheckinAt ? (link.lastCheckinOk ? `Last check-in with ${COMPANY_NAME}: ${dateTimeColombo(link.lastCheckinAt)}` : `Last check-in didn't work (${dateTimeColombo(link.lastCheckinAt)}): ${link.lastCheckinError ?? "no answer"}`) : `This system checks in with ${COMPANY_NAME} once a day for licence renewals and support.`}
+            {link?.lastCheckinAt ? (link.lastCheckinOk ? `Last check-in with ${COMPANY_NAME}: ${dateTimeColombo(link.lastCheckinAt)}` : `Last check-in didn't work (${dateTimeColombo(link.lastCheckinAt)}): ${link.lastCheckinError ?? "no answer"}`) : `This system checks in with ${COMPANY_NAME} every hour for updates, licence renewals and support.`}
           </span>
           <div className="row wrap" style={{ gap: 8 }}>
             <button className="btn sm" disabled={busy} onClick={onCheck}>{busy ? "Checking…" : "Check now"}</button>
@@ -207,6 +210,24 @@ function SupplierCard({ link, mode, shareUsage, busy, onCheck, onShare }: { link
           </label>
         </>
       ) : null}
+    </div>
+  );
+}
+
+/** The update Polymath Tech has scheduled for this system, with what it brings. */
+function ComingUpdate() {
+  const { tenant } = useApp();
+  const u = tenant?.supplier?.update;
+  const m = updateMessage(u);
+  if (!u || !m) return null;
+  return (
+    <div className={`card card-body stack tight`} data-testid="coming-update">
+      <div className="row wrap" style={{ gap: 8 }}>
+        <h3 className="grow" style={{ margin: 0 }}>{m.title}</h3>
+        <span className={`badge ${m.tone === "warn" ? "warn" : "info"}`}>{u.state === "scheduled" ? "Scheduled" : u.state === "updating" ? "Updating" : "Installed"}</span>
+      </div>
+      <p className="small" style={{ margin: 0 }}>{m.detail}</p>
+      {u.highlights?.length ? <ul className="small" style={{ margin: 0, paddingLeft: 20 }}>{u.highlights.map((h, i) => <li key={i}>{h}</li>)}</ul> : null}
     </div>
   );
 }

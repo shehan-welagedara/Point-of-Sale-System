@@ -4,58 +4,15 @@
  */
 import { randomBytes } from "node:crypto";
 import { EDITIONS, type Edition, type LicencePayload, MODULES, type ModuleKey, type UsageLimits, buildEntitlements, publicKeyFromPrivate, signDirective, signLicence } from "@pos/core";
-import { type DocumentReference, FieldValue, type Firestore } from "firebase-admin/firestore";
-import { type GithubConfig, dispatchRelease, recentRuns, releaseBranchVersion } from "./github.js";
-import { type ClientLicence, type ConsoleClient, type DailyMetrics, INDUSTRIES, type Permission, STAFF_ROLES, type StaffRole, type Subscription, can, compareVersions, dailyMetrics } from "./model.js";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { type Actor, ActionError, DATE, type Deps, ID, PROJECT, audit, bad, getClient, githubConfig, need, str } from "./common.js";
+import { decideBusiness } from "./businesses.js";
+import { dispatchRelease, releaseBranchVersion } from "./github.js";
+import { eraseClient, exportClient, saveRetention, savePrivacy } from "./privacy.js";
+import { addRelease, cancelRollout, createRollout, followRuns, markRollout, registryFor, runRollouts, syncReleases } from "./releases.js";
+import { type ClientLicence, type ConsoleClient, type DailyMetrics, INDUSTRIES, STAFF_ROLES, type StaffRole, type Subscription, compareVersions, dailyMetrics } from "./model.js";
 
-export interface Actor {
-  uid: string;
-  email: string;
-  emailVerified: boolean;
-  role?: string;
-}
-
-export interface Deps {
-  db: Firestore;
-  now: Date;
-  /** OWNER_EMAIL: the first owner, set by `pnpm console:setup`. */
-  ownerEmail: string;
-  privateKey: () => string;
-  githubToken: () => string;
-  setRole: (uid: string, role: StaffRole | null) => Promise<void>;
-  fetch?: typeof fetch;
-}
-
-export class ActionError extends Error {
-  constructor(
-    public code: "permission-denied" | "invalid-argument" | "not-found" | "failed-precondition",
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-const bad = (m: string) => new ActionError("invalid-argument", m);
-const str = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-const ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
-const PROJECT = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-function need(actor: Actor, p: Permission) {
-  if (!can(actor.role, p)) throw new ActionError("permission-denied", `Your role (${actor.role ?? "none"}) can't do this.`);
-}
-
-async function audit(deps: Deps, actor: Actor, action: string, clientId: string | null, summary: string) {
-  await deps.db.collection("audit").add({ at: deps.now.toISOString(), uid: actor.uid, email: actor.email, role: actor.role ?? null, action, clientId, summary });
-}
-
-async function getClient(deps: Deps, id: unknown): Promise<{ ref: DocumentReference; c: ConsoleClient }> {
-  if (typeof id !== "string" || !ID.test(id)) throw bad("clientId is required");
-  const ref = deps.db.collection("clients").doc(id);
-  const snap = await ref.get();
-  if (!snap.exists) throw new ActionError("not-found", `No client ${id}`);
-  return { ref, c: snap.data() as ConsoleClient };
-}
+export { ActionError, type Actor, type Deps } from "./common.js";
 
 const licenceIdFor = (now: Date) => `LIC-${now.toISOString().slice(0, 10).replace(/-/g, "")}-${randomBytes(4).toString("hex").slice(0, 5).toUpperCase()}`;
 /** End of a day in Sri Lanka, as an instant. */
@@ -148,12 +105,6 @@ function readSubscription(s: Record<string, unknown>): Subscription {
     cancelled: Boolean(s.cancelled),
     ...(str(s.notes, 1000) ? { notes: str(s.notes, 1000) } : {}),
   };
-}
-
-async function githubConfig(deps: Deps): Promise<GithubConfig & { stagingProjectId?: string }> {
-  const g = (await deps.db.doc("config/github").get()).data() as (GithubConfig & { stagingProjectId?: string }) | undefined;
-  if (!g?.owner || !g.repo) throw new ActionError("failed-precondition", "Set the GitHub repository first (Settings → GitHub).");
-  return { ...g, workflow: g.workflow || "release.yml", ref: g.ref || "main" };
 }
 
 /** Today's figures for the dashboard's trends; one document per day, rewritten during the day. */
@@ -405,10 +356,7 @@ export async function runAction(deps: Deps, actor: Actor, data: Record<string, u
         if (!ids.length || ids.some((i) => !clients.some((c) => c.id === i))) throw bad("Choose staging, a wave, or existing clients");
         deployTarget = ids.join(",");
       }
-      const registry = {
-        staging: g.stagingProjectId ? { id: "staging", name: "Staging", projectId: g.stagingProjectId, region: "asia-south1", backupBucket: `gs://${g.stagingProjectId}-backups` } : { id: "staging", name: "Staging", projectId: "REPLACE" },
-        clients: clients.filter((c) => c.status !== "cancelled").map((c) => ({ id: c.id, name: c.name, projectId: c.projectId, region: c.region, wave: c.wave, maintenanceWindow: c.maintenanceWindow, backupBucket: `gs://${c.projectId}-backups`, enabled: c.enabled !== false })),
-      };
+      const registry = registryFor(clients, g);
       const ref = db.collection("deployments").doc();
       await ref.set({ id: ref.id, target: deployTarget, requestedBy: actor.email, at, status: "requested" });
       try {
@@ -424,16 +372,80 @@ export async function runAction(deps: Deps, actor: Actor, data: Record<string, u
       const g = await githubConfig(deps);
       const token = deps.githubToken();
       if (!token || token === "none") return { ok: false, reason: "no GitHub token" };
-      const runs = await recentRuns(g, token, deps.fetch);
-      const open = await db.collection("deployments").where("status", "in", ["requested", "queued", "in_progress", "waiting", "pending"]).get();
-      for (const d of open.docs) {
-        const run = runs.find((r) => r.title.includes(d.id));
-        if (run) await d.ref.set({ status: run.status === "completed" ? (run.conclusion ?? "completed") : run.status, run }, { merge: true });
-      }
+      await followRuns(deps, g, token);
       const latest = await releaseBranchVersion(g, token, deps.fetch).catch(() => undefined);
       if (latest) await db.doc("config/github").set({ latestVersion: latest, latestCheckedAt: at }, { merge: true });
       return { ok: true, latestVersion: latest };
     }
+
+    // ── Releases and rollouts (releases.ts) ──
+    case "syncReleases": {
+      need(actor, "deploy");
+      return await syncReleases(deps, actor, typeof data.changelog === "string" ? data.changelog : undefined);
+    }
+    case "addRelease": {
+      need(actor, "deploy");
+      return await addRelease(deps, actor, data);
+    }
+    case "createRollout": {
+      need(actor, "deploy");
+      return await createRollout(deps, actor, data);
+    }
+    case "cancelRollout": {
+      need(actor, "deploy");
+      return await cancelRollout(deps, actor, data);
+    }
+    case "markRollout": {
+      need(actor, "deploy");
+      return await markRollout(deps, actor, data);
+    }
+    case "runRollouts": {
+      need(actor, "deploy");
+      return await runRollouts(deps);
+    }
+
+    // ── Businesses (businesses.ts) ──
+    case "decideBusiness": {
+      need(actor, "clients");
+      return await decideBusiness(deps, actor, data);
+    }
+    case "setApprovals": {
+      need(actor, "suspend");
+      const { ref, c } = await getClient(deps, data.clientId);
+      const approvals = data.approvals === "off" ? "off" : "required";
+      await ref.set({ approvals, updatedAt: at }, { merge: true });
+      await audit(deps, actor, "setApprovals", c.id, approvals === "off" ? "new businesses open without approval" : "new businesses need approval");
+      return { approvals };
+    }
+    case "setBroadcast": {
+      need(actor, "clients");
+      const text = str(data.text, 400);
+      const until = str(data.until, 10);
+      if (until && !DATE.test(until)) throw bad("until must be a date");
+      if (text) await db.doc("config/broadcast").set({ text, level: data.level === "warn" ? "warn" : "info", ...(until ? { until: endOfDay(until) } : {}), by: actor.email, at });
+      else await db.doc("config/broadcast").delete();
+      await audit(deps, actor, "setBroadcast", null, text || "(cleared)");
+      return { ok: true };
+    }
+
+    // ── Privacy (privacy.ts) ──
+    case "savePrivacy": {
+      need(actor, "clients");
+      return await savePrivacy(deps, actor, data);
+    }
+    case "saveRetention": {
+      need(actor, "settings");
+      return await saveRetention(deps, actor, data);
+    }
+    case "exportClient": {
+      need(actor, "suspend");
+      return await exportClient(deps, actor, data);
+    }
+    case "eraseClient": {
+      need(actor, "settings");
+      return await eraseClient(deps, actor, data);
+    }
+
     // Today's dashboard figures (also written every morning by housekeeping).
     case "recordMetrics": {
       need(actor, "read");

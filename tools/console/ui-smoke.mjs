@@ -115,7 +115,7 @@ try {
       }
       await visit("clients", "/clients", "Noura Kitchen", "clients");
       await visit("client overview", "/clients/noura-kitchen", "Registered name", "client");
-      for (const [tab, text, shot] of [["Health", "Server version", "client-health"], ["Licence", "Current licence", "client-licence"], ["Subscription", "Payments", "client-subscription"], ["Usage", "Bills, last", null], ["Suspend / notice", "Notice to the client", "client-status"], ["Activity", "issueLicence", null]]) {
+      for (const [tab, text, shot] of [["Health", "Server version", "client-health"], ["Licence", "Current licence", "client-licence"], ["Subscription", "Payments", "client-subscription"], ["Usage", "Bills, last", null], ["Controls", "Notice to the client", "client-status"], ["Activity", "issueLicence", null]]) {
         await page.goto("http://localhost:5175/clients/noura-kitchen");
         await page.getByRole("tab", { name: tab }).click();
         await page.getByText(text).first().waitFor({ timeout: 15_000 });
@@ -124,7 +124,12 @@ try {
         if (shot && scheme === "light") await page.screenshot({ path: join(shots, `${vp.name}-${shot}.png`), fullPage: vp.name === "pc" });
       }
       await visit("licences", "/licences", "LIC-", "licences");
-      await visit("deployments", "/updates", "New update", "updates");
+      await visit("deployments", "/deployments", "New update", "deployments");
+      await visit("updates", "/updates", "Rollouts", "updates");
+      check(await page.getByTestId("notice-preview").isVisible(), `${tag} · updates show what clients will see`);
+      await visit("businesses", "/businesses", "Waiting for approval", "businesses");
+      check((await page.locator("[data-request]").count()) >= 1, `${tag} · a business request waits for approval with its checks`);
+      await visit("privacy", "/privacy", "What the console holds", "privacy");
       await visit("subscriptions", "/subscriptions", "Monthly recurring revenue", "subscriptions");
       await visit("monitoring", "/monitoring", "Unrecognised check-ins", "monitoring");
       await visit("reports", "/reports", "Revenue collected", "reports");

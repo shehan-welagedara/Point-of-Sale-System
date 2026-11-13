@@ -76,6 +76,57 @@ describe("tenant onboarding", () => {
     await assertSucceeds(newBiz("mallory", "mallory-co"));
   });
 
+  it("on a system linked to the Polymath Console, opens only a business Polymath Tech approved for the person asking", async () => {
+    await seedTenant();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "deployment", "config"), { ownerUid: "owner", openSignup: false });
+      await setDoc(doc(db, "deployment", "link"), { approvalRequired: true });
+      await setDoc(doc(db, "businessRequests", "noura-2"), { id: "noura-2", uid: "owner", name: "Noura Kitchen Galle", status: "pending" });
+      await setDoc(doc(db, "businessRequests", "noura-3"), { id: "noura-3", uid: "owner", name: "Noura Express", status: "approved" });
+      await setDoc(doc(db, "businessRequests", "other-co"), { id: "other-co", uid: "someone", name: "Other", status: "approved" });
+    });
+    const newBiz = (uid: string, id: string, extra: Record<string, unknown> = {}) => {
+      const db = as(uid);
+      const b = writeBatch(db);
+      b.set(doc(db, "tenants", id), { id, name: id, ownerUid: uid, modules: { pos: true }, plan: "trial", status: "active", createdFromTenant: T, ...extra });
+      b.set(doc(db, "tenants", id, "members", uid), { id: uid, uid, role: "owner", tenantId: id });
+      return b.commit();
+    };
+    await assertFails(newBiz("owner", "noura-dup"));
+    await assertFails(newBiz("owner", "noura-2"));
+    await assertFails(newBiz("owner", "other-co"));
+    await assertSucceeds(newBiz("owner", "noura-3"));
+    // Requests are readable only by the person who asked; nobody writes them or the link.
+    await assertSucceeds(getDoc(doc(as("owner"), "businessRequests", "noura-2")));
+    await assertFails(getDoc(doc(as("mgr"), "businessRequests", "noura-2")));
+    await assertFails(setDoc(doc(as("owner"), "businessRequests", "noura-4"), { id: "noura-4", uid: "owner", status: "approved" }));
+    await assertFails(updateDoc(doc(as("owner"), "businessRequests", "noura-2"), { status: "approved" }));
+    await assertFails(setDoc(doc(as("owner"), "deployment", "link"), { approvalRequired: false }));
+    // An owner can't switch approvals off: the flag lives in deployment/link, which only the server writes.
+    await assertSucceeds(updateDoc(doc(as("owner"), "deployment", "config"), { approvalRequired: false }));
+    await assertFails(newBiz("owner", "noura-dup"));
+    // Approvals switched off by the console: businesses open straight away again.
+    await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), "deployment", "link"), { approvalRequired: false }));
+    await assertSucceeds(newBiz("owner", "noura-dup"));
+  });
+
+  it("lets only the owner archive or restore a business, and never creates one archived", async () => {
+    await seedTenant();
+    await assertFails(updateDoc(doc(as("mgr"), "tenants", T), { status: "archived" }));
+    await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), "tenants", T, "members", "adm"), { id: "adm", uid: "adm", role: "admin", tenantId: T }));
+    await assertFails(updateDoc(doc(as("adm"), "tenants", T), { status: "archived" }));
+    await assertFails(updateDoc(doc(as("owner"), "tenants", T), { status: "suspended" }));
+    await assertSucceeds(updateDoc(doc(as("owner"), "tenants", T), { status: "archived", archivedAt: "2026-11-13T08:00:00Z", archivedBy: "owner" }));
+    await assertSucceeds(updateDoc(doc(as("owner"), "tenants", T), { status: "active" }));
+    await assertSucceeds(updateDoc(doc(as("adm"), "tenants", T), { name: "Spice Lagoon" }));
+    const db = as("owner");
+    const b = writeBatch(db);
+    b.set(doc(db, "tenants", "x-co"), { id: "x-co", name: "X", ownerUid: "owner", modules: { pos: true }, plan: "trial", status: "archived", createdFromTenant: T });
+    b.set(doc(db, "tenants", "x-co", "members", "owner"), { id: "owner", uid: "owner", role: "owner", tenantId: "x-co" });
+    await assertFails(b.commit());
+  });
+
   it("refuses ownership of someone else's tenant and outsiders' reads", async () => {
     await seedTenant();
     await assertFails(setDoc(doc(as("eve"), "tenants", T, "members", "eve"), { id: "eve", uid: "eve", role: "owner", tenantId: T }));

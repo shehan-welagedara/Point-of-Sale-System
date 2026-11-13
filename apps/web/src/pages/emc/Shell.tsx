@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { MEMBER_ROLE_INFO, editionInfo } from "@pos/core";
 import { DEMO_PEOPLE } from "@pos/sample-data";
 import { Loading } from "../../components/ui";
+import { MaintenanceBanner, WhatsNew } from "../../components/UpdateNotices";
 import { useApp } from "../../state/app";
 import { type Workspace, WORKSPACES, visibleWorkspaces, workspaceFor } from "../../workspaces";
 import { BottomNav, MoreSheet, PhoneTopBar, SectionPills, TodayPage, phoneTitle, useIsPhone } from "./Phone";
@@ -83,9 +84,9 @@ function TopBar({ workspace, onMenu }: { workspace?: Workspace; onMenu?: () => v
       ) : null}
       <span className="grow" />
       <LicenceBadge />
-      {tenants.length > 1 ? (
+      {tenants.filter((t) => t.status !== "archived").length > 1 ? (
         <select className="select hide-sm" style={{ minHeight: 30, width: "auto", padding: "2px 8px", fontSize: 13 }} value={tenant?.id} onChange={(e) => switchTenant(e.target.value)} aria-label="Business">
-          {tenants.map((t) => (
+          {tenants.filter((t) => t.status !== "archived").map((t) => (
             <option key={t.id} value={t.id}>
               {t.name}
             </option>
@@ -200,6 +201,8 @@ function PhoneShell() {
           </NavLink>
         ) : null}
         <SupplierBanner />
+        <MaintenanceBanner />
+        <WhatsNew />
         {settingsReady ? <Outlet /> : <Loading />}
       </div>
       <BottomNav onMore={() => setMore((m) => !m)} moreOpen={more} />
@@ -268,6 +271,8 @@ function DesktopShell() {
           </div>
         ) : null}
         <SupplierBanner />
+        <MaintenanceBanner />
+        <WhatsNew />
         {/* Pages wait for the business's settings, so no form starts from (and could save) the defaults. */}
         {settingsReady ? <Outlet /> : <Loading />}
       </div>

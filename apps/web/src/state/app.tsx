@@ -95,8 +95,17 @@ interface AppState {
   /** Emails a password-reset link (silently does nothing for unknown addresses). */
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
-  /** A new business: empty (with the chosen modules) or one of the demo businesses. */
-  createTenant: (name: string, sample: false | SampleKind, modules?: MK[]) => Promise<void>;
+  /** A new business: empty (with the chosen modules) or one of the demo businesses. `id`: the approved request's id. */
+  createTenant: (name: string, sample: false | SampleKind, modules?: MK[], id?: string) => Promise<void>;
+  /**
+   * On a system linked to Polymath Tech, a new business is approved first (two-step validation):
+   * sends the request and says whether to wait. Local and unlinked systems answer `required: false`.
+   */
+  requestBusiness: (input: { id: string; name: string; kind: "business" | "demo"; sample?: SampleKind; modules: MK[] }) => Promise<BusinessRequestResult>;
+  /** Asks Polymath Tech again about a request (check), or withdraws it (cancel). */
+  businessRequest: (action: "check" | "cancel", id: string) => Promise<BusinessRequestResult>;
+  /** Owner only: archive a business opened by mistake (hidden, closed to the POS, data kept), or restore it. */
+  setTenantArchived: (id: string, archived: boolean) => Promise<void>;
   switchTenant: (id: string) => void;
   updateTenant: (patch: Partial<Tenant>) => Promise<void>;
   saveSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => Promise<void>;
@@ -118,6 +127,31 @@ interface AppState {
   activateLicence: (token: string) => Promise<void>;
   /** Checks in with the supplier's console now (Firebase mode, owner or administrator). */
   checkWithSupplier: () => Promise<{ ok: boolean; skipped?: boolean; error?: string; applied: string[] }>;
+}
+
+/** businessRequests/{id} as the person who asked sees it (written by the server). */
+export interface BusinessRequestDoc {
+  id: string;
+  name: string;
+  kind: "business" | "demo";
+  sample?: SampleKind;
+  modules: MK[];
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  requestedAt: string;
+  decidedAt?: string;
+  message?: string;
+}
+
+export interface BusinessRequestResult {
+  required: boolean;
+  request?: BusinessRequestDoc;
+  similar?: { id: string; name: string; status: string }[];
+  checkin?: { ok: boolean; error?: string };
+}
+
+/** A new business's id: from its name, plus a random part. */
+export function newBusinessId(name: string): string {
+  return `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "tenant"}-${Math.random().toString(36).slice(2, 7).padEnd(5, "0")}`;
 }
 
 export interface LicenceInfo {
@@ -323,8 +357,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return t.exists() ? ({ ...t.data(), id: t.id } as Tenant) : null;
     }))).filter((t): t is Tenant => Boolean(t));
     setTenants(ts);
+    // Archived businesses (opened by mistake) open only when they are all this person has.
     const preferred = localStorage.getItem("pos-suite.activeTenant");
-    const active = ts.find((t) => t.id === preferred) ?? ts[0] ?? null;
+    const live = ts.filter((t) => t.status !== "archived");
+    const active = live.find((t) => t.id === preferred) ?? live[0] ?? ts.find((t) => t.id === preferred) ?? ts[0] ?? null;
     setTenant(active);
     setStore(active ? withValidation(withStaffSecrets(new FirestoreStore(db, active.id, () => firebase().auth.currentUser?.uid))) : null);
   }, []);
@@ -469,7 +505,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const createTenant = useCallback(
-    async (name: string, withSample: false | SampleKind, chosen?: MK[]) => {
+    async (name: string, withSample: false | SampleKind, chosen?: MK[], approvedId?: string) => {
       const sample = withSample ? await sampleOps(withSample) : null;
       // Demo data runs on the demo edition; a new client business starts a trial with the
       // modules chosen at installation (always within the edition's entitlement).
@@ -507,7 +543,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       creating.current = true;
       try {
         const { db } = firebase();
-        const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "tenant"}-${Math.random().toString(36).slice(2, 7)}`;
+        const id = approvedId ?? newBusinessId(name);
         // An owner/administrator adding a business (e.g. a training copy) proves it with their current one;
         // the very first business in a new project claims the deployment (see firestore.rules).
         const from = tenant && memberships.some((m) => m.tenantId === tenant.id && (m.role === "owner" || m.role === "admin")) ? tenant.id : undefined;
@@ -580,6 +616,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [tenant, mode, actor, updateTenant],
   );
 
+  const requestBusiness = useCallback(
+    async (input: { id: string; name: string; kind: "business" | "demo"; sample?: SampleKind; modules: MK[] }): Promise<BusinessRequestResult> => {
+      if (mode !== "firebase") return { required: false };
+      try {
+        const res = await httpsCallable(firebase().functions, "businessApi", { timeout: 60_000 })({ action: "submit", ...input });
+        return res.data as BusinessRequestResult;
+      } catch (e) {
+        const err = e as { code?: string; message?: string };
+        // A system deployed before 1.10.0 has no businessApi: it opens businesses as before.
+        if (err.code === "functions/not-found" || /not[- ]found|does not exist/i.test(err.message ?? "")) return { required: false };
+        throw new Error((err.message ?? "").replace(/^.*?:\s*/, "") || "Couldn't send the request");
+      }
+    },
+    [mode],
+  );
+
+  const businessRequest = useCallback(
+    async (action: "check" | "cancel", id: string): Promise<BusinessRequestResult> => {
+      if (mode !== "firebase") return { required: false };
+      const res = await httpsCallable(firebase().functions, "businessApi", { timeout: 60_000 })({ action, id });
+      return res.data as BusinessRequestResult;
+    },
+    [mode],
+  );
+
+  const setTenantArchived = useCallback(
+    async (id: string, archived: boolean) => {
+      const patch = archived ? { status: "archived" as const, archivedAt: new Date().toISOString(), archivedBy: user?.uid ?? "local" } : { status: "active" as const };
+      if (mode === "local") {
+        if (tenant?.id === id) await updateTenant(patch);
+        return;
+      }
+      await setDoc(doc(firebase().db, "tenants", id), patch, { merge: true });
+      if (archived && tenant?.id === id) {
+        const next = tenants.find((t) => t.id !== id && t.status !== "archived");
+        if (next) localStorage.setItem("pos-suite.activeTenant", next.id);
+      }
+      if (!archived) localStorage.setItem("pos-suite.activeTenant", id);
+      if (user) await loadMemberships(user);
+    },
+    [mode, tenant, tenants, user, loadMemberships, updateTenant],
+  );
+
   const checkWithSupplier = useCallback(async () => {
     if (!tenant || mode !== "firebase") return { ok: false, skipped: true, error: "Only in a deployed system.", applied: [] };
     const res = await httpsCallable(firebase().functions, "consoleLinkNow", { timeout: 60_000 })({ tenantId: tenant.id });
@@ -619,6 +698,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await firebaseSignOut(firebase().auth);
     },
     createTenant,
+    requestBusiness,
+    businessRequest,
+    setTenantArchived,
     switchTenant,
     updateTenant,
     licence: lic,
