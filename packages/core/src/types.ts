@@ -281,7 +281,23 @@ export interface IntegrationSettings extends Entity {
   id: "integrations";
   payhere: { mode: IntegrationMode; merchantId: string; currency: "LKR" };
   lankaqr: { mode: IntegrationMode; merchantName: string; merchantCity: string; merchantId: string; mcc: string };
-  whatsapp: { mode: IntegrationMode; phoneNumberId: string; eodRecipients: { name: string; phone: string }[]; eodTime: string };
+  whatsapp: {
+    mode: IntegrationMode;
+    phoneNumberId: string;
+    eodRecipients: { name: string; phone: string }[];
+    eodTime: string;
+    /** WhatsApp Business for customers (module whatsappCommerce, 1.11.0). Secrets stay on the server. */
+    wabaId?: string;
+    catalogId?: string;
+    /** The business number as customers see it (+94 77 123 4567). */
+    displayPhone?: string;
+    bot?: { enabled: boolean; welcome?: string; handoff?: string; hours?: string };
+    /** Shown to customers paying by bank transfer. */
+    bankDetails?: string;
+    /** Approved message template names (Meta) for messages outside the 24-hour window. */
+    templates?: Partial<Record<"order_confirmed" | "order_dispatched" | "order_delivered" | "invoice_ready" | "payment_received" | "payment_reminder" | "quotation" | "new_arrivals", string>>;
+    templateLanguage?: string;
+  };
   accountingExport: { target: "excel" | "erpnext" | "akaunting"; baseUrl?: string };
 }
 
@@ -550,7 +566,7 @@ export interface TimeCard extends Entity {
 }
 
 /** Back-office login (Firebase Auth user) and its access level for this tenant. */
-export type MemberRole = "owner" | "admin" | "manager" | "accountant" | "storekeeper" | "auditor" | "viewer" | "terminal";
+export type MemberRole = "owner" | "admin" | "manager" | "sales" | "accountant" | "storekeeper" | "auditor" | "viewer" | "terminal";
 
 export interface Member extends Entity {
   /** Firebase Auth uid (= id). */
@@ -588,6 +604,11 @@ export interface InventoryItem extends Entity {
   isPrep: boolean;
   trackStock: boolean;
   active: boolean;
+  /** Wholesale/retail variants (1.11.0): the style, size and colour, and the barcode (EAN-13). */
+  styleId?: string;
+  size?: string;
+  colour?: string;
+  barcode?: string;
 }
 
 export interface Location extends Entity {
@@ -733,6 +754,17 @@ export interface Customer extends Entity {
   /** Business customers: printed on tax invoices when VAT-registered. */
   vatTin?: string;
   address?: string;
+  /** Wholesale buyers (1.11.0): shop, area, price list, credit limit and terms. */
+  shopName?: string;
+  area?: string;
+  priceListId?: string;
+  /** Most the customer may owe at once (0/absent = cash only). */
+  creditLimit?: Cents;
+  paymentTermsDays?: number;
+  /** WhatsApp number in international form (94771234567) and consent for broadcasts. */
+  whatsapp?: string;
+  whatsappOptIn?: boolean;
+  whatsappOptOutAt?: string;
 }
 
 // ───────────────────────────── Checks, invoices, payments ─────────────────────────────

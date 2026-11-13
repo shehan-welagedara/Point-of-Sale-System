@@ -289,6 +289,25 @@ async function depleteChecks(store: DocStore, args: { locationId: string; by: st
   return { checks: pending.length, movements };
 }
 
+/** Stock out for a sale outside the POS (a wholesale delivery): FIFO cost, cost of sales on that day. */
+export function issueStock(store: DocStore, args: { locationId: string; lines: { itemId: string; qty: number }[]; businessDate: string; ref: string }): Promise<StockMovement> {
+  return simpleMovement(store, "sale", { ...args, lines: args.lines.filter((l) => l.qty > 0).map((l) => ({ itemId: l.itemId, qty: -l.qty })) });
+}
+
+/** Goods coming back from a customer (a returned delivery): new lots at current cost, less cost of sales. */
+export async function returnStock(store: DocStore, args: { locationId: string; lines: { itemId: string; qty: number }[]; businessDate: string; ref: string }): Promise<StockMovement> {
+  const m = await simpleMovement(store, "sale", { ...args, lines: args.lines.filter((l) => l.qty > 0) });
+  const costByMajorGroup: Record<string, number> = {};
+  const items = new Map((await store.list<InventoryItem>(C.inventoryItems)).map((i) => [i.id, i]));
+  for (const l of m.lines) {
+    const g = items.get(l.itemId)?.majorGroup ?? "Other";
+    costByMajorGroup[g] = (costByMajorGroup[g] ?? 0) - l.cost;
+  }
+  const fixed = { ...m, costByMajorGroup };
+  await store.set(C.stockMovements, fixed);
+  return fixed;
+}
+
 async function simpleMovement(
   store: DocStore,
   type: MovementType,
