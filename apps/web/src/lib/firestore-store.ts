@@ -10,6 +10,7 @@ import {
   increment,
   limit,
   onSnapshot,
+  runTransaction,
   orderBy,
   query,
   setDoc,
@@ -102,6 +103,16 @@ export class FirestoreStore implements DocStore {
 
   async increment(col: string, id: string, inc: Increments, base?: Record<string, unknown>): Promise<void> {
     await settle(setDoc(this.ref(col, id), { ...(base ?? {}), id, ...toIncrements(inc) }, { merge: true }));
+  }
+
+  /** Document numbers (orders, quotations): a transaction, so two people never get the same number. */
+  async nextSequence(col: string, id: string): Promise<number> {
+    const ref = this.ref(col, id);
+    return runTransaction(this.db, async (t) => {
+      const seq = (Number((await t.get(ref)).data()?.seq) || 0) + 1;
+      t.set(ref, this.stamp({ id, seq }) as DocumentData, { merge: true });
+      return seq;
+    });
   }
 
   async remove(col: string, id: string): Promise<void> {

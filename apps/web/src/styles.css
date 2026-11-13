@@ -448,6 +448,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 /* Short 16:9 screens (1366×768, 1280×720): tighter spacing so whole screens fit. */
 @media (min-width: 901px) and (max-height: 820px) {
+  .insight { padding: 8px 12px; }
   .page { padding: 16px 24px 18px; gap: 12px; }
   .page-head h1 { font-size: 24px; }
   .page-head p { font-size: 14px; }
@@ -554,6 +555,13 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .insight.bad .insight-ico { background: var(--bad-bg); color: var(--bad); }
 .insight.info .insight-ico { background: var(--info-bg); color: var(--info); }
 .insight-go { align-self: flex-start; font-weight: 600; margin-top: 4px; padding: 2px 0; }
+/* One insight uses the whole row, its text flowing on as few lines as possible. */
+.insight-list > .insight:only-child { grid-column: 1 / -1; }
+@media (min-width: 901px) {
+  .insight-list > .insight:only-child .grow { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 10px; }
+  .insight-list > .insight:only-child strong { flex-basis: 100%; }
+  .insight-list > .insight:only-child .insight-go { margin-top: 0; }
+}
 @media (max-width: 600px) {
   .insight-list { grid-template-columns: 1fr; }
   .insight-go { padding: 10px 0 2px; }

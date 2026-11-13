@@ -129,7 +129,8 @@ export async function buildWholesaleSample(opts: { today: string; settings: Retu
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   for (const s of TEES_STYLES) await saveStyle(store, { ...s, updatedAt: now });
-  const lines = TEES_STYLES.flatMap((s) => styleVariants(s).map((v) => ({ inventoryItemId: v.sku, qty: rnd() < 0.08 ? 0 : 24 + Math.floor(rnd() * 8) * 12, unitCost: s.cost! }))).filter((l) => l.qty > 0);
+  // Received in packs (the style's pack size) at the cost per pack: 4–11 packs per size and colour.
+  const lines = TEES_STYLES.flatMap((s) => styleVariants(s).map((v) => ({ inventoryItemId: v.sku, qty: rnd() < 0.08 ? 0 : 4 + Math.floor(rnd() * 8), unitCost: s.cost! * (s.packSize ?? 1) }))).filter((l) => l.qty > 0);
   const grn: GoodsReceipt = { id: "GRN-0001", number: "GRN-0001", vendorId: "MILL", locationId: LOC, supplierInvoiceNo: "MILL-2611-01", date: openDate, lines, inputVat: 0, status: "draft" };
   await store.set(C.goodsReceipts, grn);
   await postGoodsReceipt(store, grn.id, "sample-data");

@@ -133,9 +133,14 @@ export function MobilePos({ style, api, children }: { style: MobileStyle; api: P
   const lastCheckId = useRef<string | null>(null);
 
   // Opening a table or picking up a check moves on to the menu (new check) or the order (existing).
+  // A check reopened from Functions (closed checks) closes Functions and shows that order.
   useEffect(() => {
     const id = api.check?.id ?? null;
-    if (id && id !== lastCheckId.current && (tab === "tables" || tab === "orders" || tab === "home")) setTab(api.check?.lines.length ? "cart" : "menu");
+    const fromFunctions = overlay?.t === "functions";
+    if (id && id !== lastCheckId.current && (tab === "tables" || tab === "orders" || tab === "home" || fromFunctions)) {
+      if (fromFunctions) setOverlay(null);
+      setTab(api.check?.lines.length ? "cart" : "menu");
+    }
     lastCheckId.current = id;
   }, [api.check?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

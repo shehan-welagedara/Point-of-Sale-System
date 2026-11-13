@@ -17,7 +17,7 @@ Shared code (`packages/*`) is changed on this branch first and merged into the e
 
 | Branch | What it is | Deploy from it? |
 |---|---|---|
-| `main` | The Cloud Restaurant Edition: released and tested. Every release is merged here. | **Yes**: always deploy clients from `main`. |
+| `main` | The Cloud Edition for every kind of business (restaurants, cafés, retail, clothing, wholesale; salons and services in preview): released and tested. Every release is merged here. | **Yes**: always deploy clients from `main`. |
 | `develop` | Work in progress for the next release. It is merged into `main` (through a pull request, after the tests pass) and then matches `main` again. | No |
 | `enterprise/hotel-suite` | The Enterprise Hotel Edition: `main` plus the hotel design and build documentation. | Hotel projects only |
 
@@ -36,8 +36,11 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | Area | Highlights |
 |------|-----------|
 | **Polymath Console** (for Polymath Tech) | Central management of every client in its own Firebase project, in the Polymath Technologies look: an overview with live figures, trend lines, a map of clients (world and Sri Lanka) and platform health; licences issued and renewed from the browser and delivered automatically; subscriptions, payments and monthly recurring revenue; monitoring of every system's hourly check-in; reports and analytics; suspend/restore; **updates pushed to chosen clients** from a release catalogue, now or in their maintenance window, with a maintenance notice and *What's new* on the client's side; **two-step validation of every new business** (the client's system, then the business, with duplicate checks and signed approvals); a message to all clients; privacy and data controls (data agreements, export, erasure, retention); staff roles and an audit log. [How it works](docs/22-polymath-console.md) · [Deployment and configuration](docs/23-polymath-console-deployment.md) |
+| **Industry models** (one platform) | One codebase for every kind of business: restaurant, café, bar, bakery, retail, clothing, **wholesale & distribution**; salon, tattoo studio and services in preview. Each starts with its own modules, words and starter data; the Polymath Console shows each business's model. [Details](docs/25-industry-models-wholesale-whatsapp.md) |
+| **Wholesale & distribution** | Styles in sizes and colours (each a stock item with SKU and EAN-13 barcode), quantity prices per style, customer price lists, size/colour extras, custom printing; quotations → orders → packing → dispatch (stock out, invoice) → delivery; credit limits with manager approval; bank slips, courier cash on delivery settlements, cheques (post-dated, bounced); printable quotations and invoices. Demo: *Colombo Tees*. Client plan: [Zevix](docs/clients/zevix.md) |
+| **WhatsApp Business** (Cloud API) | Ordering assistant (designs, colours, sizes with stock, quantity prices, checkout, payment choice, slip photos), shared inbox with take-over, automatic order/dispatch/payment messages within WhatsApp's 24-hour rule and approved templates, broadcasts to opted-in customers with STOP, catalogue sync with stock; signed webhook, secrets kept server-side; a simulator before Meta is connected |
 | **Licensing & modules** | Editions (Starter, Professional, Enterprise) with add-ons and limits; vendor-signed licence keys bound to the client's Firebase project; modules chosen at installation; launchpad with a separate workspace per module. [Details](docs/15-licensing-and-modules.md) |
-| **POS** (terminals and tablets) | PIN sign-in with roles and manager override; tables and covers; dine-in, takeaway and delivery; modifiers; **allergy alerts**; send to kitchen (KOT routing kitchen/bar, backup printers); guest check with **LankaQR**; split payments (cash with change, card approval code, LankaQR, PayHere, USD cash, vouchers, house account, comp); voids with reason codes; discounts; 86 items; X/Z reports; **End of Day** (stock deduction, journal, WhatsApp report) |
+| **POS** (terminals and tablets) | PIN sign-in with roles and manager override; tables and covers; dine-in, takeaway and delivery; modifiers; **allergy alerts**; send to kitchen (KOT routing kitchen/bar, backup printers); guest check with **LankaQR**; split payments (cash with change, card approval code, LankaQR, PayHere, USD cash, vouchers, house account, comp); voids with reason codes; discounts; 86 items; **closed-check corrections** (find any check, reprint, change payment, refund items, void, reopen, with numbered credit notes), merge checks, cash pickups and till counts; X/Z reports; **End of Day** (stock deduction, journal, WhatsApp report) |
 | **Sri Lanka compliance** | Service charge → SSCL → VAT order, inclusive or exclusive pricing, **IRD tax invoice format** (Gazette 2481/22) with `YYMMM_W01_n` numbers per workstation, hash-chained immutable invoices, plain invoices for non-VAT businesses |
 | **Back office (EMC)** | Menu, categories, modifiers, tenders, discounts, order types, reason codes, tables, outlets and revenue centres, devices and printers, **branding per client** (logo, colours, bill text), **modules on/off per client** |
 | **People & Security** | Hotel hierarchy (enterprise → property → revenue centre); employees with property roles, revenue-centre access, cards and employment dates; roles with **levels, limits and "needs approval"**; sign-in by number/card/name + PIN with **lockout**, auto sign-out, **clock in/out**; manager override by a senior employee only; back-office logins. [Details](docs/16-users-access-and-audit.md) |
@@ -78,13 +81,14 @@ pnpm dev                 # open http://localhost:5173 → "Load the demo restaur
 | 14 | [**Feature coverage vs Simphony and S/4HANA**](docs/14-feature-coverage.md) |
 | 15 | [**Licensing and modules**](docs/15-licensing-and-modules.md) |
 | 16 | [**Users, access control, audit and QA**](docs/16-users-access-and-audit.md) |
-| 18 | [**Client deployment manual (A to Z)**](docs/18-deployment-manual.md) · client plans: [Noura Kitchen](docs/clients/noura-kitchen.md) |
+| 18 | [**Client deployment manual (A to Z)**](docs/18-deployment-manual.md) · client plans: [Noura Kitchen](docs/clients/noura-kitchen.md) · [Zevix](docs/clients/zevix.md) |
 | 19 | [**User manual and role-based training manuals for clients**](docs/manual/README.md) (PDFs: `pnpm manual:pdf`) |
 | 20 | [**Releases and updates**](docs/20-release-and-updates.md): versions, waves, approvals, backups, migrations, rollback, support levels |
 | 21 | [**Security and reliability review**](docs/21-security-review.md) and the go-live security checklist |
 | 22 | [**Polymath Console**](docs/22-polymath-console.md): central management of clients, licences, subscriptions, health and updates |
 | 23 | [**Polymath Console deployment and configuration (A to Z)**](docs/23-polymath-console-deployment.md): Firebase project, setup, deploy, staff, clients, linking, updates and approvals, privacy, backups, troubleshooting |
 | 24 | [**Privacy and data protection**](docs/24-privacy-and-data-protection.md): who holds what, Sri Lanka's PDPA roles, lawful basis, security, the client data agreement, requests, retention, breaches, end of contract |
+| 25 | [**Industry models, wholesale, WhatsApp Business, POS manager functions**](docs/25-industry-models-wholesale-whatsapp.md): one platform for every kind of business, the wholesale flow and its books, the WhatsApp assistant and its security, closed-check corrections |
 
 ## Commands
 ```bash

@@ -103,7 +103,9 @@ function Thread({ conv }: { conv: WaConversation }) {
   useEffect(() => {
     if (conv.unread) void store.merge(WA.conversations, conv.id, { unread: 0 });
   }, [conv.id, conv.unread, store]);
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [sorted.length]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [sorted.length]);
   async function send(message: WaOutbound) {
     try {
       await wa({ action: "send", conversationId: conv.id, message });
@@ -300,7 +302,9 @@ export function WhatsAppSettingsPage() {
   const [w, setW] = useState(settings.integrations.whatsapp);
   const [secrets, setSecrets] = useState({ accessToken: "", appSecret: "", verifyToken: "" });
   const [busy, setBusy] = useState(false);
-  useEffect(() => setW(settings.integrations.whatsapp), [settings.integrations.whatsapp]);
+  useEffect(() => {
+    setW(settings.integrations.whatsapp);
+  }, [settings.integrations.whatsapp]);
   if (!on("whatsappCommerce")) return <ModuleOff name="WhatsApp Business" />;
   const admin = role === "owner" || role === "admin";
   const region = (import.meta.env.VITE_FUNCTIONS_REGION as string | undefined) || "asia-south1";

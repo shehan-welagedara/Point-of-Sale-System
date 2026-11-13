@@ -487,10 +487,10 @@ export async function buildSampleStore(opts: SampleOptions): Promise<{ store: Me
 
   if (noura) {
     const modules = Object.fromEntries(Object.keys(allModulesOn()).map((k) => [k, NOURA_MODULES.has(k as ModuleKey)])) as Record<ModuleKey, boolean>;
-    return { store, tenant: { id: "demo-noura-kitchen", name: "Noura Kitchen (demo)", modules, plan: "demo", entitlements: builtInEntitlements("demo"), status: "active" } };
+    return { store, tenant: { id: "demo-noura-kitchen", name: "Noura Kitchen (demo)", industry: "restaurant", modules, plan: "demo", entitlements: builtInEntitlements("demo"), status: "active" } };
   }
   return {
     store,
-    tenant: { id: "demo-spice-lagoon", name: "Spice Lagoon (demo)", modules: allModulesOn(), plan: "demo", entitlements: builtInEntitlements("demo"), status: "active" },
+    tenant: { id: "demo-spice-lagoon", name: "Spice Lagoon (demo)", industry: "restaurant", modules: { ...allModulesOn(), wholesale: false, whatsappCommerce: false }, plan: "demo", entitlements: builtInEntitlements("demo"), status: "active" },
   };
 }

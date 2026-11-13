@@ -141,3 +141,12 @@ describe("wholesale credit, payments, couriers and stock", () => {
     expect((await store.get<StockLevel>(C.stockLevels, stockLevelId("MAIN", sku)))!.qty).toBe(16);
   });
 });
+
+describe("document numbers", () => {
+  it("never hands out the same number twice, even when asked at the same time", async () => {
+    const store = new MemoryStore();
+    const numbers = await Promise.all(Array.from({ length: 20 }, () => nextDocNumber(store, "SO")));
+    expect(new Set(numbers).size).toBe(20);
+    expect(numbers.sort()[19]).toBe("SO-000020");
+  });
+});

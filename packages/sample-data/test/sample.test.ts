@@ -134,3 +134,16 @@ describe("Colombo Tees (wholesale demo)", () => {
     expect(cogs).toBeGreaterThan(0);
   });
 });
+
+describe("Colombo Tees stock", () => {
+  it("receives packs at the cost per pack, so a piece costs the style's cost", async () => {
+    const { COLLECTIONS: C } = await import("@pos/core");
+    const { buildSampleStore } = await import("../src/index.js");
+    const { store } = await buildSampleStore({ today: "2026-11-13", kind: "colombo-tees" });
+    const levels = await store.list<{ itemId: string; qty: number; value: number; lots: { unitCost: number }[] }>(C.stockLevels);
+    const hoodie = levels.find((l) => l.itemId.startsWith("CT-HOD01-") && l.qty > 0)!;
+    expect(hoodie.lots[0]!.unitCost).toBe(2_350_00);
+    expect(hoodie.qty % 5).toBe(0);
+    expect(Math.max(...levels.map((l) => l.qty))).toBeLessThanOrEqual(11 * 12);
+  });
+});

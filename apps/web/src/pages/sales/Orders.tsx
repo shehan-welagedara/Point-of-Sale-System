@@ -428,7 +428,8 @@ function OrderDetail({ order: o, data, onClose, onEdit }: { order: SalesOrder; d
       await wa({ action: "orderMessage", orderId: o.id, kind });
       if (!silent) toast("Sent on WhatsApp");
     } catch (e) {
-      toast(`WhatsApp: ${(e as Error).message}`, true);
+      // Automatic messages skip quietly (e.g. no approved template yet); a message sent on purpose says why not.
+      if (!silent) toast(`WhatsApp: ${(e as Error).message}`, true);
     }
   };
 

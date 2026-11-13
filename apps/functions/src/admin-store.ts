@@ -56,6 +56,15 @@ export class AdminStore implements DocStore {
     await this.ref(col, id).set({ ...(base ?? {}), id, ...toIncrements(inc) }, { merge: true });
   }
 
+  async nextSequence(col: string, id: string): Promise<number> {
+    const ref = this.ref(col, id);
+    return this.db.runTransaction(async (t: Transaction) => {
+      const seq = (Number((await t.get(ref)).get("seq")) || 0) + 1;
+      t.set(ref, { id, seq }, { merge: true });
+      return seq;
+    });
+  }
+
   async remove(col: string, id: string): Promise<void> {
     await this.ref(col, id).delete();
   }

@@ -346,6 +346,7 @@ export function withValidation<S extends DocStore>(store: S): DocStore {
     },
     merge: (col, id, data) => store.merge(col, id, data),
     increment: (col, id, inc, base) => store.increment(col, id, inc, base),
+    ...(store.nextSequence ? { nextSequence: (col: string, id: string) => store.nextSequence!(col, id) } : {}),
     remove: (col, id) => store.remove(col, id),
     batch: (ops) => {
       for (const o of ops) if (o.op === "set") check(o.col, o.data);

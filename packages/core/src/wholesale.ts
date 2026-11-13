@@ -371,9 +371,14 @@ export function codSettlementFor(courier: Pick<Courier, "codFeeBp" | "parcelFee"
 
 /** Next document number (QT-000001, SO-000001…), kept per prefix in docSequences. */
 export async function nextDocNumber(store: DocStore, prefix: "QT" | "SO" | "CS"): Promise<string> {
-  const cur = await store.get<{ id: string; seq: number }>(WHOLESALE.docSequences, prefix);
-  const seq = (cur?.seq ?? 0) + 1;
-  await store.set(WHOLESALE.docSequences, { id: prefix, seq });
+  // Atomic where the store can (Firestore transaction): staff and the WhatsApp assistant never share a number.
+  let seq: number;
+  if (store.nextSequence) seq = await store.nextSequence(WHOLESALE.docSequences, prefix);
+  else {
+    const cur = await store.get<{ id: string; seq: number }>(WHOLESALE.docSequences, prefix);
+    seq = (cur?.seq ?? 0) + 1;
+    await store.set(WHOLESALE.docSequences, { id: prefix, seq });
+  }
   return `${prefix}-${String(seq).padStart(6, "0")}`;
 }
 
