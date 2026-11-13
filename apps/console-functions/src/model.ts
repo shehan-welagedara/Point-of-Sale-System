@@ -118,7 +118,7 @@ export interface ConsoleClient {
 
 export const DEFAULT_SUPPLIER: SupplierContact = { name: "Polymath Tech" };
 
-export const INDUSTRIES = ["Restaurant", "Café", "Bakery", "Bar & pub", "Hotel", "Resort", "Catering", "Retail", "Other"] as const;
+export const INDUSTRIES = ["Restaurant", "Café", "Bakery", "Bar & pub", "Hotel", "Resort", "Catering", "Retail", "Clothing & apparel", "Wholesale & distribution", "Salon & spa", "Tattoo studio", "Services", "Other"] as const;
 
 const DAY = 86_400_000;
 const dayStart = (d: string) => Date.parse(`${d}T00:00:00+05:30`);

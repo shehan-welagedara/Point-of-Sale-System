@@ -27,6 +27,7 @@ export interface ConsoleBusinessRequest {
   name: string;
   kind: "business" | "demo";
   modules: string[];
+  industry?: string;
   requestedBy: { uid: string; email: string; name?: string };
   requestedAt: string;
   note?: string;
@@ -50,6 +51,7 @@ function cleanRequest(r: BusinessRequest): BusinessRequest | null {
     name: r.name.slice(0, 80),
     kind: r.kind === "demo" ? "demo" : "business",
     modules: (Array.isArray(r.modules) ? r.modules : []).slice(0, 40).map((m) => String(m).slice(0, 40)),
+    ...(typeof r.industry === "string" && /^[a-z]{3,20}$/.test(r.industry) ? { industry: r.industry } : {}),
     requestedBy: { uid: r.requestedBy.uid.slice(0, 128), email: String(r.requestedBy.email ?? "").slice(0, 120), ...(r.requestedBy.name ? { name: String(r.requestedBy.name).slice(0, 80) } : {}) },
     requestedAt: String(r.requestedAt ?? "").slice(0, 40),
     ...(r.note ? { note: String(r.note).slice(0, 300) } : {}),

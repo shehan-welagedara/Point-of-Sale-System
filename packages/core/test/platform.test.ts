@@ -72,12 +72,13 @@ describe("licensing", () => {
 
   it("builds entitlements with dependencies and clamps module switches to them", () => {
     const starter = buildEntitlements("starter", ["purchasing"]);
-    // Purchasing needs inventory, which needs recipes.
-    expect(starter.modules).toEqual(expect.arrayContaining(["purchasing", "inventory", "recipes"]));
+    // Purchasing needs inventory (recipes are optional since 1.11.0: shops stock finished goods).
+    expect(starter.modules).toEqual(expect.arrayContaining(["purchasing", "inventory"]));
+    expect(starter.modules).not.toContain("recipes");
     expect(starter.modules).not.toContain("accounting");
-    const on = clampModules({ pos: true, accounting: true, inventory: true, purchasing: true, recipes: false }, starter);
+    const on = clampModules({ pos: true, accounting: true, inventory: false, purchasing: true }, starter);
     expect(on.accounting).toBe(false); // not licensed
-    expect(on.purchasing).toBe(false); // its dependency (recipes) is switched off
+    expect(on.purchasing).toBe(false); // its dependency (inventory) is switched off
     expect(on.pos).toBe(true);
     expect(Object.values(clampModules({ pos: true }, starter, false)).some(Boolean)).toBe(false); // expired licence
   });

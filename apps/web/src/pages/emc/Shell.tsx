@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { MEMBER_ROLE_INFO, editionInfo } from "@pos/core";
+import { MEMBER_ROLE_INFO, type ModuleKey, editionInfo, industryModel } from "@pos/core";
 import { DEMO_PEOPLE } from "@pos/sample-data";
 import { InsightList, insightRange, useInsights } from "../../components/Insights";
 import { Loading } from "../../components/ui";
@@ -121,6 +121,8 @@ function TopBar({ workspace, onMenu }: { workspace?: Workspace; onMenu?: () => v
 }
 
 /** Module launchpad: one tile per licensed, switched-on module the person may use. */
+const TRADE_SPECIFIC: ModuleKey[] = ["wholesale", "whatsappCommerce", "tables", "recipes", "kds"];
+
 export function Launchpad() {
   const phone = useIsPhone();
   return phone ? <TodayPage /> : <LaunchpadTiles />;
@@ -138,11 +140,15 @@ function HomeInsights() {
 }
 
 function LaunchpadTiles() {
-  const { on, role, licence, settings } = useApp();
+  const { on, role, licence, settings, tenant } = useApp();
   const navigate = useNavigate();
   const visible = visibleWorkspaces(on, role);
   const groups = [...new Set(WORKSPACES.map((w) => w.group))];
-  const locked = WORKSPACES.filter((w) => w.modules && !w.modules.some(on) && w.modules.some((m) => !licence.entitlements.modules.includes(m)));
+  // Upgrades on offer: modules for any business, and the trade-specific ones of this business's kind
+  // (a restaurant isn't offered Wholesale; a wholesaler isn't offered Table Service).
+  const model = industryModel(tenant?.industry);
+  const relevant = (m: ModuleKey) => !TRADE_SPECIFIC.includes(m) || model.modules.includes(m);
+  const locked = WORKSPACES.filter((w) => w.modules && !w.modules.some(on) && w.modules.some((m) => !licence.entitlements.modules.includes(m)) && w.modules.some(relevant));
   return (
     <div className="page">
       <div className="page-head">

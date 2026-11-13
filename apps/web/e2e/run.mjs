@@ -643,6 +643,83 @@ try {
     }
   }
 
+  // ── Manager functions on closed checks (1.11.0): find, change payment, refund items, void, reopen;
+  //    cash pickup and till count. On the app-style POS of a PC (same Functions as the terminal).
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, storageState: await page.context().storageState() });
+    await ctx.addInitScript(() => localStorage.setItem("pos-suite.workstation", "W02"));
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errors.push(`closed checks: ${e.message}`));
+    await p.goto(`${B}/pos?mode=local`);
+    await p.waitForTimeout(900);
+    await p.getByLabel("Employee number or card").fill("1001");
+    await p.getByLabel("PIN", { exact: true }).fill("1111");
+    await p.getByRole("button", { name: "Sign In" }).click();
+    await p.waitForTimeout(800);
+    if (await p.locator(".mauth-list button").count()) await p.locator(".mauth-list button").first().click();
+    await p.waitForTimeout(600);
+    for (const n of [0, 1]) {
+      await p.locator(".w-nav button", { hasText: "Menu" }).click();
+      await p.waitForTimeout(300);
+      for (const k of [0, 1]) {
+        await p.locator(".m-product:not(.out) .m-add").nth(n + k).click();
+        await p.waitForTimeout(250);
+        if (await p.locator(".modal").count()) await p.locator(".modal .btn.primary").last().click();
+      }
+      await p.locator(".w-order .m-btn.cta").click();
+      await p.waitForTimeout(400);
+      await p.getByRole("button", { name: /Pay Now|Complete Payment/ }).click();
+      await p.waitForTimeout(1000);
+      await p.getByRole("button", { name: "Done" }).click();
+      await p.waitForTimeout(300);
+    }
+    const openFunctions = async () => {
+      await p.locator(".w-nav button", { hasText: "More" }).click();
+      await p.waitForTimeout(300);
+      await p.locator(".m-sheet-row", { hasText: "Functions" }).click();
+      await p.waitForTimeout(400);
+    };
+    await openFunctions();
+    await p.locator(".card", { hasText: "Closed checks" }).first().click();
+    await p.waitForTimeout(600);
+    check("Closed checks lists today's paid checks", (await p.locator(".closed-row").count()) >= 2);
+    const toastText = async () => (await p.locator(".toast").allTextContents()).join(" | ");
+    await p.locator(".closed-row").nth(0).click();
+    await p.getByRole("button", { name: "Change payment", exact: true }).click();
+    await p.getByPlaceholder("e.g. Paid by card, rung up as cash").fill("Paid by card");
+    await p.getByTestId("credit-tender").getByRole("button", { name: "Change" }).click();
+    await p.waitForTimeout(700);
+    check("a closed check's payment method can be changed", (await toastText()).includes("Payment method changed") && (await p.locator(".closed-row .badge", { hasText: "Payment changed" }).count()) === 1, await toastText());
+    await p.getByRole("button", { name: "Refund items", exact: true }).click();
+    await p.getByTestId("credit-refund").getByRole("button", { name: /^More / }).first().click();
+    await p.getByTestId("credit-refund").getByPlaceholder(/Why/).fill("Customer returned it");
+    await p.getByTestId("credit-refund").getByRole("button", { name: "Refund", exact: true }).click();
+    await p.waitForTimeout(900);
+    check("refunding one item issues a credit note", /CN-\d{2}[A-Z]{3}_W02_1: Rs [\d,.]+ refunded/.test(await toastText()) && (await p.locator(".closed-row .badge", { hasText: "Refunded" }).count()) === 1, await toastText());
+    await p.getByRole("button", { name: "Void check", exact: true }).click();
+    await p.getByTestId("credit-void").getByPlaceholder(/Why/).fill("Should not have been closed");
+    await p.getByTestId("credit-void").getByRole("button", { name: "Void check" }).click();
+    await p.waitForTimeout(800);
+    check("a partly refunded check can't be voided whole (refund the rest item by item)", (await toastText()).includes("item by item"), await toastText());
+    await p.locator(".closed-row").nth(1).click();
+    await p.getByRole("button", { name: "Reopen", exact: true }).click();
+    await p.getByTestId("credit-reopen").getByPlaceholder(/Why/).fill("Add a dessert");
+    await p.getByTestId("credit-reopen").getByRole("button", { name: "Reopen" }).click();
+    await p.waitForTimeout(1200);
+    check("reopening a closed check cancels its bill and opens it again to correct", (await toastText()).includes("is open again") && (await p.locator(".w-order .m-line").count()) >= 1, await toastText());
+    await openFunctions();
+    await p.locator(".card", { hasText: "Till count" }).first().click();
+    await p.waitForTimeout(400);
+    await p.getByLabel("Rs 1000").fill("3");
+    await p.waitForTimeout(200);
+    const summary = await p.getByTestId("till-summary").innerText();
+    check("till count compares the drawer with the cash expected", /Counted\s+Rs 3,000\.00/.test(summary) && /Expected/.test(summary), summary.replace(/\n/g, " "));
+    await p.getByRole("button", { name: "Save count" }).click();
+    await p.waitForTimeout(800);
+    check("the till count is saved and logged", /Till (balanced|over|short)/.test(await toastText()), await toastText());
+    await ctx.close();
+  }
+
   // ── The Noura Kitchen demo: their set-up with sample data to explore; the About page.
   {
     const version = JSON.parse((await import("node:fs")).readFileSync(resolve(web, "package.json"), "utf8")).version;
@@ -702,6 +779,105 @@ try {
       await p.waitForTimeout(400);
     }
     check("the office PC shows a standard bill on screen (Bill No, no tax invoice, no VAT)", receipt.includes("Bill No") && !receipt.includes("TAX INVOICE") && !/VAT\s/.test(receipt), receipt.split("\n").slice(0, 3).join(" / "));
+    await ctx.close();
+  }
+
+  // ── Wholesale (1.11.0): the Colombo Tees demo — order with the size grid and price list, pack,
+  //    dispatch (stock out, invoice), payment into the books; WhatsApp assistant takes an order.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errors.push(`wholesale: ${e.message}`));
+    const toasts = async () => (await p.locator(".toast").allTextContents()).join(" | ");
+    await p.goto(`${B}/?mode=local`);
+    await p.getByRole("radio", { name: /Wholesale/ }).click();
+    check("choosing Wholesale sets its modules", (await p.locator("details.field summary").textContent())?.includes("(6)") || (await p.locator("details.field summary").textContent())?.includes("(7)"), await p.locator("details.field summary").textContent());
+    await p.getByText("Try a demo business").click();
+    await p.getByRole("button", { name: "Load Colombo Tees" }).click();
+    await p.waitForURL(/emc\/home/, { timeout: 90_000 });
+    await p.waitForFunction(() => document.querySelectorAll(".tile-name").length >= 6, null, { timeout: 15_000 }).catch(() => {});
+    const wTiles = await p.locator(".tile-name").allTextContents();
+    check("Colombo Tees shows the trade workspaces, not the restaurant ones", ["Sales & Orders", "WhatsApp Business", "Inventory & Purchasing", "Finance"].every((t) => wTiles.includes(t)) && !wTiles.includes("Point of Sale") && !wTiles.includes("Menu Management"), wTiles.join(", "));
+
+    await p.goto(`${B}/emc/sales/orders?mode=local`);
+    await p.waitForTimeout(900);
+    check("the orders board lists new, confirmed and packed orders to do", (await p.locator("tr[data-testid^=order-SO-]").count()) >= 3);
+    await p.getByRole("button", { name: "New order" }).click();
+    await p.getByLabel("Customer", { exact: true }).selectOption({ label: "Lanka Fashion House – Nimal Perera (Kandy)" });
+    await p.getByLabel("Add a style").selectOption({ label: "CT-OVS01 · Oversized tee" });
+    await p.getByLabel("Black M", { exact: true }).fill("12");
+    await p.getByLabel("Off-white L", { exact: true }).fill("12");
+    await p.getByTestId("size-grid").getByRole("button", { name: "Add to order" }).click();
+    const totals = await p.getByTestId("order-totals").innerText();
+    // 24 pieces of the style: the 12+ tier (Rs 1,300) less the A-grade 5% = Rs 1,235 each.
+    check("the order prices the style tier and the customer's price list", totals.includes("Rs 29,640.00") && totals.includes("24 pcs"), totals.replace(/\s+/g, " "));
+    await p.getByRole("button", { name: "Confirm order" }).click();
+    await p.waitForTimeout(800);
+    check("confirming saves the order with its number", /SO-\d{6} saved/.test(await toasts()), await toasts());
+    await p.getByTestId("order-actions").getByRole("button", { name: "Packed" }).click();
+    await p.waitForTimeout(600);
+    await p.getByTestId("order-actions").getByRole("button", { name: "Dispatch" }).click();
+    await p.getByLabel("Tracking number").fill("IE5555");
+    await p.getByRole("button", { name: "Dispatch now" }).click();
+    await p.waitForTimeout(1500);
+    check("dispatch takes stock out and invoices the customer", /dispatched and invoiced/.test(await toasts()), await toasts());
+    check("the order shows its invoice number", /Invoice\s+SINV-/.test(await p.locator(".modal").first().innerText()));
+    await p.getByTestId("order-actions").getByRole("button", { name: "Record payment" }).click();
+    await p.getByLabel("Reference").fill("BOC 7788");
+    await p.getByRole("button", { name: "Record", exact: true }).click();
+    await p.waitForTimeout(500);
+    await p.getByTestId("order-payment").getByRole("button", { name: "Confirm received" }).click();
+    await p.waitForTimeout(1200);
+    check("a confirmed payment marks the order paid", (await p.locator(".modal .badge", { hasText: "Paid" }).count()) >= 1, await toasts());
+    await p.keyboard.press("Escape");
+
+    // WhatsApp: a customer orders through the assistant (simulated phone).
+    await p.goto(`${B}/emc/whatsapp/inbox?mode=local`);
+    await p.waitForTimeout(800);
+    check("the WhatsApp inbox shows the demo conversation", (await p.locator(".wa-conv").count()) >= 1);
+    await p.getByTestId("wa-sim-toggle").click();
+    await p.getByLabel("Customer number").fill("94779998877");
+    const sim = p.getByTestId("wa-sim");
+    const say = async (text) => { await sim.getByLabel("Customer message").fill(text); await sim.getByRole("button", { name: "Send", exact: true }).click(); await p.waitForTimeout(500); };
+    const tap = async (label) => { await sim.locator(".chip", { hasText: label }).first().click(); await p.waitForTimeout(500); };
+    await say("hi");
+    await tap("Place an order");
+    await tap("Classic crew-neck tee");
+    await tap("White");
+    await tap("M");
+    await say("24");
+    const thread = await p.locator(".wa-msgs").innerText();
+    check("the assistant prices the cart with the quantity tier", thread.includes("Rs 850.00") && thread.includes("Total Rs 20,400.00"), thread.split("\n").slice(-4).join(" / "));
+    await tap("Checkout");
+    await say("45 Hill Street, Nuwara Eliya");
+    await tap("Cash on delivery");
+    await p.goto(`${B}/emc/sales/orders?mode=local`);
+    await p.waitForTimeout(900);
+    const board = await p.locator("table").first().innerText();
+    check("the WhatsApp order arrives on the board as new, cash on delivery", board.includes("💬 WhatsApp") && board.includes("Rs 20,400.00"), board.split("\n").slice(0, 3).join(" / "));
+
+    await p.goto(`${B}/emc/sales/money?mode=local`);
+    await p.waitForTimeout(700);
+    await p.getByRole("tab", { name: "Courier COD" }).click();
+    await p.locator("input[type=checkbox]").first().check();
+    await p.getByRole("button", { name: "Record settlement" }).click();
+    await p.waitForTimeout(1500);
+    check("a courier's COD settlement confirms the payments, less fees", /CS-\d{6}: Rs [\d,.]+ from /.test(await toasts()), await toasts());
+    await p.goto(`${B}/emc/finance/statements?mode=local`);
+    await p.getByRole("tab", { name: "Trial balance" }).click();
+    await p.waitForTimeout(700);
+    check("Colombo Tees books balance after orders, dispatch and payments", (await p.locator(".card-head .badge").first().textContent()) === "Balanced");
+    await p.goto(`${B}/emc/sales/styles?mode=local`);
+    await p.waitForTimeout(700);
+    check("styles show stock per size and colour", (await p.locator("[data-testid^=style-CT-]").count()) === 5);
+    // Phones: the orders board and the inbox fit the screen width.
+    await p.setViewportSize({ width: 390, height: 844 });
+    for (const path of ["/emc/sales/orders", "/emc/whatsapp/inbox", "/emc/sales/styles"]) {
+      await p.goto(`${B}${path}?mode=local`);
+      await p.waitForTimeout(700);
+      const over = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      check(`phone: ${path} has no sideways scroll`, over <= 1, `${over}px`);
+    }
     await ctx.close();
   }
 

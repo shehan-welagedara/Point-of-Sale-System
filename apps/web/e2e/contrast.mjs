@@ -419,6 +419,46 @@ try {
       }
     }
   }
+
+  // ── Trade (1.11.0): Sales & Orders and WhatsApp Business on the Colombo Tees demo, light and dark ──
+  if (!only.length || only.includes("trade")) {
+    const ctx0 = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+    const tp0 = await ctx0.newPage();
+    await tp0.goto(`${B}/?mode=local`);
+    await tp0.getByText("Try a demo business").click();
+    await tp0.getByRole("button", { name: "Load Colombo Tees" }).click();
+    await tp0.waitForURL(/emc\/home/, { timeout: 90_000 });
+    const tees = await ctx0.storageState();
+    await ctx0.close();
+    for (const scheme of ["light", "dark"]) {
+      for (const [size, opts] of [["PC", { viewport: { width: 1366, height: 768 } }], ["phone", { ...devices["Pixel 7"] }]]) {
+        const ctx = await browser.newContext({ ...opts, storageState: tees, colorScheme: scheme });
+        ctx.setDefaultTimeout(8000);
+        const p = await ctx.newPage();
+        const tag = `trade ${scheme} · ${size}`;
+        for (const [name, path] of [
+          ["launchpad", "/emc/home"],
+          ["orders", "/emc/sales/orders"],
+          ["payments & COD", "/emc/sales/money"],
+          ["styles & stock", "/emc/sales/styles"],
+          ["WhatsApp inbox", "/emc/whatsapp/inbox"],
+          ["WhatsApp broadcasts", "/emc/whatsapp/broadcasts"],
+          ["WhatsApp connection", "/emc/whatsapp/settings"],
+        ]) {
+          await p.goto(`${B}${path}?mode=local`);
+          await p.waitForTimeout(900);
+          if (path === "/emc/whatsapp/inbox") await p.locator(".wa-conv").first().click().catch(() => {});
+          await audit(p, `${tag} · ${name}`);
+        }
+        await p.goto(`${B}/emc/sales/orders?mode=local`);
+        await p.waitForTimeout(800);
+        await p.locator("tr[data-testid^=order-]").first().click().catch(() => {});
+        await p.waitForTimeout(500);
+        await audit(p, `${tag} · order detail`);
+        await ctx.close();
+      }
+    }
+  }
 } finally {
   await browser.close();
   await server.close();

@@ -331,3 +331,41 @@ describe("bank reconciliation", () => {
 });
 
 export type { Invoice };
+
+describe("wholesale orders in the books", () => {
+  it("invoices a dispatched order once and receipts confirmed payments against it", async () => {
+    const { store, runner } = await ledgerStore({ paymentApprovalThreshold: 100_000_00 });
+    const { WHOLESALE } = await import("@pos/core");
+    const sales = { uid: "seller", name: "Sam (sales)", role: "sales" as const };
+    const order = {
+      id: "o1", number: "SO-000001", status: "dispatched", customerId: "SHOP1", customerName: "Lanka Fashion", channel: "whatsapp", date: "2026-11-03",
+      lines: [{ id: "1", styleId: "OVS01", styleCode: "ZX-OVS01", name: "Oversized tee", colour: "Black", size: "M", sku: "ZX-OVS01-BLACK-M", qty: 24, unit: 1_250_00, amount: 30_000_00 }],
+      print: { description: "Logo front", method: "screen", sides: ["front"], colours: 1, setupFee: 1_500_00, pricePerPiece: 150_00, status: "done" },
+      discount: 1_000_00, deliveryCharge: 400_00, subtotal: 30_000_00 - 1_000_00 + 24 * 150_00 + 1_500_00 + 400_00, vat: 0, total: 34_500_00,
+      payments: [{ id: "pay1", method: "bank", amount: 20_000_00, at: NOW, by: "whatsapp", status: "pending" }, { id: "pay2", method: "cod", amount: 14_500_00, at: NOW, by: "courier", status: "pending" }],
+      paid: 0, paymentStatus: "unpaid", onCredit: false, createdBy: "seller", createdAt: NOW, updatedAt: NOW, history: [],
+    };
+    await store.set(WHOLESALE.salesOrders, order);
+    const { postSalesOrder } = await import("../src/index.js");
+    const inv = await postSalesOrder(runner, { orderId: "o1", event: "invoice", date: "2026-11-03", actor: sales, now: NOW });
+    expect(inv.voucher).toMatchObject({ status: "posted", outstanding: 34_500_00, customerId: "SHOP1" });
+    expect(inv.order.invoiceNo).toMatch(/^SINV-/);
+    const again = await postSalesOrder(runner, { orderId: "o1", event: "invoice", date: "2026-11-03", actor: sales, now: NOW });
+    expect(again.voucher!.id).toBe(inv.voucher!.id);
+    const sinvLines = (await store.list<LedgerEntry>(L.ledger)).filter((l) => l.voucherId === inv.voucher!.id);
+    expect(sinvLines.filter((l) => l.account === "4020").reduce((a, l) => a + l.credit, 0)).toBe(34_500_00);
+    expect(sinvLines.find((l) => l.account === "1100")).toMatchObject({ debit: 34_500_00, partyId: "SHOP1" });
+
+    const r1 = await postSalesOrder(runner, { orderId: "o1", event: "payment", paymentId: "pay1", date: "2026-11-04", actor: sales, now: NOW });
+    expect(r1.order).toMatchObject({ paid: 20_000_00, paymentStatus: "partial" });
+    // The courier's cash on delivery, less its fee, reaches the bank.
+    const r2 = await postSalesOrder(runner, { orderId: "o1", event: "payment", paymentId: "pay2", date: "2026-11-06", fees: 568_00, actor: sales, now: NOW });
+    expect(r2.order).toMatchObject({ paid: 34_500_00, paymentStatus: "paid" });
+    expect((await store.get<SalesInvoice>(L.vouchers, inv.voucher!.id))!.outstanding).toBe(0);
+    const bank = (await store.list<LedgerEntry>(L.ledger)).filter((l) => l.account === "1010").reduce((a, l) => a + l.debit - l.credit, 0);
+    expect(bank).toBe(34_500_00 - 568_00);
+    // Draft orders and quotations never reach the books.
+    await store.set(WHOLESALE.salesOrders, { ...order, id: "o2", number: "SO-000002", status: "draft" });
+    await expect(postSalesOrder(runner, { orderId: "o2", event: "invoice", date: "2026-11-03", actor: sales, now: NOW })).rejects.toThrow(/confirm it first/);
+  });
+});

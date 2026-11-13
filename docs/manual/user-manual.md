@@ -19,6 +19,8 @@ The screenshots come from the demo restaurant *Spice Lagoon*. Your own system sh
 7. [Menu Management](#7-menu-management)
 8. [Inventory & Purchasing](#8-inventory--purchasing)
 9. [Customers and loyalty](#9-customers-and-loyalty)
+   - 9A. [Sales & Orders (wholesale)](#9a-sales--orders-wholesale)
+   - 9B. [WhatsApp Business](#9b-whatsapp-business)
 10. [Reports & Analytics](#10-reports--analytics)
 11. [Finance](#11-finance)
 12. [Audit Center](#12-audit-center)
@@ -294,6 +296,10 @@ Print any report on the bill printer. Employees with only *own reports* see thei
 | **Unlock employee** | Unlocks someone locked out by wrong PINs. | Supervisor |
 | **Transaction journal** | Everything that happened on this workstation today. | Supervisor |
 | **Item availability (86)** | Tap an item to mark it out of stock (86) or back on sale. It shows immediately on every device. | Supervisor, kitchen |
+| **Closed checks** | Find any check of a day (number, invoice, table, amount or name) and:<br>• **Reprint** it (COPY).<br>• **Change payment** (e.g. paid by card, rung up as cash).<br>• **Refund items** (and put them back into stock).<br>• **Void** it.<br>• **Reopen** it to correct and close again.<br>The original bill never changes: each correction prints a numbered credit note (CN-…). | Manager (privilege *Adjust closed checks*) |
+| **Transfer / merge** | Move the check to another table or employee, or merge another open check into this one. | Server, supervisor |
+| **Cash pickup** | Take cash out of the drawer to the safe during the shift (logged; expected cash goes down). | Supervisor, finance |
+| **Till count** | Count the drawer by note and coin; the screen shows over or short against the expected cash, saves the count and prints a slip. | Supervisor, finance |
 
 Buttons marked **Needs approval** ask for a senior employee (see [section 5](#5-approvals-privileges-and-the-transaction-journal)).
 
@@ -644,6 +650,77 @@ Each recipe lists ingredients (stock items or prep recipes) with quantities and 
 
 ---
 
+## 9A. Sales & Orders (wholesale)
+
+For businesses with the **Wholesale & distribution** model (module *Wholesale*). Staff with the **Sales** login take orders, customers and payments; the storekeeper packs and dispatches.
+
+**Styles & stock.**
+
+- Each style has a code (e.g. `ZX-OVS01`), sizes, colours, a price per piece, quantity prices (e.g. 12+ and 50+ pieces of the style on one order), extras for some sizes or colours (XXL +Rs 100) and a pack size.
+- Every size and colour is a stock item with its own SKU and barcode (*Barcodes* prints labels).
+- The grid shows what is in stock, and in brackets what is free to sell after confirmed orders.
+- **Receive goods in packs** (Inventory → Goods receipts) at the cost per pack.
+
+**Price lists and customers.**
+
+- Price lists give a group of shops a percentage off, or set prices per style.
+- Each customer (Sales & Orders → Customers) has a shop name, area, WhatsApp number, price list, **credit limit** and **days to pay**.
+
+**Orders** (Sales & Orders → Orders).
+
+| Status | Meaning | Next step |
+|---|---|---|
+| Quotation (QT-) | Prices sent, nothing reserved. | **Make it an order** |
+| New | An order from WhatsApp (or saved for later) to check. | **Confirm** (checks the credit limit) |
+| Confirmed | Stock is held for it. | Storekeeper: **Packed** |
+| Packed | Ready to go. | **Dispatch**: courier and tracking number |
+| On the way | Stock taken out; the customer is invoiced (SINV-). | **Delivered** |
+| Delivered | Done; payment may still be due. | — |
+
+- *New order* / *New quotation*:
+  1. Choose the shop (or **New**).
+  2. Pick a style and type quantities in the **size × colour grid**, then *Add to order*.
+  3. Add custom printing (method, sides, colours: priced automatically, editable), delivery (courier, address, cash on delivery) and a discount or delivery charge.
+  4. Save. The totals show the quantity price and the shop's price list.
+- **Over the credit limit:** a manager confirms it (recorded on the order); others save it for a manager.
+- **Payments:** *Record payment* (bank transfer, cash on delivery, cheque, cash, link, card). It waits as *Payment to check* until someone sees the money and taps **Confirm received**: that posts it to the books. A slip photo sent on WhatsApp shows as *View slip*.
+- **Print / PDF** prints the quotation, order or invoice, or saves it as a PDF to send.
+- **Send on WhatsApp** sends the quotation, confirmation, tracking, invoice or a payment reminder. With *Automatic order messages* on, confirmation, dispatch, delivery and payment messages go by themselves.
+
+**Payments & COD.**
+
+- *Owed:* what each shop owes, oldest first, with **Remind on WhatsApp**.
+- *Courier COD:* choose the courier, tick the parcels on their statement, **Record settlement**. Each order is marked paid; the courier's fees are booked as bank charges.
+- *Cheques:*
+  - **Deposited** (not before the date on a post-dated cheque);
+  - then **Cleared** (paid) or **Bounced** (the order is unpaid again).
+
+## 9B. WhatsApp Business
+
+For businesses with the module *WhatsApp Business*; set up by Polymath Tech with the owner ([Zevix plan §6](../clients/zevix.md)).
+
+- **The assistant** answers customers day and night:
+  - the menu (*Place an order*, *My orders*, *Talk to us*);
+  - designs, colours and sizes with stock, then the quantity;
+  - the cart priced with the shop's prices;
+  - the address and the payment method.
+
+  The order appears on the Orders board as **New**. A photo of a bank slip is attached to their latest unpaid order. *STOP* stops offers; *START* resumes them.
+- **Inbox:**
+  - **Take over** to reply yourself (the assistant stays quiet in that chat).
+  - **Hand back to assistant** when done.
+  - Ticks: ✓ sent, ✓✓ delivered, ✓✓ read.
+  - More than 24 hours after the customer's last message, WhatsApp only allows **approved templates**: choose one instead of typing.
+- **Try as a customer** (before WhatsApp is connected): a simulated phone to practise and to show the team.
+- **Broadcasts:** an approved template to shops by tag, area or price list. Only customers who agreed to offers and never sent STOP; send a test to yourself first. Managers send them.
+- **Connection & assistant** (owner, administrator):
+  - the Meta connection;
+  - welcome and hand-over texts, opening hours and bank details;
+  - template names;
+  - the catalogue (*Sync catalogue now* after new stock or prices).
+
+---
+
 ## 10. Reports & Analytics
 
 ![Dashboard](img/bo-dashboard.jpg)
@@ -799,7 +876,12 @@ Invite people by email and give them a back-office role (see [section 2](#2-sign
 
 ![New business](img/bo-new-business.jpg)
 
-**Account → Add a business** (owners and administrators) creates another business in the same system: give it a name and choose its modules, or open **Try a demo business** for a training copy.
+**Account → Add a business** (owners and administrators) creates another business in the same system:
+
+1. Give it a name.
+2. Choose the **kind of business**: restaurant, café, retail shop, clothing, wholesale and others. It sets the modules and the starter set-up; *Modules* adjusts them.
+
+Or open **Try a demo business** for a training copy. The kind can be changed later under Business & tax.
 
 **Approval by Polymath Tech.** On a system looked after by Polymath Tech, a new business is approved first (it protects you from businesses opened by mistake or by someone who shouldn't). After *Create business* the screen shows **Waiting for approval**; you can leave it and come back. Polymath Tech checks who asked and whether the business already exists, usually within minutes in working hours. When it is **Approved**, press **Open** and the business is set up; if it is **Declined**, their message says why (for example *You already have Noura Kitchen: open it from your business list*).
 

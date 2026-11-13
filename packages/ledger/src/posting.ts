@@ -5,10 +5,13 @@ import {
   type GoodsReceipt,
   type InventoryItem,
   type PurchaseOrder,
+  type SalesOrder,
   type StockMovement,
   type TenderMedia,
   COLLECTIONS as C,
+  WHOLESALE,
   buildDailyJournal,
+  paymentState,
   canonicalJson,
   receiptValue,
   sha256Hex,
@@ -706,6 +709,100 @@ export function postPosDay(runner: TxRunner, args: { propertyId: string; busines
       createdAt: args.now,
     };
     return commit(tx, v, { lines, extra: () => {}, requiresApproval: false }, ctx, args.actor, args.now);
+  });
+}
+
+/** Where money received for a wholesale order lands, by how it was paid. */
+export const RECEIPT_ACCOUNT: Record<string, string> = { bank: "1010", cheque: "1010", cod: "1010", link: "1040", card: "1020", cash: "1000" };
+
+/**
+ * Wholesale orders in the books (sales staff may run it; the ledger does the posting):
+ *  - "invoice" (on dispatch): a customer invoice for the goods, print work and delivery, with VAT
+ *    when registered; the order gets its invoice number. The cost of the goods is posted with the
+ *    day's stock movements (postPosDay).
+ *  - "payment" (a payment checked and confirmed): a receipt against that invoice (or an advance
+ *    before it), with courier fees as bank charges; the payment is marked confirmed on the order.
+ * Each runs once: a second call returns what was posted.
+ */
+export function postSalesOrder(runner: TxRunner, args: { orderId: string; event: "invoice" | "payment"; paymentId?: string; date: string; fees?: Cents; bankAccount?: string; actor: Actor; now: string }): Promise<{ order: SalesOrder; voucher: Voucher | null }> {
+  return runner.run(async (tx) => {
+    const order = await tx.get<SalesOrder>(WHOLESALE.salesOrders, args.orderId);
+    if (!order) throw new LedgerError("order not found");
+    if (order.status === "quotation" || order.status === "draft" || order.status === "cancelled") throw new LedgerError(`order ${order.number} is ${order.status}: confirm it first`);
+    const ctx = await loadCtx(tx);
+    const accounting = await tx.get<AccountingSettings>(C.settings, "accounting");
+    const cc = ctx.settings.defaultCostCenter;
+    if (args.event === "invoice") {
+      if (order.invoiceId) return { order, voucher: await tx.get<Voucher>(L.vouchers, order.invoiceId) };
+      const sales = accounting?.accounts.salesByMajorGroup?.Other ?? "4020";
+      const pieces = order.lines.reduce((a, l) => a + l.qty, 0);
+      const goods = order.lines.reduce((a, l) => a + l.amount, 0);
+      const print = order.print ? order.print.pricePerPiece * pieces + order.print.setupFee : 0;
+      const items = [
+        { description: `${order.number}: ${pieces} pcs${order.discount ? `, less discount` : ""}`, account: sales, qty: 1, rate: goods - order.discount, costCenter: cc },
+        ...(print ? [{ description: `Printing: ${order.print!.description}`, account: sales, qty: 1, rate: print, costCenter: cc }] : []),
+        ...(order.deliveryCharge ? [{ description: "Delivery", account: sales, qty: 1, rate: order.deliveryCharge, costCenter: cc }] : []),
+      ].filter((i) => i.rate !== 0);
+      const subtotal = items.reduce((a, i) => a + i.rate, 0);
+      const vatRateBp = subtotal ? Math.round((order.vat * 10_000) / subtotal) : 0;
+      const v: SalesInvoice = {
+        id: await uniqueVoucherId(tx, `SINV-${order.number}`),
+        type: "salesInvoice",
+        status: "draft",
+        postingDate: args.date,
+        remarks: `${order.customerName}: order ${order.number}`,
+        currency: ctx.settings.baseCurrency,
+        exchangeRateMicros: BASE_RATE,
+        costCenter: cc,
+        customerId: order.customerId,
+        dueDate: order.dueDate ?? args.date,
+        items,
+        vatRateBp,
+        createdBy: args.actor.uid,
+        createdAt: args.now,
+      };
+      const built = salesInvoiceLines(v, ctx);
+      const posted = await commit(tx, v, built, ctx, args.actor, args.now, { submittedBy: args.actor.uid, submittedAt: args.now });
+      const next = { ...order, invoiceId: posted.id, invoiceNo: posted.number!, updatedAt: args.now };
+      tx.set(WHOLESALE.salesOrders, next);
+      return { order: next, voucher: posted };
+    }
+    const pay = order.payments.find((p) => p.id === args.paymentId);
+    if (!pay) throw new LedgerError("payment not found on this order");
+    if (pay.status === "rejected") throw new LedgerError("this payment was rejected");
+    if (pay.voucherId) return { order, voucher: await tx.get<Voucher>(L.vouchers, pay.voucherId) };
+    const invoice = order.invoiceId ? await tx.get<SalesInvoice>(L.vouchers, order.invoiceId) : null;
+    const allocate = invoice?.status === "posted" ? Math.min(pay.amount, invoice.outstanding ?? 0) : 0;
+    const p: PaymentVoucher = {
+      id: await uniqueVoucherId(tx, `RCPT-${order.number}-${pay.id.slice(-6)}`),
+      type: "payment",
+      status: "draft",
+      postingDate: args.date,
+      remarks: `${order.customerName}: ${pay.method} for ${order.number}`,
+      currency: ctx.settings.baseCurrency,
+      exchangeRateMicros: BASE_RATE,
+      costCenter: cc,
+      direction: "receive",
+      partyType: "customer",
+      partyId: order.customerId,
+      bankAccount: args.bankAccount ?? RECEIPT_ACCOUNT[pay.method] ?? "1010",
+      amount: pay.amount,
+      allocations: allocate > 0 ? [{ voucherId: invoice!.id, amount: allocate }] : [],
+      bankCharges: args.fees ?? 0,
+      ...(pay.reference ? { reference: pay.reference } : {}),
+      createdBy: args.actor.uid,
+      createdAt: args.now,
+    };
+    const built = paymentLines(p, ctx, new Map(invoice ? [[invoice.id, invoice]] : []));
+    let voucher: Voucher;
+    if (built.requiresApproval) {
+      voucher = { ...p, status: "submitted", submittedBy: args.actor.uid, submittedAt: args.now } as Voucher;
+      tx.set(L.vouchers, voucher);
+    } else voucher = await commit(tx, p, built, ctx, args.actor, args.now, { submittedBy: args.actor.uid, submittedAt: args.now });
+    const payments = order.payments.map((x) => (x.id === pay.id ? { ...x, status: "confirmed" as const, voucherId: voucher.id } : x));
+    const next = { ...order, payments, ...paymentState(order.total, payments), updatedAt: args.now };
+    tx.set(WHOLESALE.salesOrders, next);
+    return { order: next, voucher };
   });
 }
 

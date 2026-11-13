@@ -73,6 +73,7 @@ export async function handleCheckin(db: Firestore, callerEmail: string, raw: unk
       plan: t.plan,
       ...(t.licence ? { licence: { licenceId: String(t.licence.licenceId), expiresAt: String(t.licence.expiresAt), status: String(t.licence.status) } } : {}),
       modules: t.modules,
+      ...(typeof t.industry === "string" && /^[a-z]{3,20}$/.test(t.industry) ? { industry: t.industry } : {}),
       devices: t.devices.map((d) => Object.fromEntries(Object.entries(d).filter(([, v]) => v !== undefined)) as { id: string }),
       errors24h: t.errors24h,
       counts: { workstations: Number(t.counts?.workstations) || 0, employees: Number(t.counts?.employees) || 0, backOfficeUsers: Number(t.counts?.backOfficeUsers) || 0 },

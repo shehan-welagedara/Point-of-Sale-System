@@ -17,7 +17,9 @@ export type ModuleKey =
   | "lankaqr"
   | "whatsapp"
   | "qrOrdering"
-  | "website";
+  | "website"
+  | "wholesale"
+  | "whatsappCommerce";
 
 export interface ModuleInfo {
   key: ModuleKey;
@@ -34,7 +36,7 @@ export const MODULES: readonly ModuleInfo[] = [
   { key: "tables", name: "Table Service", group: "POS", description: "Floor plan, tables, covers and table status for dine-in.", requires: ["pos"], status: "available" },
   { key: "kds", name: "Kitchen Display", group: "POS", description: "Kitchen and bar screens with bump and timers, alongside or instead of KOT printers (KOT printers work today).", requires: ["pos"], status: "planned" },
   { key: "recipes", name: "Recipes & Costing", group: "ERP", description: "Recipes, sub-recipes (prep items), portion cost, food cost % and gross profit per item.", requires: [], status: "available" },
-  { key: "inventory", name: "Inventory", group: "ERP", description: "Stock by location with FIFO lots, recipe-based depletion from sales, waste, counts, transfers, valuation.", requires: ["recipes"], status: "available" },
+  { key: "inventory", name: "Inventory", group: "ERP", description: "Stock by location with FIFO lots, depletion from sales (through recipes for restaurants), waste, counts, transfers, valuation.", requires: [], status: "available" },
   { key: "purchasing", name: "Purchasing", group: "ERP", description: "Vendors, purchase orders, goods receipts (GRN) with input VAT.", requires: ["inventory"], status: "available" },
   { key: "accounting", name: "Accounting", group: "Finance", description: "Full general ledger (ERPNext design, S/4HANA-style universal journal): POS day posting, payables with 3-way match, receivables, bank reconciliation, fixed assets, budgets, period close, SLFRS statements, maker-checker approvals and the audit trail.", requires: [], status: "available" },
   { key: "crm", name: "Customers (CRM)", group: "Customers", description: "Customer profiles, visit and spend history, tags, business buyers for VAT invoices.", requires: [], status: "available" },
@@ -45,6 +47,8 @@ export const MODULES: readonly ModuleInfo[] = [
   { key: "whatsapp", name: "WhatsApp Reports", group: "Integrations", description: "End-of-day reports and alerts to managers on WhatsApp (simulated until Meta approval).", requires: [], status: "available" },
   { key: "qrOrdering", name: "QR Table Ordering", group: "Channels", description: "Guests order (and pay) from a table QR code.", requires: ["pos"], status: "planned" },
   { key: "website", name: "Website & Online Ordering", group: "Channels", description: "Restaurant website with pickup and delivery orders straight into the POS.", requires: ["pos"], status: "planned" },
+  { key: "wholesale", name: "Wholesale & Distribution", group: "ERP", description: "Styles with size and colour variants and barcodes, quantity tiers, customer price lists, quotations, sales orders, deliveries with cash on delivery, credit customers, cheques and custom print jobs.", requires: ["inventory", "crm"], status: "available" },
+  { key: "whatsappCommerce", name: "WhatsApp Business", group: "Channels", description: "WhatsApp Cloud API: shared inbox, order-taking bot, catalogue sync, order, invoice and payment messages, payment reminders and broadcast campaigns (simulated until Meta approval).", requires: ["crm"], status: "available" },
 ];
 
 export function moduleInfo(key: ModuleKey): ModuleInfo {

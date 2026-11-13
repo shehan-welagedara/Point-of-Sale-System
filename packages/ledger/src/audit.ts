@@ -47,7 +47,7 @@ export interface AuditSeal {
 }
 
 /** Collections whose changes are not audited one by one (append-only ledgers and counters). */
-export const UNAUDITED = new Set(["ledger", "accountBalances", "ledgerHead", "numberSeries", "sequences", "dailyStats", "printJobs", "auditEvents", "auditSeals", "posJournal", "menuImages", "staffSecrets", "deviceStatus", "clientErrors", "attachmentChunks"]);
+export const UNAUDITED = new Set(["ledger", "accountBalances", "ledgerHead", "numberSeries", "sequences", "dailyStats", "printJobs", "auditEvents", "auditSeals", "posJournal", "menuImages", "staffSecrets", "deviceStatus", "clientErrors", "attachmentChunks", "waMessages", "waConversations", "docSequences"]);
 
 /** Never copied into the audit trail (PIN hashes, card numbers): recorded as changed, value hidden. */
 const SECRET = new Set(["pinHash", "pinSalt", "cardId"]);
@@ -299,6 +299,7 @@ const DUTIES: Record<MemberRole, string[]> = {
   manager: ["Maintain suppliers", "Receive goods", "Handle cash at the POS"],
   accountant: ["Post supplier payments", "Approve supplier invoices", "Post journals"],
   storekeeper: ["Maintain suppliers", "Receive goods"],
+  sales: [],
   auditor: [],
   viewer: [],
   terminal: ["Handle cash at the POS"],

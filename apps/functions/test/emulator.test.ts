@@ -260,3 +260,71 @@ describe("phones and tablets connected with one-time codes (deviceApi)", () => {
     await expect(dev({ action: "revoke", tenantId: T, uid: accountant })).rejects.toMatchObject({ code: "functions/not-found" });
   }, 60_000);
 });
+
+describe("WhatsApp Business on Cloud Functions", () => {
+  const W = `${T}-wa`;
+  const PN = `10${Date.now()}`.slice(0, 15);
+  const SECRET = "app-secret-e2e";
+  const VERIFY = "verify-token-e2e-123";
+  const hook = `http://127.0.0.1:5001/${PROJECT}/asia-south1/whatsappWebhook`;
+  const wa = (data: Record<string, unknown>) => httpsCallable(fns, "whatsappApi")({ tenantId: W, ...data }).then((r) => r.data as Record<string, unknown>);
+  const delivery = (id: string, from: string, text: string) => ({
+    object: "whatsapp_business_account",
+    entry: [{ id: "WABA", changes: [{ field: "messages", value: { messaging_product: "whatsapp", metadata: { display_phone_number: "94770000000", phone_number_id: PN }, contacts: [{ profile: { name: "Nimal" }, wa_id: from }], messages: [{ from, id, timestamp: String(Math.floor(Date.now() / 1000)), type: "text", text: { body: text } }] } }] }],
+  });
+  const post = async (body: unknown, secret: string | null) => {
+    const raw = JSON.stringify(body);
+    const { createHmac } = await import("node:crypto");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (secret) headers["X-Hub-Signature-256"] = `sha256=${createHmac("sha256", secret).update(raw).digest("hex")}`;
+    return fetch(hook, { method: "POST", headers, body: raw });
+  };
+
+  it("connects a number, verifies the webhook, answers only signed messages and lets staff reply", async () => {
+    await as(`own-${T}@demo.lk`);
+    const b = writeBatch(db);
+    b.set(doc(db, "tenants", W), { id: W, name: "Zevix test", ownerUid: owner, modules: { crm: true, inventory: true, wholesale: true, whatsappCommerce: true }, plan: "demo", status: "active", createdFromTenant: T });
+    b.set(doc(db, "tenants", W, "members", owner), { id: owner, uid: owner, role: "owner", tenantId: W, name: "Owner", email: "o" });
+    await b.commit();
+    await setDoc(doc(db, "tenants", W, "settings", "integrations"), { id: "integrations", whatsapp: { mode: "mock", phoneNumberId: PN, eodRecipients: [], eodTime: "23:00", bot: { enabled: true } }, ...stamp(owner) });
+    await setDoc(doc(db, "tenants", W, "settings", "business"), { id: "business", legalName: "Zevix", tradingName: "Zevix", vatRegistered: false, ...stamp(owner) });
+
+    // Connecting stores the secrets on the server only.
+    expect(await wa({ action: "connect", phoneNumberId: PN, appSecret: SECRET, verifyToken: VERIFY })).toEqual({ accessToken: false, appSecret: true, verifyToken: true });
+    expect(await wa({ action: "status" })).toMatchObject({ appSecret: true, live: false, phoneNumberId: PN });
+    await expect(getDoc(doc(db, "integrationSecrets", W))).rejects.toMatchObject({ code: "permission-denied" });
+    await expect(getDoc(doc(db, "waRouting", PN))).rejects.toMatchObject({ code: "permission-denied" });
+
+    // Meta's one-time verification.
+    const ok = await fetch(`${hook}?hub.mode=subscribe&hub.verify_token=${VERIFY}&hub.challenge=4242`);
+    expect([ok.status, await ok.text()]).toEqual([200, "4242"]);
+    expect((await fetch(`${hook}?hub.mode=subscribe&hub.verify_token=wrong-token-xyz&hub.challenge=1`)).status).toBe(403);
+
+    // Unsigned or wrongly signed deliveries are refused and change nothing.
+    expect((await post(delivery("wamid.bad1", "94770001111", "hi"), null)).status).toBe(401);
+    expect((await post(delivery("wamid.bad2", "94770001111", "hi"), "not-the-secret")).status).toBe(401);
+    expect(await adminList(`tenants/${W}/waMessages`)).toHaveLength(0);
+
+    // A signed message: the assistant answers (simulated until live), the customer is created.
+    expect((await post(delivery("wamid.ok1", "94770001111", "hi"), SECRET)).status).toBe(200);
+    const msgs = await until(async () => {
+      const list = await adminList(`tenants/${W}/waMessages`);
+      return list.some((m) => m.direction === "out") ? list : null;
+    });
+    expect(msgs.find((m) => m.direction === "in")).toMatchObject({ id: "wamid.ok1", conversationId: "94770001111", text: "hi" });
+    expect(msgs.find((m) => m.direction === "out")).toMatchObject({ conversationId: "94770001111", status: "simulated" });
+    expect((await adminList(`tenants/${W}/customers`)).find((c) => c.whatsapp === "94770001111")).toMatchObject({ name: "Nimal" });
+    // Meta retrying the same delivery is answered once.
+    expect((await post(delivery("wamid.ok1", "94770001111", "hi"), SECRET)).status).toBe(200);
+    expect((await adminList(`tenants/${W}/waMessages`)).filter((m) => m.direction === "in")).toHaveLength(1);
+
+    // Staff: reply within 24 hours, try the assistant as a customer; the app can't write messages itself.
+    expect(await wa({ action: "send", conversationId: "94770001111", message: { kind: "text", text: "Hello from Zevix" } })).toMatchObject({ status: "simulated", text: "Hello from Zevix" });
+    expect((await getDoc(doc(db, "tenants", W, "waConversations", "94770001111"))).data()).toMatchObject({ mode: "human", unread: 0 });
+    expect(((await wa({ action: "simulate", message: { from: "94770002222", type: "text", text: "hi" } })).replies as unknown[]).length).toBeGreaterThan(0);
+    await expect(setDoc(doc(db, "tenants", W, "waMessages", "fake"), { id: "fake", direction: "out", text: "x", ...stamp(owner) })).rejects.toThrow(/PERMISSION_DENIED/);
+
+    // Another business can't take over the number; a business without the module can't use the API.
+    await expect(httpsCallable(fns, "whatsappApi")({ tenantId: T, action: "connect", phoneNumberId: PN })).rejects.toMatchObject({ code: "functions/failed-precondition" });
+  }, 90_000);
+});

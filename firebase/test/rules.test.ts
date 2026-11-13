@@ -189,6 +189,75 @@ describe("roles", () => {
   });
 });
 
+describe("closed-check corrections", () => {
+  beforeEach(async () => seedTenant());
+  it("lets POS devices and managers issue credit notes and payment changes, which then never change", async () => {
+    const till = as("till");
+    await assertSucceeds(setDoc(doc(till, "tenants", T, "creditNotes", "CN-26NOV_W01_1"), { id: "CN-26NOV_W01_1", hash: "h", reason: "Wrong table", depletion: "pending" }));
+    await assertFails(setDoc(doc(till, "tenants", T, "creditNotes", "CN-26NOV_W01_2"), { id: "CN-26NOV_W01_2", hash: "h", reason: "" }));
+    await assertFails(setDoc(doc(as("acct"), "tenants", T, "creditNotes", "CN-26NOV_W01_3"), { id: "CN-26NOV_W01_3", hash: "h", reason: "x" }));
+    await assertSucceeds(updateDoc(doc(till, "tenants", T, "creditNotes", "CN-26NOV_W01_1"), { depletion: "done" }));
+    await assertFails(updateDoc(doc(as("mgr"), "tenants", T, "creditNotes", "CN-26NOV_W01_1"), { reason: "changed" }));
+    await assertFails(deleteDoc(doc(as("owner"), "tenants", T, "creditNotes", "CN-26NOV_W01_1")));
+    await assertSucceeds(setDoc(doc(till, "tenants", T, "checkAdjustments", "A1"), { id: "A1", reason: "Card, not cash" }));
+    await assertFails(updateDoc(doc(as("mgr"), "tenants", T, "checkAdjustments", "A1"), { amount: 1 }));
+    await assertSucceeds(setDoc(doc(till, "tenants", T, "tillCounts", "TC1"), { id: "TC1", counted: 100 }));
+    await assertFails(updateDoc(doc(till, "tenants", T, "tillCounts", "TC1"), { counted: 999 }));
+  });
+});
+
+describe("wholesale and WhatsApp Business", () => {
+  beforeEach(async () => {
+    await seedTenant({ wholesale: true, whatsappCommerce: true, inventory: true, purchasing: true, crm: true, accounting: true });
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "tenants", T, "members", "sam"), { id: "sam", uid: "sam", role: "sales", tenantId: T });
+      await setDoc(doc(db, "tenants", T, "members", "store"), { id: "store", uid: "store", role: "storekeeper", tenantId: T });
+      await setDoc(doc(db, "tenants", T, "salesOrders", "O1"), { id: "O1", number: "SO-000001", status: "confirmed", payments: [] });
+      await setDoc(doc(db, "tenants", T, "waConversations", "9477"), { id: "9477", mode: "bot", unread: 3, step: "menu", cart: [] });
+      await setDoc(doc(db, "tenants", T, "waMessages", "m1"), { id: "m1", conversationId: "9477", text: "hi" });
+      await setDoc(doc(db, "integrationSecrets", T), { whatsapp: { accessToken: "EAAG-secret" } });
+      await setDoc(doc(db, "waRouting", "1234567890"), { tenantId: T });
+    });
+  });
+
+  it("lets sales staff take orders and customers, never invoice them or change prices", async () => {
+    const sam = as("sam");
+    await assertSucceeds(setDoc(doc(sam, "tenants", T, "salesOrders", "O2"), { id: "O2", number: "QT-000001", status: "quotation" }));
+    await assertFails(setDoc(doc(sam, "tenants", T, "salesOrders", "O3"), { id: "O3", status: "dispatched", invoiceId: "SINV-x" }));
+    await assertSucceeds(updateDoc(doc(sam, "tenants", T, "salesOrders", "O1"), { status: "packed" }));
+    await assertFails(updateDoc(doc(sam, "tenants", T, "salesOrders", "O1"), { invoiceNo: "SINV-FAKE" }));
+    await assertFails(deleteDoc(doc(sam, "tenants", T, "salesOrders", "O1")));
+    await assertSucceeds(setDoc(doc(sam, "tenants", T, "customers", "SHOP1"), { id: "SHOP1", name: "Lanka Fashion", creditLimit: 50000000 }));
+    await assertFails(setDoc(doc(sam, "tenants", T, "priceLists", "A"), { id: "A", name: "A-grade", percentOff: 9000 }));
+    await assertFails(setDoc(doc(sam, "tenants", T, "styles", "OVS01"), { id: "OVS01", price: 1 }));
+    await assertSucceeds(setDoc(doc(as("mgr"), "tenants", T, "priceLists", "A"), { id: "A", name: "A-grade", percentOff: 1000 }));
+    await assertSucceeds(setDoc(doc(as("store"), "tenants", T, "styles", "OVS01"), { id: "OVS01", price: 145000 }));
+    // Dispatching takes stock out; the storekeeper packs orders but can't take them.
+    await assertSucceeds(setDoc(doc(sam, "tenants", T, "stockMovements", "M1"), { id: "M1", type: "sale" }));
+    await assertSucceeds(updateDoc(doc(as("store"), "tenants", T, "salesOrders", "O1"), { status: "packed" }));
+    await assertFails(setDoc(doc(as("store"), "tenants", T, "salesOrders", "O4"), { id: "O4", status: "draft" }));
+    // POS terminals and viewers don't see wholesale orders; accountants do.
+    await assertFails(getDoc(doc(as("till"), "tenants", T, "salesOrders", "O1")));
+    await assertFails(getDoc(doc(as("view"), "tenants", T, "salesOrders", "O1")));
+    await assertSucceeds(getDoc(doc(as("acct"), "tenants", T, "salesOrders", "O1")));
+  });
+
+  it("keeps the WhatsApp token server-only and messages written by the server", async () => {
+    const sam = as("sam");
+    await assertSucceeds(getDoc(doc(sam, "tenants", T, "waMessages", "m1")));
+    await assertFails(setDoc(doc(sam, "tenants", T, "waMessages", "m2"), { id: "m2", conversationId: "9477", direction: "out", text: "fake" }));
+    await assertSucceeds(updateDoc(doc(sam, "tenants", T, "waConversations", "9477"), { unread: 0, mode: "human" }));
+    await assertFails(updateDoc(doc(sam, "tenants", T, "waConversations", "9477"), { cart: [{ qty: 1000 }] }));
+    await assertFails(getDoc(doc(as("till"), "tenants", T, "waMessages", "m1")));
+    for (const uid of ["owner", "sam"]) {
+      await assertFails(getDoc(doc(as(uid), "integrationSecrets", T)));
+      await assertFails(setDoc(doc(as(uid), "integrationSecrets", T), { whatsapp: { accessToken: "x" } }));
+      await assertFails(getDoc(doc(as(uid), "waRouting", "1234567890")));
+    }
+  });
+});
+
 describe("module licensing", () => {
   it("blocks ERP and finance writes when the module is off", async () => {
     await seedTenant({ pos: true });
