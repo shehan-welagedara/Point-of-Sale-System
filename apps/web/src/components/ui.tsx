@@ -1,11 +1,55 @@
 import { type ReactNode, useEffect, useState } from "react";
 
+/** A long description split after its first sentence (the rest is shown on request). */
+export function firstSentence(text: string): [string, string] {
+  const m = /^([\s\S]{20,}?[.!?])\s+(?=[A-Z(“"‘])([\s\S]+)$/.exec(text.trim());
+  return m ? [m[1]!, m[2]!] : [text, ""];
+}
+
+/** An explanation that shows its first sentence; ⓘ shows the rest. */
+export function Explain({ children, className = "callout small", as = "div" }: { children: string; className?: string; as?: "div" | "p" }) {
+  const [more, setMore] = useState(false);
+  const [first, rest] = firstSentence(children);
+  const Tag = as;
+  return (
+    <Tag className={className}>
+      {first}
+      {rest ? (
+        <>
+          {more ? <> {rest}</> : null}{" "}
+          <button type="button" className="more-info" aria-expanded={more} aria-label={more ? "Show less" : "More"} title={more ? "Show less" : "More"} onClick={() => setMore(!more)}>
+            {more ? "Less" : "ⓘ"}
+          </button>
+        </>
+      ) : null}
+    </Tag>
+  );
+}
+
+/**
+ * Page title with a one-line description: only the first sentence shows; ⓘ reveals the rest, so
+ * screens stay calm for everyday use and the explanation is one tap away when someone needs it.
+ */
 export function PageHead({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
+  const [more, setMore] = useState(false);
+  const [first, rest] = typeof subtitle === "string" ? firstSentence(subtitle) : [subtitle, ""];
   return (
     <div className="page-head">
       <div>
         <h1>{title}</h1>
-        {subtitle ? <p>{subtitle}</p> : null}
+        {subtitle ? (
+          <p className={more ? "open" : undefined}>
+            {first}
+            {rest ? (
+              <>
+                {more ? <> {rest}</> : null}{" "}
+                <button type="button" className="more-info" aria-expanded={more} aria-label={more ? "Show less" : "More about this page"} title={more ? "Show less" : "More about this page"} onClick={() => setMore(!more)}>
+                  {more ? "Less" : "ⓘ"}
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </div>
       {actions ? <div className="row wrap">{actions}</div> : null}
     </div>

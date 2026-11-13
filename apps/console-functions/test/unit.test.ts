@@ -1,10 +1,11 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { DEMO_LICENCE_PUBLIC_KEY, publicKeyFromPrivate, signDirective, suspensionInfo, verifyDirective } from "@pos/core";
+import { DEMO_LICENCE_PUBLIC_KEY, businessKey, publicKeyFromPrivate, signDirective, suspensionInfo, verifyBusinessDecision, verifyDirective } from "@pos/core";
 import { describe, expect, it } from "vitest";
 import { IdentityError, serviceAccountProject, verifyGoogleIdToken } from "../src/identity.js";
 import { type ConsoleClient, can, dailyMetrics, healthState, monthlyLkr, noticeFor, subscriptionState, validateCheckin } from "../src/model.js";
+import { nextWindow, parseChangelog, plain, zoneOffset } from "../src/releases.js";
 
 const DEMO_PRIVATE = /^private=(.+)$/m.exec(readFileSync(resolve(__dirname, "../../../tools/licence/demo-key.txt"), "utf8"))![1]!.trim();
 
@@ -114,5 +115,72 @@ describe("console rules", () => {
     expect(r.tenants[0]!.name.length).toBe(120);
     expect(r.tenants[0]!.devices.length).toBe(100);
     expect(r.tenants[0]!.errors24h).toBe(0);
+  });
+});
+
+describe("release catalogue", () => {
+  const md = readFileSync(resolve(__dirname, "../../../CHANGELOG.md"), "utf8");
+  it("reads every release of the changelog with its notes for clients", () => {
+    const all = parseChangelog(md, new Date());
+    expect(all.length).toBeGreaterThan(15);
+    const r = all.find((x) => x.version === "1.9.0")!;
+    expect(r.date).toBe("2026-11-12");
+    expect(r.type).toMatch(/^Minor/);
+    expect(r.highlights[0]).toMatch(/^Run the restaurant from your phone\./);
+    expect(r.highlights.every((h) => !h.includes("**"))).toBe(true);
+    expect(r.changes.length).toBeGreaterThan(3);
+    expect(all.find((x) => x.version === "1.0.0")).toBeTruthy();
+  });
+  it("turns markdown into plain text", () => {
+    expect(plain("**Bold** and `code` and [a link](http://x) *now*")).toBe("Bold and code and a link now");
+  });
+});
+
+describe("maintenance windows", () => {
+  it("knows Sri Lanka and the Maldives", () => {
+    expect(zoneOffset("Asia/Colombo", new Date("2026-11-13T00:00:00Z"))).toBe(330);
+    expect(zoneOffset("Indian/Maldives", new Date("2026-11-13T00:00:00Z"))).toBe(300);
+    expect(zoneOffset("Nowhere/Else", new Date())).toBe(330);
+  });
+  it("finds the next window, overnight windows and windows already open", () => {
+    // 10:00 in Colombo: tonight 23:30 to 05:00.
+    const w = nextWindow("23:30-05:00 Asia/Colombo", new Date("2026-11-13T04:30:00Z"))!;
+    expect(w.start.toISOString()).toBe("2026-11-13T18:00:00.000Z");
+    expect(w.end.toISOString()).toBe("2026-11-13T23:30:00.000Z");
+    // 01:00 in Colombo, inside the window: starts now, ends at 05:00.
+    const inside = nextWindow("23:30-05:00 Asia/Colombo", new Date("2026-11-13T19:30:00Z"))!;
+    expect(inside.start.toISOString()).toBe("2026-11-13T19:30:00.000Z");
+    expect(inside.end.toISOString()).toBe("2026-11-13T23:30:00.000Z");
+    // 04:45, only 15 minutes left: tomorrow night.
+    expect(nextWindow("23:30-05:00 Asia/Colombo", new Date("2026-11-13T23:15:00Z"))!.start.toISOString()).toBe("2026-11-14T18:00:00.000Z");
+    // A daytime window in the Maldives.
+    expect(nextWindow("14:00-15:00 Indian/Maldives", new Date("2026-11-13T10:00:00Z"))!.start.toISOString()).toBe("2026-11-14T09:00:00.000Z");
+    expect(nextWindow("whenever", new Date())).toBeNull();
+    expect(nextWindow(undefined, new Date("2026-11-13T04:30:00Z"))!.start.toISOString()).toBe("2026-11-13T18:00:00.000Z");
+  });
+});
+
+describe("business approvals", () => {
+  it("treats names that differ only in case, accents, punctuation or (demo) as the same business", () => {
+    expect(businessKey("Noura Kitchen")).toBe(businessKey("noura  KITCHEN (Pvt) Ltd."));
+    expect(businessKey("Noura Kitchen")).toBe(businessKey("Noura Kitchen (demo)"));
+    expect(businessKey("Café Lagoon")).toBe(businessKey("Lagoon Cafe"));
+    expect(businessKey("Noura Kitchen")).not.toBe(businessKey("Noura Express"));
+  });
+  it("signs decisions the client can check, bound to its project", async () => {
+    const payload = { v: 1 as const, type: "business" as const, projectId: "noura-pos", requestId: "noura-galle-ab12c", decision: "approved" as const, ownerUid: "u1", name: "Noura Galle", issuedAt: new Date().toISOString() };
+    const token = await signDirective(payload, DEMO_PRIVATE);
+    expect((await verifyBusinessDecision(token, DEMO_LICENCE_PUBLIC_KEY, "noura-pos")).decision).toBe("approved");
+    await expect(verifyBusinessDecision(token, DEMO_LICENCE_PUBLIC_KEY, "other-pos")).rejects.toThrow(/for project/);
+    // A status directive is not a business decision, and the other way round.
+    await expect(verifyDirective(token, DEMO_LICENCE_PUBLIC_KEY, "noura-pos")).rejects.toThrow(/Unsupported/);
+    const status = await signDirective({ v: 1, type: "status", projectId: "noura-pos", state: "active", issuedAt: new Date().toISOString() }, DEMO_PRIVATE);
+    await expect(verifyBusinessDecision(status, DEMO_LICENCE_PUBLIC_KEY, "noura-pos")).rejects.toThrow(/Unsupported/);
+  });
+  it("prefers the staff's notice, then a message to all clients, then a renewal reminder", () => {
+    const now = new Date("2026-11-13T00:00:00Z");
+    expect(noticeFor({}, "Polymath Tech", now, { text: "New support hours", level: "info" })?.text).toBe("New support hours");
+    expect(noticeFor({ notice: { text: "Yours", level: "warn" } }, "Polymath Tech", now, { text: "All", level: "info" })?.text).toBe("Yours");
+    expect(noticeFor({}, "Polymath Tech", now, { text: "Old", level: "info", until: "2026-11-01T00:00:00Z" })).toBeNull();
   });
 });

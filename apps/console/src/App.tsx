@@ -1,13 +1,16 @@
-import { orderBy } from "firebase/firestore";
+import { orderBy, where } from "firebase/firestore";
 import { type ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Icon, type IconName, Logo } from "./icons";
 import { AuditPage } from "./pages/Audit";
+import { BusinessesPage } from "./pages/Businesses";
 import { ClientDetail } from "./pages/ClientDetail";
 import { ClientsPage } from "./pages/Clients";
 import { Dashboard } from "./pages/Dashboard";
 import { LicencesPage } from "./pages/Licences";
 import { MonitoringPage } from "./pages/Monitoring";
+import { PrivacyPage } from "./pages/Privacy";
+import { ReleasesPage } from "./pages/Releases";
 import { ReportsPage } from "./pages/Reports";
 import { SettingsPage } from "./pages/Settings";
 import { SignIn } from "./pages/SignIn";
@@ -16,7 +19,7 @@ import { SubscriptionsPage } from "./pages/Subscriptions";
 import { SupportPage } from "./pages/Support";
 import { UpdatesPage } from "./pages/Updates";
 import { type Permission, ROLE_LABEL, SessionProvider, useCol, useDocData, useSession } from "./state";
-import { type Client, type UnknownProject, attentionList, initials, latestVersion } from "./types";
+import { type BusinessRequest, type Client, type UnknownProject, attentionList, initials, latestVersion } from "./types";
 import { Loading } from "./ui";
 
 // ───────────── Shared data: every screen and the top bar read the same live lists ─────────────
@@ -24,6 +27,8 @@ import { Loading } from "./ui";
 interface ConsoleData {
   clients: Client[] | undefined;
   unknown: UnknownProject[];
+  /** Requests to open a business that wait for approval. */
+  pending: BusinessRequest[];
   latest: string | undefined;
   company: { name?: string; website?: string; email?: string; phone?: string; whatsapp?: string } | null | undefined;
   me: { name?: string } | null | undefined;
@@ -37,10 +42,11 @@ export function useConsole(): ConsoleData {
 function DataProvider({ uid, children }: { uid: string; children: ReactNode }) {
   const clients = useCol<Client>("clients", [orderBy("name")], "name");
   const unknown = useCol<UnknownProject>("unknownProjects");
+  const pending = useCol<BusinessRequest>("businessRequests", [where("status", "==", "pending")], "pending");
   const gh = useDocData<{ latestVersion?: string }>("config/github");
   const company = useDocData<ConsoleData["company"] & object>("config/company");
   const me = useDocData<{ name?: string }>(`staff/${uid}`);
-  const value = useMemo<ConsoleData>(() => ({ clients, unknown: unknown ?? [], latest: clients ? latestVersion(clients, gh) : undefined, company, me }), [clients, unknown, gh, company, me]);
+  const value = useMemo<ConsoleData>(() => ({ clients, unknown: unknown ?? [], pending: pending ?? [], latest: clients ? latestVersion(clients, gh) : undefined, company, me }), [clients, unknown, pending, gh, company, me]);
   return <DataCtx.Provider value={value}>{children}</DataCtx.Provider>;
 }
 
@@ -52,10 +58,13 @@ const NAV: { to: string; label: string; icon: IconName; perm?: Permission; group
   { to: "/licences", label: "Licences", icon: "licence", group: "main" },
   { to: "/subscriptions", label: "Subscriptions", icon: "subscription", group: "main" },
   { to: "/monitoring", label: "Monitoring", icon: "monitoring", group: "main" },
+  { to: "/updates", label: "Updates", icon: "update", group: "main" },
+  { to: "/businesses", label: "Businesses", icon: "business", group: "main" },
   { to: "/deployments", label: "Deployments", icon: "deploy", group: "main" },
   { to: "/reports", label: "Reports & Analytics", icon: "reports", group: "main" },
   { to: "/staff", label: "Staff", icon: "staff", perm: "staff", group: "admin" },
   { to: "/audit", label: "Audit log", icon: "audit", group: "admin" },
+  { to: "/privacy", label: "Privacy & data", icon: "shield", group: "admin" },
   { to: "/settings", label: "Settings", icon: "settings", group: "admin" },
   { to: "/support", label: "Support", icon: "support", group: "admin" },
 ];
@@ -69,13 +78,14 @@ export const displayName = (me: { name?: string } | null | undefined, email: str
 
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, role, can, signOut } = useSession();
-  const { company, me } = useConsole();
+  const { company, me, pending } = useConsole();
   const name = displayName(me, user?.email ?? null, user?.displayName);
   const links = (group: "main" | "admin") =>
     NAV.filter((n) => n.group === group && (!n.perm || can(n.perm))).map((n) => (
       <NavLink key={n.to} to={n.to} end={n.to === "/"} className={({ isActive }) => `nav ${isActive ? "active" : ""}`} onClick={onClose}>
         <Icon name={n.icon} />
-        <span>{n.label}</span>
+        <span className="grow">{n.label}</span>
+        {n.to === "/businesses" && pending.length ? <span className="nav-count" aria-label={`${pending.length} waiting`}>{pending.length}</span> : null}
       </NavLink>
     ));
   return (
@@ -221,12 +231,12 @@ function Search() {
 }
 
 function Alerts() {
-  const { clients, unknown, latest } = useConsole();
+  const { clients, unknown, latest, pending } = useConsole();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useOutside(box, () => setOpen(false));
   const items = clients ? attentionList(clients, latest) : [];
-  const count = items.length + unknown.length;
+  const count = items.length + unknown.length + pending.length;
   return (
     <div className="pop-anchor" ref={box}>
       <button className="icon-btn bell" onClick={() => setOpen(!open)} aria-label={`Alerts: ${count}`} aria-expanded={open}>
@@ -236,6 +246,12 @@ function Alerts() {
       {open ? (
         <div className="popover alerts" role="dialog" aria-label="Alerts">
           <div className="pop-head"><strong>Alerts</strong><span className="tiny muted">{count ? `${count} to look at` : "All clear"}</span></div>
+          {pending.map((r) => (
+            <Link key={r.id} to="/businesses" className="alert-row" onClick={() => setOpen(false)}>
+              <span className="status-dot warn" aria-hidden="true" />
+              <span className="grow"><strong>{r.name}</strong><span className="tiny muted">New business at {r.clientName}: waiting for approval</span></span>
+            </Link>
+          ))}
           {unknown.map((u) => (
             <Link key={u.id} to="/clients" className="alert-row" onClick={() => setOpen(false)}>
               <span className="status-dot warn" aria-hidden="true" />
@@ -312,8 +328,10 @@ function Shell() {
               <Route path="/licences" element={<LicencesPage />} />
               <Route path="/subscriptions" element={<SubscriptionsPage />} />
               <Route path="/monitoring" element={<MonitoringPage />} />
+              <Route path="/updates" element={<ReleasesPage />} />
+              <Route path="/businesses" element={<BusinessesPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/deployments" element={<UpdatesPage />} />
-              <Route path="/updates" element={<Navigate to="/deployments" replace />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/staff" element={<StaffPage />} />
               <Route path="/audit" element={<AuditPage />} />

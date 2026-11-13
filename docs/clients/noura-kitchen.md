@@ -12,10 +12,21 @@ Follow the [deployment manual](../18-deployment-manual.md) for the technical ste
 
 **Status (12 November 2026): in use.** The owner created their account and the business **Noura Kitchen** with Point of Sale, Table Service, Recipes & Costing, Inventory, Purchasing, Accounting and Revenue Management, and is working through the configuration (section 3). Until a licence is activated the business runs on the 30-day trial. The modules they chose match the licence in section 2.4: **Starter** (POS, tables, revenue) with the **Recipes, Inventory, Purchasing and Accounting** add-ons.
 
-**Next:**
+**Status (13 November 2026): a second "Noura Kitchen" opened by mistake.** The owner created the business again. Nothing is lost: 1.10.0 lets the owner **archive** the one opened by mistake (Account → *Archive this business*; it keeps its data and can be restored), and from 1.10.0 every new business on their system waits for Polymath Tech's approval (docs/22 §9), so it can't happen again unnoticed.
+
+**Next: 1.10.0, the first update pushed from the Polymath Console.**
+
+1. Make sure Noura Kitchen is a client in the console and its system checks in (step 2 below). A system on 1.5.8 can't check in yet: then this one update is deployed from the release PC and you tell the owner yourself; from 1.10.0 on, every update announces itself.
+2. Console → **Updates** → *Load release notes* → **1.10.0** → tick Noura Kitchen → *In each maintenance window* (their window, `23:30-05:00 Asia/Colombo`) → **Schedule update**. A system already on 1.7.0–1.9.x shows the notice to the owner at once (as a message at the top of the back office); the console shows the time.
+3. At the time, the row shows **Run on the release PC** (no GitHub connection yet): from the project folder, `git pull`, `pnpm install`, `pnpm release:deploy --target noura-kitchen`. With GitHub connected the console starts it by itself.
+4. Within the hour Noura's system checks in with 1.10.0 and the row turns **Done**. The owner sees **What's new** once; *About → Check now* makes the check-in immediate.
+5. With the owner: **Account → Archive this business** on the Noura Kitchen opened by mistake (the one without their configuration: check its menu and stores first). The console's **Businesses** page shows it as archived.
+6. The next update (1.10.1 or later) is the first that Noura's screens announce with the full maintenance notice: the banner with the time, the POS sign-in warning on the day, the item in Tasks, and *Updating now* during it.
+
+**Earlier steps:**
 
 1. **Update** from 1.5.8 to the current version at a quiet time (after closing), from the project folder: `git pull`, `pnpm install`, `pnpm release:deploy --target noura-kitchen`. (12 November: the first try with 1.8.0 took the backup and deployed the indexes, then stopped at the data updates with *14 UNAVAILABLE … Protocol error*, an HTTP/2 problem on the PC; nothing else changed. 1.8.1 fixes it: pull and run the same command again.) It backs up their data first, then the data updates change one thing only: bills say *Powered by Polymath Tech* instead of *POS Suite (demo)*. This exact update is rehearsed by `pnpm test:update` on every change.
-2. **Link it to the Polymath Console** ([23](../23-polymath-console-deployment.md)): set up the console once (sections B–H), add Noura Kitchen as a client (project `noura-kitchen-pos`, Restaurant, Colombo), deploy Noura Kitchen once more so it learns the console's address, then *About → Check now* in their back office and confirm the project number. From then on it checks in daily.
+2. **Link it to the Polymath Console** ([23](../23-polymath-console-deployment.md)): set up the console once (sections B–H), add Noura Kitchen as a client (project `noura-kitchen-pos`, Restaurant, Colombo), deploy Noura Kitchen once more so it learns the console's address, then *About → Check now* in their back office and confirm the project number. From then on it checks in every hour (daily before 1.10.0).
 3. **Issue the licence from the console** (Licence → Issue licence: Starter + the four add-ons) and record the subscription. It reaches their system at the next check-in.
 
 The Firebase project exists and the Blaze plan is active (deployment manual B–D). The rest happens on your PC, in **Command Prompt** (Start → *cmd*) inside the project folder; the deployment manual E–G explains each step.
@@ -53,7 +64,7 @@ pnpm release:deploy --target noura-kitchen
 
 1. The owner creates their account on `https://<project-id>.web.app` and verifies the email.
 2. **Create business** "Noura Kitchen" with the modules **Accounting**, **Inventory**, **Purchasing** (and **Recipes** if the menu will be costed). The starter set-up is added automatically: outlet MAIN, main store, roles, payment methods, reason codes, chart of accounts and cost centre.
-3. **+ Business → Load the Noura Kitchen demo** as a training copy: the same set-up as theirs (not VAT registered, one counter phone with the Bluetooth printer) with a Sri Lankan menu, stock, suppliers, a month of sales and books, to explore and train on before their own data goes in. Staff sign in to the POS with 1001/1111 (manager), 1002/2222 (cashier) or 1003/3333 (steward).
+3. **+ Business → Try a demo business → Load Noura Kitchen** (approved in the console first, from 1.10.0) as a training copy: the same set-up as theirs (not VAT registered, one counter phone with the Bluetooth printer) with a Sri Lankan menu, stock, suppliers, a month of sales and books, to explore and train on before their own data goes in. Staff sign in to the POS with 1001/1111 (manager), 1002/2222 (cashier) or 1003/3333 (steward).
 4. Licence (deployment manual I). Noura Kitchen starts with **one phone** as its only POS device, so **Starter + Inventory, Purchasing, Recipes and Accounting add-ons** is enough (3 workstations: the phone plus spares). Choose **Professional + Accounting** (12 workstations) instead if they expect more staff phones soon; moving up later is a new licence key, nothing else changes. Issue against the project and business IDs shown on Licence & modules.
 
 ## 3. Configuration with the client (2–3 hours)

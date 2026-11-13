@@ -54,6 +54,8 @@ export function App() {
   if (mode === "firebase" && !user) return <Login />;
   if (!tenant && isDeviceLogin(user?.email)) return <DeviceDisconnected />;
   if (!tenant) return <Onboarding />;
+  // An archived business (opened by mistake) is closed until its owner restores it.
+  if (tenant.status === "archived") return isDeviceLogin(user?.email) ? <DeviceDisconnected /> : <Onboarding />;
   return (
     <Routes>
       <Route path="/pos" element={<PosApp />} />

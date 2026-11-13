@@ -14,7 +14,7 @@ import { useApp, useCollection, useDoc, useStore } from "../../state/app";
 import { resizeImage } from "../../lib/images";
 import { money, pct, stockQty } from "../../lib/format";
 import { queuePrint } from "../../lib/printing";
-import { Field, ModuleOff } from "../../components/ui";
+import { Field, ModuleOff, Explain } from "../../components/ui";
 import { ConnectedDevices } from "./Devices";
 
 const yes = (b: unknown) => (b ? <span className="badge good">Yes</span> : <span className="badge">No</span>);
@@ -424,11 +424,11 @@ export function DevicesPage() {
         <div className="grid cols-2">
           <div className="card pad stack tight">
             <h3>Dedicated hardware</h3>
-            <p className="small muted">Windows 10/11 PC or touch POS terminal running the POS full-screen. USB or network bill printer, cash drawer on the printer's RJ11 port, optional customer display.</p>
+            <Explain as="p" className="small muted">Windows 10/11 PC or touch POS terminal running the POS full-screen. USB or network bill printer, cash drawer on the printer's RJ11 port, optional customer display.</Explain>
           </div>
           <div className="card pad stack tight">
             <h3>Phones and tablets</h3>
-            <p className="small muted">Staff phones, iPads and Android tablets run the POS app in the browser over the internet (Wi-Fi or mobile data). Bills and KOTs still print on the physical printers: phones send print jobs through the cloud to the Print Agent in the restaurant, which drives the printers and cash drawer.</p>
+            <Explain as="p" className="small muted">Staff phones, iPads and Android tablets run the POS app in the browser over the internet (Wi-Fi or mobile data). Bills and KOTs still print on the physical printers: phones send print jobs through the cloud to the Print Agent in the restaurant, which drives the printers and cash drawer.</Explain>
           </div>
         </div>
       </div>

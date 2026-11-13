@@ -29,6 +29,24 @@ export interface CheckinTenant {
   /** Yesterday's figures (Asia/Colombo business date); null when the owner switched sharing off. */
   usage: { date: string; checks: number; covers: number; netSales: number; total: number } | null;
   shareUsage: boolean;
+  /** Since 1.10.0: archived businesses are kept but hidden and closed to the POS. */
+  status?: "active" | "archived";
+  createdAt?: string;
+  /** Since 1.10.0: Polymath Tech's approval of this business (none for businesses opened before approvals). */
+  approval?: { requestId: string; approvedAt: string };
+}
+
+/** A request to open a new business, waiting for Polymath Tech (since 1.10.0; docs/22 §9). */
+export interface BusinessRequest {
+  /** The id the new business will have. */
+  id: string;
+  name: string;
+  /** "demo": a demo or training business filled with sample data. */
+  kind: "business" | "demo";
+  modules: string[];
+  requestedBy: { uid: string; email: string; name?: string };
+  requestedAt: string;
+  note?: string;
 }
 
 export interface CheckinRequest {
@@ -39,6 +57,8 @@ export interface CheckinRequest {
   sentAt: string;
   reason: "scheduled" | "manual";
   tenants: CheckinTenant[];
+  /** Since 1.10.0: businesses waiting for approval. */
+  businessRequests?: BusinessRequest[];
 }
 
 export interface SupplierContact {
@@ -61,7 +81,26 @@ export interface CheckinResponse {
   /** A message for the client's owner and administrators (renewal reminders and the like). */
   notice?: { text: string; level: "info" | "warn" } | null;
   supplier?: SupplierContact;
+  /** Since 1.10.0: an update Polymath Tech has scheduled for this system (null: none). */
+  update?: UpdateNotice | null;
+  /** Since 1.10.0: signed decisions on the business requests the client reported. */
+  businessDecisions?: { token: string }[];
+  /** Since 1.10.0: whether opening a new business needs Polymath Tech's approval. */
+  approvals?: "required" | "off";
   error?: string;
+}
+
+/** An update scheduled from the console, as the client shows it (maintenance notice). */
+export interface UpdateNotice {
+  version: string;
+  /** scheduled: announced; updating: the deploy has started; deployed: finished, waiting for the system to confirm. */
+  state: "scheduled" | "updating" | "deployed";
+  /** Start and end of the maintenance window (ISO). */
+  at?: string;
+  until?: string;
+  /** The release's "For clients" notes, plain text. */
+  highlights?: string[];
+  message?: string;
 }
 
 /** The client's status, signed by the console. */
@@ -78,9 +117,24 @@ export interface StatusDirective {
   issuedAt: string;
 }
 
+/** Polymath Tech's answer to a request to open a business, signed by the console. */
+export interface BusinessDecision {
+  v: 1;
+  type: "business";
+  projectId: string;
+  requestId: string;
+  decision: "approved" | "rejected";
+  /** The person who asked (only they may open the approved business). */
+  ownerUid: string;
+  name: string;
+  message?: string;
+  issuedAt: string;
+}
+
 /** What the client keeps from the console on each business (written only by its server). */
 export interface TenantSupplierLink {
   suspension?: { since: string; graceUntil: string; message?: string };
+  update?: UpdateNotice;
   /** issuedAt of the last directive applied (older ones are ignored). */
   directiveAt?: string;
   notice?: { text: string; level: "info" | "warn" };
@@ -112,7 +166,7 @@ function unb64url(s: string): Uint8Array {
 
 export class DirectiveError extends Error {}
 
-export async function signDirective(payload: StatusDirective, privateKey: string): Promise<string> {
+export async function signDirective(payload: StatusDirective | BusinessDecision, privateKey: string): Promise<string> {
   const s = requireSubtle("Signing directives");
   const key = await s.importKey("pkcs8", unb64url(privateKey) as BufferSource, ALG, false, ["sign"]);
   const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
@@ -120,16 +174,34 @@ export async function signDirective(payload: StatusDirective, privateKey: string
   return `${DIRECTIVE_PREFIX}.${body}.${b64url(sig)}`;
 }
 
-/** Checks the signature and that the directive is for this project. */
-export async function verifyDirective(token: string, publicKey: string, projectId: string): Promise<StatusDirective> {
+async function verifySigned(token: string, publicKey: string, projectId: string, type: string): Promise<{ v: number; type: string; projectId: string }> {
   const parts = token.trim().split(".");
-  if (parts.length !== 3 || parts[0] !== DIRECTIVE_PREFIX) throw new DirectiveError("Not a status directive");
+  if (parts.length !== 3 || parts[0] !== DIRECTIVE_PREFIX) throw new DirectiveError("Not a signed directive");
   const ok = await ecdsaP256Verify(unb64url(publicKey), unb64url(parts[2]!), new TextEncoder().encode(`${DIRECTIVE_PREFIX}.${parts[1]}`));
   if (!ok) throw new DirectiveError("The directive's signature is not valid");
-  const d = JSON.parse(new TextDecoder().decode(unb64url(parts[1]!))) as StatusDirective;
-  if (d.v !== 1 || d.type !== "status") throw new DirectiveError("Unsupported directive");
+  const d = JSON.parse(new TextDecoder().decode(unb64url(parts[1]!))) as { v: number; type: string; projectId: string };
+  if (d.v !== 1 || d.type !== type) throw new DirectiveError("Unsupported directive");
   if (d.projectId !== projectId) throw new DirectiveError(`This directive is for project "${d.projectId}"`);
   return d;
+}
+
+/** Checks the signature and that the directive is for this project. */
+export async function verifyDirective(token: string, publicKey: string, projectId: string): Promise<StatusDirective> {
+  return (await verifySigned(token, publicKey, projectId, "status")) as StatusDirective;
+}
+
+/** Checks a decision on a business request (signature, project). */
+export async function verifyBusinessDecision(token: string, publicKey: string, projectId: string): Promise<BusinessDecision> {
+  const d = (await verifySigned(token, publicKey, projectId, "business")) as BusinessDecision;
+  if (typeof d.requestId !== "string" || !["approved", "rejected"].includes(d.decision) || typeof d.ownerUid !== "string") throw new DirectiveError("Incomplete business decision");
+  return d;
+}
+
+/** Business names compared for duplicates: case, accents, spaces, punctuation, "(demo)", "Pvt Ltd" and the like ignored. */
+export function businessKey(name: string): string {
+  const plain = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\(demo\)/g, " ");
+  const key = (s: string) => s.replace(/[^a-z0-9\u0d80-\u0dff\u0b80-\u0bff]+/g, "");
+  return key(plain.replace(/\b(the|pvt|ltd|private|limited|restaurant|cafe)\b/g, " ")) || key(plain);
 }
 
 /** The public half of a vendor key pair (to show and check which key the console signs with). */

@@ -83,7 +83,7 @@ The back office is divided into **workspaces**. You only see the ones your licen
 | ⋮⋮⋮ (launcher) | Jump to any workspace. |
 | Business name / workspace | Where you are. Choose the business name to return to the launchpad. |
 | Licence badge | Your edition and days left (for trials and demos). |
-| **+ Business** | Owners and administrators: add another business (for example a second restaurant company, or a training copy with the demo restaurant). |
+| **+ Business** | Owners and administrators: add another business (for example a second restaurant company, or a training copy with a demo business). On a system looked after by Polymath Tech it is approved first (14.2). |
 | **Sign out** | Ends your back-office session. |
 
 **Inside a workspace**, the left sidebar lists its pages. **← All modules** at the bottom returns to the launchpad. On a phone the back office works like an app instead: see 2.1.
@@ -98,7 +98,7 @@ On a phone the back office is laid out as an app, so the owner and managers can 
 
 | Part | What it does |
 |---|---|
-| **Today** (first tab) | Today's net sales against the same day last week, the last 14 days, checks and covers, average per cover, the month against its target, what needs you, quick actions (Open POS, Record expense, Snap a bill, Receive goods, Stock count, Reports) and today's best sellers. |
+| **Today** (first tab) | Today's net sales against the same day last week, the last 14 days, checks and covers, average per cover, the month against its target, **Worth knowing** (below), what needs you, quick actions (Open POS, Record expense, Snap a bill, Receive goods, Stock count, Reports) and today's best sellers. |
 | **Tasks** (and the bell at the top) | Everything waiting for someone, with the number on the bell: documents to approve, bill photos to record, deliveries to receive, items below par level, checks still open from an earlier day, the licence or trial ending, a message from your supplier. Tap one to go straight to it. |
 | **Middle tabs** | The two places you use most, by role: Reports and POS for owners and managers; Stock for storekeepers; Finance for accountants. |
 | **More** | Every module you may use, your account, and About and help. |
@@ -108,6 +108,19 @@ On a phone the back office is laid out as an app, so the owner and managers can 
 | **Your initials** (top right) | Your account: who you are, switching business, the licence, signing out. |
 
 Everything else works as on a computer; wide tables scroll sideways with their first column fixed.
+
+**Worth knowing** (on Today, and at the top of the home screen on a computer; owners, administrators and managers) picks out up to four things from the last five weeks' sales, in plain words, each with where to look:
+
+- **Today against a usual day:** *Sales are 21% below a usual Friday: Rs 9,900 by 1 pm, against Rs 12,535 on recent Fridays.*
+- **Yesterday:** *Yesterday was 13% better than a usual Thursday.*
+- **Voids or discounts well above usual** this week (shown first, in red): see who did them in the POS journal.
+- **A dish selling much more or less** this week than last: check its price, quality, stock.
+- **Spend per guest** up or down this week.
+- **Today's busiest hour** still to come, so staff and prep are ready.
+
+It needs no set-up: it reads the figures the POS keeps. Nothing shows when there is nothing worth saying.
+
+**Shorter screens.** Each page shows one line about what it is for; tap **ⓘ** for the full explanation.
 
 **Back-office login roles** (set by the owner or an administrator under People & Security → Back-office logins):
 
@@ -784,10 +797,18 @@ Invite people by email and give them a back-office role (see [section 2](#2-sign
 
 ![New business](img/bo-new-business.jpg)
 
-**+ Business** in the top bar (owners and administrators) creates another business in the same system: give it a name and choose its modules, or load a demo business as a training copy:
+**Account → Add a business** (owners and administrators) creates another business in the same system: give it a name and choose its modules, or open **Try a demo business** for a training copy.
 
-- **Load the Noura Kitchen demo:** a small restaurant set up like Noura Kitchen. It is not VAT or SSCL registered (standard bills), has a restaurant and a takeaway counter, one counter phone printing kitchen tickets and bills to a Bluetooth printer, and an office PC that shows bills on screen for exploring. It comes with a Sri Lankan menu with recipes and costs, stock, suppliers, a month of sales and books (opening balances, supplier bills, payroll, fixed assets, a few items waiting for approval). Sign in to the POS with 1001/1111 (manager), 1002/2222 (cashier) or 1003/3333 (steward).
-- **Load the demo restaurant:** Spice Lagoon, a larger VAT-registered restaurant with network printers and a Print Agent, a full sample menu, staff and a week of sales.
+**Approval by Polymath Tech.** On a system looked after by Polymath Tech, a new business is approved first (it protects you from businesses opened by mistake or by someone who shouldn't). After *Create business* the screen shows **Waiting for approval**; you can leave it and come back. Polymath Tech checks who asked and whether the business already exists, usually within minutes in working hours. When it is **Approved**, press **Open** and the business is set up; if it is **Declined**, their message says why (for example *You already have Noura Kitchen: open it from your business list*).
+
+**Already have it?** If you type the name of a business you already have, the screen says so and offers to open it; tick *It's a different business* only if it really is.
+
+**Opened one by mistake?** The owner opens **Account → Archive this business**. It disappears from the business list and its POS devices stop, but **nothing is deleted**: *Set up a business → Archived businesses → Restore* brings it back with all its data.
+
+The demo businesses:
+
+- **Noura Kitchen:** a small restaurant set up like Noura Kitchen. It is not VAT or SSCL registered (standard bills), has a restaurant and a takeaway counter, one counter phone printing kitchen tickets and bills to a Bluetooth printer, and an office PC that shows bills on screen for exploring. It comes with a Sri Lankan menu with recipes and costs, stock, suppliers, a month of sales and books (opening balances, supplier bills, payroll, fixed assets, a few items waiting for approval). Sign in to the POS with 1001/1111 (manager), 1002/2222 (cashier) or 1003/3333 (steward).
+- **Spice Lagoon:** a larger VAT-registered restaurant with network printers and a Print Agent, a full sample menu, staff and a week of sales.
 
 Each business has its own menu, staff, bills and books. Switch between businesses with the business list in the top bar (shown once you have more than one).
 
@@ -846,8 +867,11 @@ The **About** tile on the launchpad (owners and administrators; also Administrat
 - **What's new:** the release notes of the latest versions, with the one you are on marked.
 - **Licence:** the edition, its status and days left, the limits (workstations, employees, back-office users, outlets) and the modules switched on.
 - **Where it runs:** cloud or local demo, the Firebase project and data region, the business ID, and how many devices are not yet updated. Quote the version and business ID when you contact support.
-- **Polymath Tech: help and support:** Polymath Tech's phone, WhatsApp, email and website, and when the system last checked in with Polymath Tech. The system checks in once a day: that is how licence renewals and upgrades arrive by themselves, with no key to type. **Check now** checks in at once (for example right after Polymath Tech tells you a renewal is ready).
+- **Coming update:** when Polymath Tech has scheduled an update, its version, time and what it brings.
+- **Polymath Tech: help and support:** Polymath Tech's phone, WhatsApp, email and website, and when the system last checked in with Polymath Tech. The system checks in every hour: that is how licence renewals, upgrades and update notices arrive by themselves, with no key to type. **Check now** checks in at once (for example right after Polymath Tech tells you a renewal is ready).
 - **Share daily figures with Polymath Tech** (on unless you switch it off): yesterday's number of bills and covers and the sales totals, so Polymath Tech can support you and plan your subscription. Nothing about customers, menu items or staff is sent.
+
+**Updates.** Polymath Tech installs updates on the server, normally in your maintenance window (late at night). Beforehand, owners, administrators and managers see a notice at the top of the back office and in Tasks, for example *Update 1.10.0 tonight, 23:30–05:00. The system may pause for a few minutes: finish open bills before 23:30.* The POS sign-in screen shows it too on the day. After the update, everyone sees **What's new** once.
 
 **Messages from Polymath Tech.** Owners and administrators may see a line at the top of the back office, for example *Your subscription renews on 1 December*. If Polymath Tech ever has to suspend an account (for example an unpaid subscription), the message says until when the system keeps working; after that the licensed modules stop like an expired licence, **your data is kept**, and everything comes back as soon as Polymath Tech restores the account.
 

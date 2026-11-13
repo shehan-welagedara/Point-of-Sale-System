@@ -7,7 +7,7 @@ import { Icon } from "../pos/mobile/icons";
 import { StatTile } from "../pos/mobile/MobileReports";
 import { DEFAULT_MOBILE_UI, MOBILE_STYLES, greeting, mobileVars } from "../pos/mobile/ui";
 import "../pos/mobile/mobile.css";
-import { Field, PageHead, Seg, Toggle } from "../../components/ui";
+import { Field, PageHead, Seg, Toggle, Explain } from "../../components/ui";
 import { money } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 import { TEMPLATES, applyTemplate, gridColumns, resolveTheme, themeClass, themeStyle } from "../pos/theme";
@@ -367,7 +367,7 @@ export function PosOptionsPage() {
           <div className="row between"><span>Print the bill automatically when a check is paid</span><Toggle on={p.autoPrintBillOnClose} onChange={(v) => setP({ ...p, autoPrintBillOnClose: v })} label="Print bill on close" /></div>
           <p className="tiny muted">When off, staff print it from the payment-successful screen or the receipt window.</p>
           <div className="row between"><span>Print a kitchen ticket (KOT) when an order is sent</span><Toggle on={p.printKotOnSend !== false} onChange={(v) => setP({ ...p, printKotOnSend: v })} label="Print KOT on send" /></div>
-          <p className="tiny muted">Kitchen tickets print on the kitchen or bar printer. With one printer for everything, they print on the bill printer (or on a phone's Bluetooth printer), each cut separately from the bills. Off when the kitchen takes orders another way.</p>
+          <Explain as="p" className="tiny muted">Kitchen tickets print on the kitchen or bar printer. With one printer for everything, they print on the bill printer (or on a phone's Bluetooth printer), each cut separately from the bills. Off when the kitchen takes orders another way.</Explain>
           <Field label="Default outlet for back-office reports">
             <select className="select" value={p.defaultPropertyId} onChange={(e) => setP({ ...p, defaultPropertyId: e.target.value })}>
               {properties.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}

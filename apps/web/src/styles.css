@@ -530,3 +530,31 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .bt-printer { white-space: nowrap; }
 .bt-printer.ok { color: var(--good); }
 .bt-printer.off { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+
+/* Updates from Polymath Tech: maintenance notice and What's new (1.10.0). */
+.update-banner { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.update-banner .btn { margin-left: auto; color: inherit; }
+.whats-new { padding: 22px 24px; gap: 12px; }
+.whats-new ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; line-height: 1.5; overflow-y: auto; }
+
+/* Page descriptions: first sentence, the rest behind ⓘ (1.10.0). */
+.more-info { font: inherit; font-size: 0.95em; line-height: 1; border: 0; background: none; color: var(--brand-text); cursor: pointer; padding: 2px 4px; border-radius: 6px; vertical-align: baseline; }
+.more-info:hover { background: var(--surface-2); }
+.more-info:focus-visible { outline: 2px solid var(--brand-text); outline-offset: 1px; }
+
+/* Insights (1.10.0): a few plain-language observations with where to look. */
+.insights-title { font-size: 15px; font-weight: 700; margin: 0; }
+.insight-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
+.insight { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.insight .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.insight strong { font-size: 14.5px; line-height: 1.35; }
+.insight-ico { flex: none; width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.insight.good .insight-ico { background: var(--good-bg); color: var(--good); }
+.insight.warn .insight-ico { background: var(--warn-bg); color: var(--warn); }
+.insight.bad .insight-ico { background: var(--bad-bg); color: var(--bad); }
+.insight.info .insight-ico { background: var(--info-bg); color: var(--info); }
+.insight-go { align-self: flex-start; font-weight: 600; margin-top: 4px; padding: 2px 0; }
+@media (max-width: 600px) {
+  .insight-list { grid-template-columns: 1fr; }
+  .insight-go { padding: 10px 0 2px; }
+}

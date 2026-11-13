@@ -41,7 +41,7 @@ import {
 import { DEMO_PEOPLE } from "@pos/sample-data";
 import { APP_VERSION } from "../../lib/version";
 import { tablesToWorkbook } from "../../lib/excel";
-import { Drawer, Field, Loading, PageHead, Seg, Stat } from "../../components/ui";
+import { Drawer, Field, Loading, PageHead, Seg, Stat, Explain } from "../../components/ui";
 import { amount, dateTimeColombo, downloadBuffer, money, todayColombo } from "../../lib/format";
 import { useApp, useCollection } from "../../state/app";
 import { TYPE_LABEL, useFiscal, useLedgerAction } from "../finance/shared";
@@ -80,9 +80,9 @@ function IntegrityTab() {
           <button className="btn" disabled={busy} onClick={() => run<AuditSeal | null>({ action: "seal" }, (s) => (s ? `Sealed ${s.count} event(s) as seal #${s.seq}` : "Nothing new to seal"))}>Seal audit trail now</button>
         ) : null}
       </div>
-      <div className="callout small">
+      <Explain>
         The check recomputes, on the server, every hash in the voucher chain, every invoice chain and every sealed batch of the audit trail; checks that each document's ledger lines balance and match the stored account balances; looks for gaps in every number series; and confirms no one approved their own document. Any edit made outside the application – even directly in the Firebase console – breaks a hash and is reported here.
-      </div>
+      </Explain>
       {report ? (
         <>
           <div className={`callout ${report.ok ? "good" : "bad"}`}>
@@ -250,7 +250,7 @@ function JournalTab() {
   }
   return (
     <div className="stack">
-      <div className="callout small">Every operator action on every workstation: sign-ins and failed PINs, checks begun, sent and closed, voids, discounts, price overrides, refunds, no-sales, paid in/out, reprints and manager approvals. Each workstation's events are hash-chained; the integrity check proves none were changed or removed.</div>
+      <Explain>Every operator action on every workstation: sign-ins and failed PINs, checks begun, sent and closed, voids, discounts, price overrides, refunds, no-sales, paid in/out, reprints and manager approvals. Each workstation's events are hash-chained; the integrity check proves none were changed or removed.</Explain>
       <div className="row wrap">
         {ui}
         <Field label="Workstation"><select className="select" value={ws} onChange={(e) => setWs(e.target.value)}><option value="">All</option>{workstations.map((w) => <option key={w.id} value={w.id}>{w.code} {w.name}</option>)}</select></Field>
@@ -303,7 +303,7 @@ function ExceptionsTab() {
   }
   return (
     <div className="stack">
-      <div className="callout small">Loss-prevention view: voids, discounts and drawer openings by employee against their sales. High void or discount rates, frequent no-sales and approvals concentrated on one manager are the classic red flags.</div>
+      <Explain>Loss-prevention view: voids, discounts and drawer openings by employee against their sales. High void or discount rates, frequent no-sales and approvals concentrated on one manager are the classic red flags.</Explain>
       <div className="row wrap">{ui}<button className="btn" style={{ alignSelf: "flex-end" }} onClick={exportXlsx}>Export</button></div>
       <div className="card table-wrap">
         <table className="table">
@@ -369,7 +369,7 @@ function QualityTab() {
   }
   return (
     <div className="stack">
-      <div className="callout small">Validates every master record in every module against its rules (types, ranges, formats) and checks every link between modules: items to categories and modifiers, recipes to stock items (including circular prep recipes), staff to roles, properties and revenue centres, workstations to revenue centres and printers, purchase documents to vendors and stock, tenders and mappings to ledger accounts, duplicate codes, cards and employee numbers. New and edited records are also validated as they are saved.</div>
+      <Explain>Validates every master record in every module against its rules (types, ranges, formats) and checks every link between modules: items to categories and modifiers, recipes to stock items (including circular prep recipes), staff to roles, properties and revenue centres, workstations to revenue centres and printers, purchase documents to vendors and stock, tenders and mappings to ledger accounts, duplicate codes, cards and employee numbers. New and edited records are also validated as they are saved.</Explain>
       <div className="row wrap">
         <button className="btn primary" disabled={busy} onClick={run}>{busy ? "Checking…" : "Run data quality check"}</button>
         {checked ? <span className="small muted">{checked.docs} records checked {dateTimeColombo(checked.at)}</span> : null}
@@ -420,7 +420,7 @@ function NumberingTab() {
   }, [vouchers, invoices]);
   return (
     <div className="stack">
-      <div className="callout small">Accounting documents get their number only when they post, from a counter updated in the same transaction, so drafts and rejected documents never leave holes. POS tax invoices are numbered per workstation and month as the IRD requires. Any missing number is listed here and in the integrity check.</div>
+      <Explain>Accounting documents get their number only when they post, from a counter updated in the same transaction, so drafts and rejected documents never leave holes. POS tax invoices are numbered per workstation and month as the IRD requires. Any missing number is listed here and in the integrity check.</Explain>
       <div className="card table-wrap">
         <table className="table">
           <thead><tr><th>Series</th><th className="num">Issued</th><th>First</th><th>Last</th><th>Missing</th></tr></thead>
@@ -627,12 +627,12 @@ function ExportsTab() {
       <div className="grid cols-2">
         <div className="card card-body stack">
           <h3>Auditor's Excel package</h3>
-          <p className="small muted">Journal entries (every line with document, account, cost centre, party, preparer and time), document register with approvers and hashes, trial balance, the audit trail with before and after values, users and roles, and numbering gaps. Ready for audit data analytics (sampling, Benford, journal-entry testing under ISA 240).</p>
+          <Explain as="p" className="small muted">Journal entries (every line with document, account, cost centre, party, preparer and time), document register with approvers and hashes, trial balance, the audit trail with before and after values, users and roles, and numbering gaps. Ready for audit data analytics (sampling, Benford, journal-entry testing under ISA 240).</Explain>
           <button className="btn primary" disabled={busy} onClick={workbook}>Download audit package</button>
         </div>
         <div className="card card-body stack">
           <h3>SAF-T (OECD Standard Audit File for Tax 2.0)</h3>
-          <p className="small muted">The international XML standard for handing accounting data to tax authorities and auditors: header, chart of accounts with opening and closing balances, customers, suppliers, tax table and every journal transaction.</p>
+          <Explain as="p" className="small muted">The international XML standard for handing accounting data to tax authorities and auditors: header, chart of accounts with opening and closing balances, customers, suppliers, tax table and every journal transaction.</Explain>
           <button className="btn" disabled={busy} onClick={saft}>Download SAF-T XML</button>
         </div>
       </div>

@@ -29,7 +29,8 @@ try {
   const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   await page.goto(`${B}/?mode=local`);
   await shot(page, "bo-new-business");
-  await page.getByText("Load the demo restaurant").click();
+  await page.getByText("Try a demo business").click();
+  await page.getByRole("button", { name: "Load Spice Lagoon" }).click();
   await page.waitForURL(/emc\/home/, { timeout: 90_000 });
   await wait(page, 1000);
 

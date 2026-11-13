@@ -19,6 +19,7 @@ import { type Member, type StaffAuthRequest, type Tenant, DEMO_LICENCE_PUBLIC_KE
 import { type Actor, type LedgerRequest, LedgerError, PermissionError, UNAUDITED, makeAuditEvent, runLedgerRequest, sealPending } from "@pos/ledger";
 import { AdminStore, adminRunner, collectionRef } from "./admin-store.js";
 import { type DeviceRequest, handleDeviceRequest, prunePairings } from "./devices.js";
+import { type BusinessApiRequest, BusinessApiError, handleBusinessApi } from "./business.js";
 import { metadataIdentity, runCheckin } from "./console-link.js";
 
 initializeApp();
@@ -105,7 +106,8 @@ export const posAuth = onCall<{ tenantId: string } & StaffAuthRequest>({ maxInst
   if (!request.auth) throw new HttpsError("unauthenticated", "sign in first");
   const { tenantId, ...req } = request.data;
   if (!tenantId || !req.action) throw new HttpsError("invalid-argument", "tenantId and action are required");
-  const { actor } = await actorFor(tenantId, request.auth.uid, String(request.auth.token.email ?? ""));
+  const { actor, tenant } = await actorFor(tenantId, request.auth.uid, String(request.auth.token.email ?? ""));
+  if (tenant.status === "archived" && req.action !== "migrate") throw new HttpsError("failed-precondition", "this business is archived: the owner can restore it under Account");
   const allowed = req.action === "migrate" ? ["owner", "admin"] : ["owner", "admin", "manager", "terminal"];
   if (!allowed.includes(actor.role)) throw new HttpsError("permission-denied", "this login can't check employee PINs");
   if (req.action === "verify" && (typeof req.staffId !== "string" || typeof req.pin !== "string" || !/^\d{4,8}$/.test(req.pin) || !["signIn", "approve"].includes(req.purpose))) {
@@ -117,9 +119,10 @@ export const posAuth = onCall<{ tenantId: string } & StaffAuthRequest>({ maxInst
 });
 
 /**
- * Daily check-in with the supplier's Polymath Console (console-link.ts): versions, devices, errors,
- * licences and, if shared, yesterday's totals go out; a newer licence key, the signed active/suspended
- * status, a notice and the supplier's contacts come back. Does nothing when CONSOLE_URL isn't set.
+ * Hourly check-in with the supplier's Polymath Console (console-link.ts): versions, devices, errors,
+ * licences, business requests and, if shared, yesterday's totals go out; a newer licence key, the
+ * signed active/suspended status, a notice, a scheduled update, decisions on business requests and the
+ * supplier's contacts come back. Does nothing when CONSOLE_URL isn't set.
  */
 const linkEnv = () => ({
   consoleUrl: process.env.CONSOLE_URL,
@@ -129,7 +132,8 @@ const linkEnv = () => ({
   identity: metadataIdentity,
 });
 
-export const consoleCheckin = onSchedule({ schedule: "every day 03:17", timeZone: "Asia/Colombo" }, async () => {
+// Hourly, so a scheduled update's maintenance notice and a licence arrive well before they matter.
+export const consoleCheckin = onSchedule({ schedule: "every 60 minutes", timeZone: "Asia/Colombo" }, async () => {
   await runCheckin(db, linkEnv(), "scheduled");
 });
 
@@ -141,6 +145,20 @@ export const consoleLinkNow = onCall<{ tenantId: string }>({ maxInstances: 2 }, 
   const { actor } = await actorFor(tenantId, request.auth.uid, String(request.auth.token.email ?? ""));
   if (actor.role !== "owner" && actor.role !== "admin") throw new HttpsError("permission-denied", "only the owner or an administrator can check with the supplier");
   return runCheckin(db, linkEnv(), "manual");
+});
+
+/**
+ * Opening a business on a linked system: the request goes to Polymath Tech for approval first
+ * (business.ts; two-step validation, docs/22 §9). Unlinked systems answer `required: false`.
+ */
+export const businessApi = onCall<BusinessApiRequest>({ maxInstances: 3 }, async (request) => {
+  try {
+    const caller = request.auth ? { uid: request.auth.uid, email: String(request.auth.token.email ?? ""), ...(request.auth.token.name ? { name: String(request.auth.token.name) } : {}) } : null;
+    return await handleBusinessApi(db, linkEnv(), caller, request.data ?? ({} as BusinessApiRequest));
+  } catch (e) {
+    if (e instanceof BusinessApiError) throw new HttpsError(e.code, e.message);
+    throw e;
+  }
 });
 
 /** Phones and tablets: one-time pairing codes instead of shared passwords (see devices.ts). */

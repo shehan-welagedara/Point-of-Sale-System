@@ -53,6 +53,19 @@ service cloud.firestore {
                                          || request.auth.uid in get(deploymentPath()).data.get('creators', [])))
         || (request.resource.data.get('createdFromTenant', '') != '' && hasRole(request.resource.data.createdFromTenant, ['owner', 'admin']));
     }
+    // Linked systems (docs/22 §9): once deployment/link.approvalRequired is set (by the server, when
+    // the Polymath Console asks for approvals), a new business needs an approved request of the person
+    // creating it, under the id they asked for. deployment/link and businessRequests are server-only.
+    function linkPath() { return /databases/$(database)/documents/deployment/link; }
+    function requestPath(t) { return /databases/$(database)/documents/businessRequests/$(t); }
+    function approvedFor(t) {
+      return !exists(linkPath()) || get(linkPath()).data.get('approvalRequired', false) != true
+        || (exists(requestPath(t)) && get(requestPath(t)).data.status == 'approved' && get(requestPath(t)).data.uid == request.auth.uid);
+    }
+    match /businessRequests/{id} {
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isPlatformAdmin());
+      allow write: if false;
+    }
     match /deployment/{docId} {
       allow read: if signedIn();
       allow create: if docId == 'config' && signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.get('openSignup', false) == false;
@@ -97,8 +110,13 @@ service cloud.firestore {
       allow read: if isMember(t) || isPlatformAdmin();
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.id == t
                     && request.resource.data.plan in ['trial', 'demo'] && !('licence' in request.resource.data) && !('supplier' in request.resource.data)
-                    && mayCreateBusiness();
-      allow update: if (isAdmin(t) && licenceUnchanged() && modulesWithinEntitlement()) || isPlatformAdmin();
+                    && request.resource.data.get('status', 'active') == 'active'
+                    && mayCreateBusiness() && (isPlatformAdmin() || approvedFor(t));
+      // Only the owner archives or restores a business (status "archived" ⇄ "active").
+      allow update: if (isAdmin(t) && licenceUnchanged() && modulesWithinEntitlement()
+                        && (request.resource.data.get('status', 'active') == resource.data.get('status', 'active')
+                            || (hasRole(t, ['owner']) && request.resource.data.get('status', 'active') in ['active', 'archived'] && resource.data.get('status', 'active') in ['active', 'archived'])))
+                    || isPlatformAdmin();
       allow delete: if false;
 
       match /members/{uid} {

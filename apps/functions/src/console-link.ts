@@ -6,10 +6,12 @@
  * with the project's own Google identity. Applies what comes back only after checking it:
  * - a newer licence key, verified with the licence public key and bound to this project;
  * - the active/suspended status, verified the same way (older directives are ignored);
- * - a notice for the owner, and the supplier's contact details.
+ * - a notice for the owner, and the supplier's contact details;
+ * - since 1.10.0: an update Polymath Tech has scheduled (the maintenance notice), whether new
+ *   businesses need approval, and signed decisions on the business requests sent (business.ts).
  * If the console can't be reached nothing changes here.
  */
-import { type CheckinRequest, type CheckinResponse, type CheckinTenant, LicenceError, type Tenant, clampModules, colomboDate, decodeLicence, licenceStatus, suspensionInfo, verifyDirective, verifyLicence } from "@pos/core";
+import { type BusinessRequest, type CheckinRequest, type CheckinResponse, type CheckinTenant, LicenceError, type Tenant, type UpdateNotice, clampModules, colomboDate, decodeLicence, licenceStatus, suspensionInfo, verifyBusinessDecision, verifyDirective, verifyLicence } from "@pos/core";
 import { FieldValue, type Firestore, type Query } from "firebase-admin/firestore";
 
 export interface LinkEnv {
@@ -44,9 +46,19 @@ async function count(q: Query): Promise<number> {
   return (await q.count().get()).data().count;
 }
 
+/** Requests to open a business that wait for Polymath Tech (business.ts). */
+async function pendingRequests(db: Firestore): Promise<BusinessRequest[]> {
+  const snap = await db.collection("businessRequests").where("status", "==", "pending").limit(20).get();
+  return snap.docs.map((d) => {
+    const r = d.data() as { id: string; name: string; kind: "business" | "demo"; modules?: string[]; uid: string; email: string; userName?: string; requestedAt: string; note?: string };
+    return { id: r.id, name: r.name, kind: r.kind, modules: r.modules ?? [], requestedBy: { uid: r.uid, email: r.email, ...(r.userName ? { name: r.userName } : {}) }, requestedAt: r.requestedAt, ...(r.note ? { note: r.note } : {}) };
+  });
+}
+
 export async function buildReport(db: Firestore, env: Pick<LinkEnv, "projectId" | "appVersion">, reason: "scheduled" | "manual", now: Date): Promise<CheckinRequest> {
   const tenants: CheckinTenant[] = [];
   const yesterday = colomboDate(now, -1);
+  const approved = new Map((await db.collection("businessRequests").where("status", "==", "approved").limit(200).get()).docs.map((d) => [d.id, String(d.data().decidedAt ?? "")]));
   for (const snap of (await db.collection("tenants").limit(50).get()).docs) {
     const t = snap.data() as Tenant;
     const ref = snap.ref;
@@ -84,9 +96,13 @@ export async function buildReport(db: Firestore, env: Pick<LinkEnv, "projectId" 
       },
       usage,
       shareUsage: share,
+      status: t.status === "archived" ? "archived" : "active",
+      ...(t.createdAt ? { createdAt: t.createdAt } : {}),
+      ...(approved.has(snap.id) ? { approval: { requestId: snap.id, approvedAt: approved.get(snap.id)! } } : {}),
     });
   }
-  return { v: 1, projectId: env.projectId, appVersion: env.appVersion, sentAt: now.toISOString(), reason, tenants };
+  const businessRequests = await pendingRequests(db);
+  return { v: 1, projectId: env.projectId, appVersion: env.appVersion, sentAt: now.toISOString(), reason, tenants, ...(businessRequests.length ? { businessRequests } : {}) };
 }
 
 /** When a licence was issued: recorded since 1.7.0, else read from its own key. */
@@ -100,8 +116,42 @@ async function issuedAt(l: Tenant["licence"], publicKey: string): Promise<string
   }
 }
 
+/** The update notice as stored on each business (only plain, bounded fields). */
+function updateNotice(u: UpdateNotice | null | undefined): UpdateNotice | null {
+  if (!u || typeof u.version !== "string" || !/^\d+\.\d+\.\d+/.test(u.version)) return null;
+  const iso = (v: unknown) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : undefined);
+  const at = iso(u.at);
+  const until = iso(u.until);
+  return {
+    version: u.version.slice(0, 20),
+    state: u.state === "updating" || u.state === "deployed" ? u.state : "scheduled",
+    ...(at ? { at } : {}),
+    ...(until ? { until } : {}),
+    ...(Array.isArray(u.highlights) ? { highlights: u.highlights.slice(0, 8).map((h) => String(h).slice(0, 300)) } : {}),
+    ...(typeof u.message === "string" && u.message.trim() ? { message: u.message.trim().slice(0, 400) } : {}),
+  };
+}
+
 export async function applyResponse(db: Firestore, res: CheckinResponse, env: Pick<LinkEnv, "projectId" | "publicKey">, now: Date): Promise<string[]> {
   const applied: string[] = [];
+  // Whether new businesses need approval (the security rules read deployment/link).
+  if (res.approvals === "required" || res.approvals === "off") {
+    await db.doc("deployment/link").set({ approvalRequired: res.approvals === "required", ...(res.clientId ? { clientId: String(res.clientId).slice(0, 60) } : {}), updatedAt: now.toISOString() }, { merge: true });
+  }
+  // Decisions on business requests, signed by the console: only the one who asked can then open it.
+  for (const d of Array.isArray(res.businessDecisions) ? res.businessDecisions.slice(0, 20) : []) {
+    try {
+      const dec = await verifyBusinessDecision(String(d?.token ?? ""), env.publicKey, env.projectId);
+      const ref = db.doc(`businessRequests/${dec.requestId}`);
+      const cur = (await ref.get()).data() as { status?: string; uid?: string } | undefined;
+      if (!cur || cur.status !== "pending" || cur.uid !== dec.ownerUid) continue;
+      await ref.set({ status: dec.decision, decidedAt: dec.issuedAt, ...(dec.message ? { message: dec.message.slice(0, 400) } : {}), decisionToken: String(d.token) }, { merge: true });
+      applied.push(`business ${dec.requestId}: ${dec.decision}`);
+    } catch (e) {
+      applied.push(`business decision ignored: ${(e as Error).message}`);
+    }
+  }
+  const scheduled = updateNotice(res.update);
   let directive: Awaited<ReturnType<typeof verifyDirective>> | null = null;
   if (res.directive?.token) {
     try {
@@ -143,6 +193,8 @@ export async function applyResponse(db: Firestore, res: CheckinResponse, env: Pi
       }
     }
     supplier.notice = res.notice?.text ? { text: String(res.notice.text).slice(0, 400), level: res.notice.level === "warn" ? "warn" : "info" } : FieldValue.delete();
+    supplier.update = scheduled ?? FieldValue.delete();
+    if (scheduled && t.supplier?.update?.state !== scheduled.state) applied.push(`${snap.id}: update ${scheduled.version} ${scheduled.state}`);
     if (res.supplier?.name) supplier.contact = Object.fromEntries(Object.entries(res.supplier).filter(([, v]) => typeof v === "string" && v).map(([k, v]) => [k, String(v).slice(0, 200)]));
     await snap.ref.set({ ...update, supplier }, { merge: true });
   }

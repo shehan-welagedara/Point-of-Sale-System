@@ -35,13 +35,34 @@ const api = (token: string, f: Fetch) => async (path: string, init: RequestInit 
   return r.status === 204 ? null : r.json();
 };
 
-/** Starts the release workflow. `requestId` comes back in the run's title so the run can be found. */
-export async function dispatchRelease(cfg: GithubConfig, token: string, inputs: { target: string; registry: string; requestId: string }, f: Fetch = fetch): Promise<void> {
+/**
+ * Starts the release workflow. `requestId` comes back in the run's title so the run can be found.
+ * `ref` is the branch or tag whose build is deployed (a tag vX.Y.Z pins that exact version).
+ */
+export async function dispatchRelease(cfg: GithubConfig, token: string, inputs: { target: string; registry: string; requestId: string }, f: Fetch = fetch, ref = cfg.ref): Promise<void> {
   if (!token || token === "none") throw new Error("No GitHub token yet: run `pnpm console:setup --github-token` (Settings → GitHub explains it).");
   await api(token, f)(`/repos/${cfg.owner}/${cfg.repo}/actions/workflows/${encodeURIComponent(cfg.workflow)}/dispatches`, {
     method: "POST",
-    body: JSON.stringify({ ref: cfg.ref, inputs: { target: inputs.target, registry: inputs.registry, request_id: inputs.requestId } }),
+    body: JSON.stringify({ ref, inputs: { target: inputs.target, registry: inputs.registry, request_id: inputs.requestId } }),
   });
+}
+
+/** Whether the repository has the tag (e.g. v1.10.0). */
+export async function tagExists(cfg: GithubConfig, token: string, tag: string, f: Fetch = fetch): Promise<boolean> {
+  try {
+    await api(token, f)(`/repos/${cfg.owner}/${cfg.repo}/git/ref/tags/${encodeURIComponent(tag)}`);
+    return true;
+  } catch (e) {
+    if (/answered 404/.test((e as Error).message)) return false;
+    throw e;
+  }
+}
+
+/** A text file from the repository (e.g. CHANGELOG.md) on the release branch. */
+export async function repoFile(cfg: GithubConfig, token: string, path: string, f: Fetch = fetch): Promise<string> {
+  const body = (await api(token, f)(`/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${encodeURIComponent(cfg.ref)}`)) as { content?: string };
+  if (!body.content) throw new Error(`${path} is empty on ${cfg.ref}`);
+  return Buffer.from(body.content, "base64").toString("utf8");
 }
 
 /** Recent runs of the workflow started by workflow_dispatch. */
